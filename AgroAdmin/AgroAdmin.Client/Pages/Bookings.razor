@@ -37,61 +37,73 @@
                     </tr>
                 </thead>
                 <tbody>
-                @foreach (var booking in allBookings)
-                {
-                    <tr>
-                        <td>
-                            <strong>@booking.GuestName</strong>
-                            <br />
-                            <small class="text-muted">@booking.GuestPhone</small>
-                        </td>
-                        <td>
-                            @booking.ArrivalDate.ToShortDateString() — @booking.DepartureDate.ToShortDateString()
-                        </td>
-                        <td>
-                            <span class="badge bg-secondary">@booking.ReservedUnit.ToFriendlyString()</span>
-                        </td>
-                        <td>
-                            <div class="d-flex flex-column">
-                                @* Общее количество крупно *@
-                                <span class="fw-bold" style="font-size: 1.1rem;">
-                                    Всего гостей: @booking.TotalGuestsCount
-                                </span>
-        
-                                @* Детализация иконками *@
-                                <div class="d-flex gap-2" style="font-size: 0.9rem;">
-                                    <span title="Взрослые">👨 @booking.AdultsCount</span>
-            
-                                    @if (booking.ChildrenCount > 0)
-                                    {
-                                        <span title="Дети (6-17 лет)">👦 @booking.ChildrenCount</span>
-                                    }
-            
-                                    @if (booking.InfantsCount > 0)
-                                    {
-                                        <span title="Младенцы (до 3 лет)">👶 @booking.InfantsCount</span>
-                                    }
+                    @foreach (var booking in allBookings)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@booking.GuestName</strong>
+                                <br />
+                                <small class="text-muted">@booking.GuestPhone</small>
+                            </td>
+                            <td>
+                                @booking.ArrivalDate.ToShortDateString() — @booking.DepartureDate.ToShortDateString()
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">@booking.ReservedUnit.ToFriendlyString()</span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold" style="font-size: 1.1rem;">
+                                        Всего: @booking.TotalGuestsCount
+                                    </span>
 
-                                    @if (booking.HasDog)
-                                    {
-                                        <span title="С собакой" class="ms-1">🐕</span>
-                                    }
+                                    <div class="d-flex gap-2 align-items-center" style="font-size: 0.9rem;">
+                                        <span title="Взрослые">👨 @booking.AdultsCount</span>
+                                        @if (booking.ChildrenCount > 0)
+                                        {
+                                            <span title="Дети">👦 @booking.ChildrenCount</span>
+                                        }
+                                        @if (booking.InfantsCount > 0)
+                                        {
+                                            <span title="Младенцы">👶 @booking.InfantsCount</span>
+                                        }
+                                        @if (booking.HasDog)
+                                        {
+                                            <span title="С собакой" class="ms-1">🐕</span>
+                                        }
+                                    </div>
                                 </div>
-                            </div>
-                        </td>
+                            </td>
 
-                        <td>
-                            @if (booking.IsFirstTimeGuest)
-                            {
-                                <span class="badge bg-warning text-dark">Новый</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-success">Постоянный</span>
-                            }
-                        </td>
-                    </tr>
-                }
+                            <td>
+                                <div class="d-flex flex-column gap-1">
+                                    @* Тип гостя *@
+                                    <div>
+                                        @if (booking.IsFirstTimeGuest)
+                                        {
+                                            <span class="badge bg-warning text-dark">Новый</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Постоянный</span>
+                                        }
+                                    </div>
+
+                                    @* Доп. услуги иконками *@
+                                    <div class="d-flex gap-2" style="font-size: 1.1rem;">
+                                        @if (booking.NeedsSauna)
+                                        {
+                                            <span title="Нужна сауна">♨️</span>
+                                        }
+                                        @if (booking.NeedsBanquetHall)
+                                        {
+                                            <span title="Нужен банкетный зал">🥂</span>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                 </tbody>
             </table>
         </div>

@@ -68,6 +68,21 @@
                 </div>
 
                 <!-- Доп. опции -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="booking.NeedsSauna" class="form-check-input" id="saunaCheck" />
+                            <label class="form-check-label" for="saunaCheck">♨️ Нужна сауна</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="booking.NeedsBanquetHall" class="form-check-input" id="hallCheck" />
+                            <label class="form-check-label" for="hallCheck">🥂 Банкетный зал</label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="mb-3 form-check form-switch">
                     <InputCheckbox @bind-Value="booking.HasDog" class="form-check-input" id="dogCheck" />
                     <label class="form-check-label" for="dogCheck">🐕 С собакой</label>

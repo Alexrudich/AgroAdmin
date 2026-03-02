@@ -22,6 +22,9 @@ public class BookingDto
 
     public ReservedUnits ReservedUnit { get; set; }
 
+    public bool NeedsSauna { get; set; }
+    public bool NeedsBanquetHall { get; set; }
+
     [Range(1, 20, ErrorMessage = "Минимум 1 гость")]
     public int TotalGuestsCount { get; set; } = 1;
 

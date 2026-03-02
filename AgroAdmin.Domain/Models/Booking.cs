@@ -10,6 +10,8 @@ public class Booking
     public DateTime ArrivalDate { get; private set; }
     public DateTime DepartureDate { get; private set; }
     public ReservedUnits ReservedUnit { get; private set; }
+    public bool NeedsSauna { get; private set; }
+    public bool NeedsBanquetHall { get; private set; }
 
     public int TotalGuestsCount { get; private set; }
     public int AdultsCount { get; private set; }
@@ -36,6 +38,8 @@ public class Booking
         int infants,
         bool hasDog,
         bool isFirstTimeGuest,
+        bool needsSauna, 
+        bool needsBanquetHall,
         string? adminNotes = null,
         string? guestPhone = null)
     {
@@ -51,6 +55,8 @@ public class Booking
         ChildrenCount = children;
         InfantsCount = infants;
 
+        NeedsSauna = needsSauna;
+        NeedsBanquetHall = needsBanquetHall;
         HasDog = hasDog;
         IsFirstTimeGuest = isFirstTimeGuest;
         AdminNotes = adminNotes;

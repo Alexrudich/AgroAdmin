@@ -27,6 +27,8 @@ public class BookingsController(AppDbContext context) : ControllerBase
                 dto.ChildrenCount,
                 dto.InfantsCount,
                 dto.HasDog,
+                dto.NeedsSauna,
+                dto.NeedsBanquetHall,
                 dto.IsFirstTimeGuest,
                 dto.AdminNotes,
                 dto.GuestPhone

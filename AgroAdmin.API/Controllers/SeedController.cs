@@ -45,6 +45,12 @@ public class SeedController(AppDbContext context) : ControllerBase
             var children = rand.Next(0, 3);
             var infants = rand.Next(0, 2);
             var total = adults + children + infants;
+            var hasDog = rand.Next(100) < 30;
+            var needsSauna = rand.Next(100) < 70;
+            var needsHall = rand.Next(100) < 10;
+            var isFirstTimeGuest = rand.Next(100) < 40;
+            var adminNotes = rand.Next(100) < 30 ? "Нужен мангал и дрова" : null;
+            var guestPhone = $"+37529{rand.Next(1000000, 9999999)}";
 
             var booking = new Booking(
                 guestName: testGuestName,
@@ -52,13 +58,15 @@ public class SeedController(AppDbContext context) : ControllerBase
                 departure: departure,
                 unit: unit,
                 totalGuests: total,
-                adults: rand.Next(1, 6),
-                children: rand.Next(0, 3),
-                infants: rand.Next(0, 2),
-                hasDog: rand.Next(100) < 15,
-                isFirstTimeGuest: rand.Next(100) < 40,
-                adminNotes: rand.Next(100) < 30 ? "Нужен мангал и дрова" : null,
-                guestPhone: $"+37529{rand.Next(1000000, 9999999)}"
+                adults: adults,
+                children: children,
+                infants: infants,
+                hasDog: hasDog,
+                needsSauna: needsSauna,
+                needsBanquetHall: needsHall,
+                isFirstTimeGuest: isFirstTimeGuest,
+                adminNotes: adminNotes,
+                guestPhone: guestPhone
             );
 
             if (rand.Next(100) < 50)
