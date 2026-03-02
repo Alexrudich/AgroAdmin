@@ -4,4 +4,7 @@
   <Project Path="AgroAdmin.Shared/AgroAdmin.Shared.csproj" />
   <Project Path="AgroAdmin/AgroAdmin.Client/AgroAdmin.Client.csproj" />
   <Project Path="AgroAdmin/AgroAdmin/AgroAdmin.csproj" />
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
 </Solution>
