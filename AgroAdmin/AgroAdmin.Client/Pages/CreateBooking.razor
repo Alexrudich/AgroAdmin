@@ -6,147 +6,197 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
-<div class="container mt-4" style="max-width: 600px;">
-    <div class="card shadow">
-        <div class="card-header bg-primary text-white">
-            <h3 class="mb-0">Новое бронирование</h3>
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <!-- Левая колонка: Форма -->
+        <div class="col-xl-6 col-lg-8">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <h3 class="mb-0">@(Id.HasValue ? "✏️ Редактирование" : "✨ Новое бронирование")</h3>
+                </div>
+                <div class="card-body p-4">
+                    <EditForm Model="@booking" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+
+                        <!-- Основная информация -->
+                        <div class="row mb-3">
+                            <div class="col-md-7">
+                                <label class="form-label fw-bold">Имя гостя</label>
+                                <InputText @bind-Value="booking.GuestName" class="form-control" placeholder="Имя Фамилия" />
+                                <ValidationMessage For="@(() => booking.GuestName)" />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold">Телефон</label>
+                                <InputText @bind-Value="booking.GuestPhone" class="form-control" placeholder="+375..." />
+                            </div>
+                        </div>
+
+                        <!-- Даты и Объект -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">📅 Заезд</label>
+                                <InputDate @bind-Value="booking.ArrivalDate" @onchange="OnDateChanged" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">📅 Выезд</label>
+                                <InputDate @bind-Value="booking.DepartureDate" @onchange="OnDateChanged" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">🏠 Объект</label>
+                                <InputSelect @bind-Value="booking.ReservedUnit" class="form-select">
+                                    @foreach (var unit in Enum.GetValues<ReservedUnits>())
+                                    {
+                                        <option value="@unit">@unit.ToFriendlyString()</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+
+                        <!-- Состав гостей -->
+                        <div class="p-3 bg-light rounded mb-3 border">
+                            <div class="row g-3">
+                                <div class="col-4">
+                                    <label class="form-label small text-muted">👨 Взрослые</label>
+                                    <InputNumber @bind-Value="booking.AdultsCount" @oninput="UpdateTotal" class="form-control" />
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted">👦 Дети</label>
+                                    <InputNumber @bind-Value="booking.ChildrenCount" @oninput="UpdateTotal" class="form-control" />
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted">👶 Младенцы</label>
+                                    <InputNumber @bind-Value="booking.InfantsCount" @oninput="UpdateTotal" class="form-control" />
+                                </div>
+                            </div>
+                            <div class="mt-2 text-primary fw-bold text-end">
+                                Итого гостей: @booking.TotalGuestsCount
+                            </div>
+                        </div>
+
+                        <!-- Опции -->
+                        <div class="row mb-3">
+                            <div class="col-6 col-md-3">
+                                <div class="form-check form-switch">
+                                    <InputCheckbox @bind-Value="booking.NeedsSauna" class="form-check-input" id="sauna" />
+                                    <label class="form-check-label" for="sauna">🌡️ Баня</label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="form-check form-switch">
+                                    <InputCheckbox @bind-Value="booking.NeedsBanquetHall" class="form-check-input" id="hall" />
+                                    <label class="form-check-label" for="hall">🥂 Зал</label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="form-check form-switch">
+                                    <InputCheckbox @bind-Value="booking.HasDog" class="form-check-input" id="dog" />
+                                    <label class="form-check-label" for="dog">🐕 Собака</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Заметки</label>
+                            <InputTextArea @bind-Value="booking.AdminNotes" class="form-control" rows="2" />
+                        </div>
+
+                        <div class="d-flex justify-content-between border-top pt-3">
+                            <button type="button" class="btn btn-outline-secondary px-4" @onclick='() => Nav.NavigateTo("/bookings")'>Отмена</button>
+                            <button type="submit" class="btn btn-success px-5 fw-bold">@(Id.HasValue ? "Обновить" : "Забронировать")</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <EditForm Model="@booking" OnValidSubmit="HandleSubmit">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="text-danger" />
 
-                <!-- Основная информация -->
-                <div class="mb-3">
-                    <label class="form-label">Имя гостя</label>
-                    <InputText @bind-Value="booking.GuestName" class="form-control" placeholder="Иван Иванов" />
+        <!-- Правая колонка: Вспомогательная инфа о занятости -->
+        <div class="col-xl-3 col-lg-4 mt-4 mt-lg-0">
+            <div class="card border-info sticky-top" style="top: 20px;">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0 small">📅 Занятость в эти даты</h5>
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Телефон</label>
-                    <InputText @bind-Value="booking.GuestPhone" class="form-control" placeholder="+375..." />
-                </div>
-
-                <!-- Даты и Объект -->
-                <div class="row mb-3">
-                    <div class="col">
-                        <label class="form-label">Заезд</label>
-                        <InputDate @bind-Value="booking.ArrivalDate" class="form-control" />
-                    </div>
-                    <div class="col">
-                        <label class="form-label">Выезд</label>
-                        <InputDate @bind-Value="booking.DepartureDate" class="form-control" />
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Что бронируем?</label>
-                    <InputSelect @bind-Value="booking.ReservedUnit" class="form-select">
-                        @foreach (var unit in Enum.GetValues<ReservedUnits>())
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        @if (!conflictingBookings.Any(x => x.Id != (Id ?? 0)))
                         {
-                            <option value="@unit">@unit.ToFriendlyString()</option>
+                            <li class="list-group-item text-success py-3 text-center">
+                                <i class="bi bi-check-circle"></i> Полностью свободно
+                            </li>
                         }
-                    </InputSelect>
+                        else
+                        {
+                            @foreach (var conflict in conflictingBookings.Where(x => x.Id != (Id ?? 0)))
+                            {
+                                <li class="list-group-item small border-start border-warning border-4">
+                                    <div class="fw-bold">@conflict.ArrivalDate.ToString("dd.MM") - @conflict.DepartureDate.ToString("dd.MM")</div>
+                                    <div>@(conflict.ReservedUnit == ReservedUnits.PondSide ? "🌊 Пруд" : "🚗 Парк")</div>
+                                    <div class="text-muted">@conflict.GuestName (@conflict.TotalGuestsCount 👨)</div>
+                                </li>
+                            }
+                        }
+                    </ul>
                 </div>
-
-                <!-- Состав гостей (с автопересчетом) -->
-                <div class="row mb-3 bg-light p-3 rounded">
-                    <div class="col-4">
-                        <label class="form-label">👨 Взр.</label>
-                        <InputNumber @bind-Value="booking.AdultsCount" @oninput="UpdateTotal" class="form-control" />
-                    </div>
-                    <div class="col-4">
-                        <label class="form-label">👦 Дети</label>
-                        <InputNumber @bind-Value="booking.ChildrenCount" @oninput="UpdateTotal" class="form-control" />
-                    </div>
-                    <div class="col-4">
-                        <label class="form-label">👶 Младенцы</label>
-                        <InputNumber @bind-Value="booking.InfantsCount" @oninput="UpdateTotal" class="form-control" />
-                    </div>
-                    <div class="mt-2 text-primary fw-bold">
-                        Всего человек: @booking.TotalGuestsCount
-                    </div>
-                </div>
-
-                <!-- Доп. опции -->
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <div class="form-check form-switch">
-                            <InputCheckbox @bind-Value="booking.NeedsSauna" class="form-check-input" id="saunaCheck" />
-                            <label class="form-check-label" for="saunaCheck">♨️ Нужна сауна</label>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-check form-switch">
-                            <InputCheckbox @bind-Value="booking.NeedsBanquetHall" class="form-check-input" id="hallCheck" />
-                            <label class="form-check-label" for="hallCheck">🥂 Банкетный зал</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3 form-check form-switch">
-                    <InputCheckbox @bind-Value="booking.HasDog" class="form-check-input" id="dogCheck" />
-                    <label class="form-check-label" for="dogCheck">🐕 С собакой</label>
-                </div>
-
-                <div class="mb-3 form-check form-switch">
-                    <InputCheckbox @bind-Value="booking.IsFirstTimeGuest" class="form-check-input" id="firstGuestCheck" />
-                    <label class="form-check-label" for="firstGuestCheck">⚠️ Гость впервые</label>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Заметки админа</label>
-                    <InputTextArea @bind-Value="booking.AdminNotes" class="form-control" rows="2" />
-                </div>
-
-                <div class="d-flex justify-content-between mt-4">
-                    <button type="button" class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("/")'>Отмена</button>
-                    <button type="submit" class="btn btn-success px-4">Сохранить</button>
-                </div>
-            </EditForm>
+            </div>
         </div>
     </div>
 </div>
 
 @code {
+    [Parameter] public int? Id { get; set; }
     private BookingDto booking = new();
-    [Parameter] public int? Id { get; set; } // Параметр из URL
+    private List<BookingDto> allBookings = new();
+    private List<BookingDto> conflictingBookings = new();
 
     protected override async Task OnInitializedAsync()
     {
+        // 1. Загружаем все данные для проверки конфликтов
+        allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings") ?? new();
+
+        // 2. Если перешли из календаря (start в URL)
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("start", out var startVal))
+        {
+            booking.ArrivalDate = DateTime.Parse(startVal!);
+            booking.DepartureDate = booking.ArrivalDate.AddDays(1);
+        }
+
+        // 3. Если режим редактирования
         if (Id.HasValue)
         {
-            // Если мы в режиме редактирования — загружаем данные
             var result = await Http.GetFromJsonAsync<BookingDto>($"api/bookings/{Id}");
             if (result != null) booking = result;
         }
+
+        UpdateConflicts();
+    }
+
+    private void OnDateChanged() => UpdateConflicts();
+
+    private void UpdateConflicts()
+    {
+        conflictingBookings = allBookings.Where(b =>
+            booking.ArrivalDate < b.DepartureDate &&
+            booking.DepartureDate > b.ArrivalDate).ToList();
+        StateHasChanged();
+    }
+
+    private void UpdateTotal()
+    {
+        Task.Delay(5).ContinueWith(_ =>
+        {
+            booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
+            InvokeAsync(() => { UpdateConflicts(); StateHasChanged(); });
+        });
     }
 
     private async Task HandleSubmit()
     {
         booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
-        
-        HttpResponseMessage response;
 
-        if (Id.HasValue)
-            // Обновляем старую
-            response = await Http.PutAsJsonAsync($"api/bookings/{Id}", booking);
-        else
-            // Создаем новую
-            response = await Http.PostAsJsonAsync("api/bookings", booking);
+        var response = Id.HasValue
+            ? await Http.PutAsJsonAsync($"api/bookings/{Id}", booking)
+            : await Http.PostAsJsonAsync("api/bookings", booking);
 
         if (response.IsSuccessStatusCode) Nav.NavigateTo("/bookings");
     }
-
-    // Автопересчет общего количества
-    private void UpdateTotal()
-    {
-        // Небольшая задержка, чтобы Blazor успел обновить биндинги
-        Task.Delay(1).ContinueWith(_ =>
-        {
-            booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
-            InvokeAsync(StateHasChanged); // Безопасное обновление UI из фонового потока
-        });
-    }
-}
 }
