@@ -11,10 +11,11 @@ public class Booking
     public DateTime DepartureDate { get; private set; }
     public ReservedUnits ReservedUnit { get; private set; }
 
-    // Состав гостей
+    public int TotalGuestsCount { get; private set; }
     public int AdultsCount { get; private set; }
     public int ChildrenCount { get; private set; }
     public int InfantsCount { get; private set; } // До 6 лет
+    public bool HasDog { get; private set; }
     public bool IsFirstTimeGuest { get; private set; }
 
     public string? AdminNotes { get; private set; } // Твои заметки
@@ -29,9 +30,11 @@ public class Booking
         DateTime arrival,
         DateTime departure,
         ReservedUnits unit,
+        int totalGuests,
         int adults,
         int children,
         int infants,
+        bool hasDog,
         bool isFirstTimeGuest,
         string? adminNotes = null,
         string? guestPhone = null)
@@ -42,9 +45,13 @@ public class Booking
         ArrivalDate = arrival.Date;
         DepartureDate = departure.Date;
         ReservedUnit = unit;
+
+        TotalGuestsCount = totalGuests;
         AdultsCount = adults;
         ChildrenCount = children;
         InfantsCount = infants;
+
+        HasDog = hasDog;
         IsFirstTimeGuest = isFirstTimeGuest;
         AdminNotes = adminNotes;
         GuestPhone = guestPhone;

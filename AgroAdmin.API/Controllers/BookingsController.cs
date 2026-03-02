@@ -22,9 +22,11 @@ public class BookingsController(AppDbContext context) : ControllerBase
                 dto.ArrivalDate,
                 dto.DepartureDate,
                 dto.ReservedUnit,
+                dto.TotalGuestsCount,
                 dto.AdultsCount,
                 dto.ChildrenCount,
                 dto.InfantsCount,
+                dto.HasDog,
                 dto.IsFirstTimeGuest,
                 dto.AdminNotes,
                 dto.GuestPhone
@@ -37,7 +39,7 @@ public class BookingsController(AppDbContext context) : ControllerBase
         }
         catch (Exception ex)
         {
-            // На собеседовании скажешь: "Тут я бы пробросил DomainException в Middleware"
+            // TODO Тут пробросить DomainException в Middleware"
             return BadRequest(ex.Message);
         }
     }

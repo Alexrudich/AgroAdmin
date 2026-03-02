@@ -29,7 +29,7 @@ public class SeedController(AppDbContext context) : ControllerBase
 
         var bookings = new List<Booking>();
 
-        for (int i = 0; i < needed; i++)
+        for (var i = 0; i < needed; i++)
         {
             var firstName = firstNames[rand.Next(firstNames.Length)];
             var lastName = lastNames[rand.Next(lastNames.Length)];
@@ -41,20 +41,26 @@ public class SeedController(AppDbContext context) : ControllerBase
             var unit = (ReservedUnits)rand.Next(0, 3);
             var testGuestName = $"[TEST] {firstName} {lastName}";
 
+            var adults = rand.Next(1, 4);
+            var children = rand.Next(0, 3);
+            var infants = rand.Next(0, 2);
+            var total = adults + children + infants;
+
             var booking = new Booking(
                 guestName: testGuestName,
                 arrival: arrival,
                 departure: departure,
                 unit: unit,
+                totalGuests: total,
                 adults: rand.Next(1, 6),
                 children: rand.Next(0, 3),
                 infants: rand.Next(0, 2),
-                isFirstTimeGuest: rand.Next(100) < 40, // 40% новых клиентов
+                hasDog: rand.Next(100) < 15,
+                isFirstTimeGuest: rand.Next(100) < 40,
                 adminNotes: rand.Next(100) < 30 ? "Нужен мангал и дрова" : null,
                 guestPhone: $"+37529{rand.Next(1000000, 9999999)}"
             );
 
-            // Рандомно добавляем сауну к некоторым броням
             if (rand.Next(100) < 50)
             {
                 booking.AddSaunaOrder(arrival.AddHours(18), 3);
