@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AgroAdmin/AgroAdmin.Client/AgroAdmin.Client.csproj" />
+  <Project Path="AgroAdmin/AgroAdmin/AgroAdmin.csproj" />
+</Solution>
