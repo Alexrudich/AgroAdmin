@@ -42,8 +42,8 @@ public class Booking
         if (departure <= arrival) throw new Exception("Check-out must be after check-in");
 
         GuestName = guestName;
-        ArrivalDate = arrival.Date;
-        DepartureDate = departure.Date;
+        ArrivalDate = DateTime.SpecifyKind(arrival, DateTimeKind.Utc);
+        DepartureDate = DateTime.SpecifyKind(departure, DateTimeKind.Utc);
         ReservedUnit = unit;
 
         TotalGuestsCount = totalGuests;

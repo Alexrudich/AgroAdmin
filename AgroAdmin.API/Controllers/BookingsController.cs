@@ -10,13 +10,13 @@ namespace AgroAdmin.API.Controllers;
 [Route("api/[controller]")]
 public class BookingsController(AppDbContext context) : ControllerBase
 {
-    // Создание бронирования
     [HttpPost]
     public async Task<ActionResult<int>> Create([FromBody] BookingDto dto)
     {
         try
         {
-            // Используем DDD-конструктор: инкапсуляция и валидация срабатывают здесь
+            // Вызываем наш "умный" конструктор из Domain
+            // Он сам проверит даты и количество гостей
             var booking = new Booking(
                 dto.GuestName,
                 dto.ArrivalDate,
@@ -39,10 +39,12 @@ public class BookingsController(AppDbContext context) : ControllerBase
         }
         catch (Exception ex)
         {
-            // TODO Тут пробросить DomainException в Middleware"
+            // Если даты неверны или гостей 0, Domain выбросит Exception,
+            // и мы вернем его текст клиенту как ошибку 400
             return BadRequest(ex.Message);
         }
     }
+
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Booking>>> GetAll()

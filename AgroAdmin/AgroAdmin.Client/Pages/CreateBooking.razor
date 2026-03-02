@@ -1,0 +1,127 @@
+﻿@page "/bookings/create"
+@using AgroAdmin.Shared.Dto
+@using AgroAdmin.Shared.Enums
+@using AgroAdmin.Shared.Extensions
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div class="container mt-4" style="max-width: 600px;">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0">Новое бронирование</h3>
+        </div>
+        <div class="card-body">
+            <EditForm Model="@booking" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                <!-- Основная информация -->
+                <div class="mb-3">
+                    <label class="form-label">Имя гостя</label>
+                    <InputText @bind-Value="booking.GuestName" class="form-control" placeholder="Иван Иванов" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Телефон</label>
+                    <InputText @bind-Value="booking.GuestPhone" class="form-control" placeholder="+375..." />
+                </div>
+
+                <!-- Даты и Объект -->
+                <div class="row mb-3">
+                    <div class="col">
+                        <label class="form-label">Заезд</label>
+                        <InputDate @bind-Value="booking.ArrivalDate" class="form-control" />
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Выезд</label>
+                        <InputDate @bind-Value="booking.DepartureDate" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Что бронируем?</label>
+                    <InputSelect @bind-Value="booking.ReservedUnit" class="form-select">
+                        @foreach (var unit in Enum.GetValues<ReservedUnits>())
+                        {
+                            <option value="@unit">@unit.ToFriendlyString()</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <!-- Состав гостей (с автопересчетом) -->
+                <div class="row mb-3 bg-light p-3 rounded">
+                    <div class="col-4">
+                        <label class="form-label">👨 Взр.</label>
+                        <InputNumber @bind-Value="booking.AdultsCount" @oninput="UpdateTotal" class="form-control" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">👦 Дети</label>
+                        <InputNumber @bind-Value="booking.ChildrenCount" @oninput="UpdateTotal" class="form-control" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">👶 Младенцы</label>
+                        <InputNumber @bind-Value="booking.InfantsCount" @oninput="UpdateTotal" class="form-control" />
+                    </div>
+                    <div class="mt-2 text-primary fw-bold">
+                        Всего человек: @booking.TotalGuestsCount
+                    </div>
+                </div>
+
+                <!-- Доп. опции -->
+                <div class="mb-3 form-check form-switch">
+                    <InputCheckbox @bind-Value="booking.HasDog" class="form-check-input" id="dogCheck" />
+                    <label class="form-check-label" for="dogCheck">🐕 С собакой</label>
+                </div>
+
+                <div class="mb-3 form-check form-switch">
+                    <InputCheckbox @bind-Value="booking.IsFirstTimeGuest" class="form-check-input" id="firstGuestCheck" />
+                    <label class="form-check-label" for="firstGuestCheck">⚠️ Гость впервые</label>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Заметки админа</label>
+                    <InputTextArea @bind-Value="booking.AdminNotes" class="form-control" rows="2" />
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("/")'>Отмена</button>
+                    <button type="submit" class="btn btn-success px-4">Сохранить</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private BookingDto booking = new();
+
+    // Автопересчет общего количества
+    private void UpdateTotal()
+    {
+        // Небольшая задержка, чтобы Blazor успел обновить биндинги
+        Task.Delay(1).ContinueWith(_ =>
+        {
+            booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
+            InvokeAsync(StateHasChanged); // Безопасное обновление UI из фонового потока
+        });
+    }
+
+    private async Task HandleSubmit()
+    {
+        // Финальный пересчет перед отправкой (синхронно)
+        booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
+
+        var response = await Http.PostAsJsonAsync("api/bookings", booking);
+        if (response.IsSuccessStatusCode)
+        {
+            // Возвращаемся именно на список броней
+            Nav.NavigateTo("/bookings");
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Ошибка: {error}");
+        }
+    }
+}
+}

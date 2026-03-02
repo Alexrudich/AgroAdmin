@@ -2,13 +2,17 @@
 @using AgroAdmin.Shared.Dto
 @using AgroAdmin.Shared.Extensions
 @inject HttpClient Http
+@inject NavigationManager Nav
 
 <PageTitle>Бронирования</PageTitle>
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Учёт заездов</h1>
-        <button class="btn btn-primary">Новая бронь</button>
+        @* 2. Привязываем переход по адресу формы *@
+        <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/bookings/create")'>
+            Новая бронь
+        </button>
     </div>
 
     @if (allBookings == null)
