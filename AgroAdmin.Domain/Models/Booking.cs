@@ -15,6 +15,7 @@ public class Booking
     public int AdultsCount { get; private set; }
     public int ChildrenCount { get; private set; }
     public int InfantsCount { get; private set; } // До 6 лет
+    public bool IsFirstTimeGuest { get; private set; }
 
     public string? AdminNotes { get; private set; } // Твои заметки
 
@@ -31,6 +32,7 @@ public class Booking
         int adults,
         int children,
         int infants,
+        bool isFirstTimeGuest,
         string? adminNotes = null,
         string? guestPhone = null)
     {
@@ -43,6 +45,7 @@ public class Booking
         AdultsCount = adults;
         ChildrenCount = children;
         InfantsCount = infants;
+        IsFirstTimeGuest = isFirstTimeGuest;
         AdminNotes = adminNotes;
         GuestPhone = guestPhone;
     }

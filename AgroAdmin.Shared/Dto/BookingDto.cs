@@ -13,5 +13,6 @@ public class BookingDto
     public int AdultsCount { get; set; } = 1;
     public int ChildrenCount { get; set; }
     public int InfantsCount { get; set; }
+    public bool IsFirstTimeGuest { get; set; } = true;
     public string? AdminNotes { get; set; }
 }
