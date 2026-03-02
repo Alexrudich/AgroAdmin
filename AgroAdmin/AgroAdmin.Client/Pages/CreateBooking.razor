@@ -1,4 +1,5 @@
 ﻿@page "/bookings/create"
+@page "/bookings/edit/{Id:int}"
 @using AgroAdmin.Shared.Dto
 @using AgroAdmin.Shared.Enums
 @using AgroAdmin.Shared.Extensions
@@ -109,6 +110,33 @@
 
 @code {
     private BookingDto booking = new();
+    [Parameter] public int? Id { get; set; } // Параметр из URL
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id.HasValue)
+        {
+            // Если мы в режиме редактирования — загружаем данные
+            var result = await Http.GetFromJsonAsync<BookingDto>($"api/bookings/{Id}");
+            if (result != null) booking = result;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
+        
+        HttpResponseMessage response;
+
+        if (Id.HasValue)
+            // Обновляем старую
+            response = await Http.PutAsJsonAsync($"api/bookings/{Id}", booking);
+        else
+            // Создаем новую
+            response = await Http.PostAsJsonAsync("api/bookings", booking);
+
+        if (response.IsSuccessStatusCode) Nav.NavigateTo("/bookings");
+    }
 
     // Автопересчет общего количества
     private void UpdateTotal()
@@ -119,24 +147,6 @@
             booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
             InvokeAsync(StateHasChanged); // Безопасное обновление UI из фонового потока
         });
-    }
-
-    private async Task HandleSubmit()
-    {
-        // Финальный пересчет перед отправкой (синхронно)
-        booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
-
-        var response = await Http.PostAsJsonAsync("api/bookings", booking);
-        if (response.IsSuccessStatusCode)
-        {
-            // Возвращаемся именно на список броней
-            Nav.NavigateTo("/bookings");
-        }
-        else
-        {
-            var error = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"Ошибка: {error}");
-        }
     }
 }
 }

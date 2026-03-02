@@ -3,6 +3,7 @@
 @using AgroAdmin.Shared.Extensions
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Бронирования</PageTitle>
 
@@ -102,6 +103,20 @@
                                     </div>
                                 </div>
                             </td>
+                            <td class="text-end">
+                                <div class="btn-group">
+                                    <button class="btn btn-outline-primary btn-sm" 
+                                            @onclick='() => Nav.NavigateTo($"/bookings/edit/{booking.Id}")'
+                                            title="Редактировать">
+                                        ✏️
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" 
+                                            @onclick="() => HandleDelete(booking.Id, booking.GuestName)">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </td>
+
                         </tr>
                     }
                 </tbody>
@@ -125,5 +140,28 @@
             Console.WriteLine($"Ошибка загрузки: {ex.Message}");
             allBookings = new();
         }
+    }
+    private async Task HandleDelete(int id, string name)
+    {
+        // Вызываем стандартное окно браузера через внедренный JS
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Вы уверены, что хотите удалить бронь гостя {name}?");
+
+        if (confirmed)
+        {
+            var response = await Http.DeleteAsync($"api/bookings/{id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Удаляем локально из списка, чтобы страница обновилась мгновенно
+                allBookings?.RemoveAll(b => b.Id == id);
+                StateHasChanged();
+            }
+            else
+            {
+                // Если на бэкенде что-то пошло не так
+                await JS.InvokeVoidAsync("alert", "Ошибка при удалении на сервере.");
+            }
+        }
+    }
     }
 }

@@ -58,4 +58,68 @@ public class BookingsController(AppDbContext context) : ControllerBase
 
         return Ok(bookings);
     }
+
+    [HttpGet("{id}")]
+    public async Task<ActionResult<BookingDto>> GetById(int id)
+    {
+        var b = await context.Bookings.FindAsync(id);
+        if (b == null) return NotFound();
+
+        // Мапим Domain -> DTO
+        var dto = new BookingDto
+        {
+            Id = b.Id,
+            GuestName = b.GuestName,
+            GuestPhone = b.GuestPhone,
+            ArrivalDate = b.ArrivalDate,
+            DepartureDate = b.DepartureDate,
+            ReservedUnit = b.ReservedUnit,
+            TotalGuestsCount = b.TotalGuestsCount,
+            AdultsCount = b.AdultsCount,
+            ChildrenCount = b.ChildrenCount,
+            InfantsCount = b.InfantsCount,
+            HasDog = b.HasDog,
+            NeedsSauna = b.NeedsSauna,
+            NeedsBanquetHall = b.NeedsBanquetHall,
+            IsFirstTimeGuest = b.IsFirstTimeGuest,
+            AdminNotes = b.AdminNotes
+        };
+
+        return Ok(dto);
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, BookingDto dto)
+    {
+        var booking = await context.Bookings.FindAsync(id);
+        if (booking == null) return NotFound();
+
+        // Обновляем поля через Reflection или вручную (для надежности)
+        // Не забываем про SpecifyKind для Postgres!
+        var arrivalUtc = DateTime.SpecifyKind(dto.ArrivalDate, DateTimeKind.Utc);
+        var departureUtc = DateTime.SpecifyKind(dto.DepartureDate, DateTimeKind.Utc);
+
+        // Используем маппинг (в идеале тут AutoMapper, но пока так)
+        context.Entry(booking).CurrentValues.SetValues(dto);
+
+        // Принудительно ставим UTC для дат
+        context.Entry(booking).Property(b => b.ArrivalDate).CurrentValue = arrivalUtc;
+        context.Entry(booking).Property(b => b.DepartureDate).CurrentValue = departureUtc;
+
+        await context.SaveChangesAsync();
+        return NoContent();
+    }
+
+
+
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        var affected = await context.Bookings
+            .Where(b => b.Id == id)
+            .ExecuteDeleteAsync();
+
+        return affected > 0 ? NoContent() : NotFound();
+    }
+
 }
