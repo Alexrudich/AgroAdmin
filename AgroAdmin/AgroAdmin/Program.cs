@@ -1,5 +1,6 @@
-using AgroAdmin.Client.Pages;
 using AgroAdmin.Components;
+using AgroAdmin.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace AgroAdmin
 {
@@ -12,6 +13,9 @@ namespace AgroAdmin
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveWebAssemblyComponents();
+
+            builder.Services.AddDbContext<AppDbContext>(options =>
+                options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             var app = builder.Build();
 
