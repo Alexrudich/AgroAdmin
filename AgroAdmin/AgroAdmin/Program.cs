@@ -1,5 +1,6 @@
 ﻿using AgroAdmin.Components;
 using AgroAdmin.Infrastructure.Persistence;
+using AgroAdmin.API.Controllers;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgroAdmin
@@ -13,12 +14,18 @@ namespace AgroAdmin
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveWebAssemblyComponents();
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddApplicationPart(typeof(BookingsController).Assembly);
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            builder.Services.AddScoped(sp => new HttpClient
+            {
+                BaseAddress = new Uri(builder.Configuration["FrontendUrl"] ?? "http://localhost:8080")
+            });
 
             var app = builder.Build();
 
@@ -42,11 +49,7 @@ namespace AgroAdmin
             {
                 app.UseWebAssemblyDebugging();
                 app.UseSwagger();
-                app.UseSwaggerUI(c =>
-                {
-                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "AgroAdmin API V1");
-                    c.RoutePrefix = string.Empty;
-                });
+                app.UseSwaggerUI();
             }
             else
             {

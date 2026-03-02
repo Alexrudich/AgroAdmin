@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="AgroAdmin.API/AgroAdmin.API.csproj" />
   <Project Path="AgroAdmin.Domain/AgroAdmin.Domain.csproj" />
   <Project Path="AgroAdmin.Infrastructure/AgroAdmin.Infrastructure.csproj" />
   <Project Path="AgroAdmin.Shared/AgroAdmin.Shared.csproj" />

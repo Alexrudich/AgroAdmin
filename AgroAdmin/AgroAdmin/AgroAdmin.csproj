@@ -12,6 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\AgroAdmin.API\AgroAdmin.API.csproj" />
     <ProjectReference Include="..\..\AgroAdmin.Domain\AgroAdmin.Domain.csproj" />
     <ProjectReference Include="..\..\AgroAdmin.Infrastructure\AgroAdmin.Infrastructure.csproj" />
     <ProjectReference Include="..\..\AgroAdmin.Shared\AgroAdmin.Shared.csproj" />
