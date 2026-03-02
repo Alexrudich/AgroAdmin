@@ -1,6 +1,6 @@
 ﻿@page "/bookings"
 @using AgroAdmin.Shared.Dto
-@using AgroAdmin.Shared.Enums
+@using AgroAdmin.Shared.Extensions
 @inject HttpClient Http
 
 <PageTitle>Бронирования</PageTitle>
@@ -44,7 +44,7 @@
                                 @booking.ArrivalDate.ToShortDateString() — @booking.DepartureDate.ToShortDateString()
                             </td>
                             <td>
-                                <span class="badge bg-secondary">@booking.ReservedUnit</span>
+                                <span class="badge bg-secondary">@booking.ReservedUnit.ToFriendlyString()</span>
                             </td>
                             <td>
                                 👤 @booking.AdultsCount | 🧒 @booking.ChildrenCount | 👶 @booking.InfantsCount
