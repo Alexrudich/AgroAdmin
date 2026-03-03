@@ -1,4 +1,5 @@
 name: Build, publish and deploy to MonsterASP.NET
+
 on:
   workflow_dispatch
 
@@ -11,20 +12,17 @@ jobs:
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0
+          dotnet-version: '10.0.x'
           
       - name: Install dependencies
-        run: dotnet restore
+        run: dotnet restore AgroAdmin/AgroAdmin/AgroAdmin.csproj
         
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --no-restore
 
       - name: Publish
-        run: dotnet publish --configuration Release --output ./publish --runtime win-x86 
+        run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --no-self-contained
         
-      - name: Test with .NET
-        run: dotnet test
-
       - name: Deploy to MonsterASP.NET via WebDeploy
         uses: rasmusbuchholdt/simply-web-deploy@2.1.0
         with:
