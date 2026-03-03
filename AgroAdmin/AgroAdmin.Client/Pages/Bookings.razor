@@ -10,7 +10,6 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Учёт заездов</h1>
-        @* 2. Привязываем переход по адресу формы *@
         <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/bookings/create")'>
             Новая бронь
         </button>
@@ -42,9 +41,9 @@
                     {
                         <tr>
                             <td>
-                                <strong>@booking.GuestName</strong>
+                                <strong>@booking.Guest?.FullName</strong>
                                 <br />
-                                <small class="text-muted">@booking.GuestPhone</small>
+                                <small class="text-muted">@booking.Guest?.Phone</small>
                             </td>
                             <td>
                                 @booking.ArrivalDate.ToShortDateString() — @booking.DepartureDate.ToShortDateString()
@@ -105,18 +104,17 @@
                             </td>
                             <td class="text-end">
                                 <div class="btn-group">
-                                    <button class="btn btn-outline-primary btn-sm" 
+                                    <button class="btn btn-outline-primary btn-sm"
                                             @onclick='() => Nav.NavigateTo($"/bookings/edit/{booking.Id}")'
                                             title="Редактировать">
                                         ✏️
                                     </button>
-                                    <button class="btn btn-outline-danger btn-sm" 
-                                            @onclick="() => HandleDelete(booking.Id, booking.GuestName)">
+                                    <button class="btn btn-outline-danger btn-sm"
+                                            @onclick="() => HandleDelete(booking.Id, booking.Guest?.FullName ?? booking.Id.ToString())">
                                         🗑️
                                     </button>
                                 </div>
                             </td>
-
                         </tr>
                     }
                 </tbody>
@@ -132,7 +130,6 @@
     {
         try
         {
-            // Стучимся в наш контроллер из AgroAdmin.API
             allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings");
         }
         catch (Exception ex)
@@ -141,9 +138,9 @@
             allBookings = new();
         }
     }
+
     private async Task HandleDelete(int id, string name)
     {
-        // Вызываем стандартное окно браузера через внедренный JS
         bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Вы уверены, что хотите удалить бронь гостя {name}?");
 
         if (confirmed)
@@ -152,16 +149,13 @@
 
             if (response.IsSuccessStatusCode)
             {
-                // Удаляем локально из списка, чтобы страница обновилась мгновенно
                 allBookings?.RemoveAll(b => b.Id == id);
                 StateHasChanged();
             }
             else
             {
-                // Если на бэкенде что-то пошло не так
                 await JS.InvokeVoidAsync("alert", "Ошибка при удалении на сервере.");
             }
         }
-    }
     }
 }

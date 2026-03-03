@@ -47,7 +47,7 @@
                                      @onclick="() => OnCellClick(date, whole)"
                                      @onmouseover="() => hoveredBookingId = whole.Id"
                                      @onmouseout="() => hoveredBookingId = null">
-                                    <span class="unit-text">🏠 Весь дом: @whole.GuestName</span>
+                                    <span class="unit-text">🏠 Весь дом: @whole.Guest.FullName</span>
                                 </div>
                             }
                             else
@@ -58,7 +58,7 @@
                                      @onmouseover="() => { if (pond != null) hoveredBookingId = pond.Id; }"
                                      @onmouseout="() => hoveredBookingId = null">
                                     <span class="unit-text">
-                                        @(pond != null ? $"🌊 {pond.GuestName}" : "🌊 Пруд (свободно)")
+                                        @(pond != null ? $"🌊 {pond.Guest.FullName}" : "🌊 Пруд (свободно)")
                                     </span>
                                 </div>
 
@@ -68,7 +68,7 @@
                                      @onmouseover="() => { if (park != null) hoveredBookingId = park.Id; }"
                                      @onmouseout="() => hoveredBookingId = null">
                                     <span class="unit-text">
-                                        @(park != null ? $"🚗 {park.GuestName}" : "🚗 Парк (свободно)")
+                                        @(park != null ? $"🚗 {park.Guest.FullName}" : "🚗 Парк (свободно)")
                                     </span>
                                 </div>
                             }
