@@ -27,6 +27,16 @@ namespace AgroAdmin
                 BaseAddress = new Uri(builder.Configuration["FrontendUrl"] ?? "http://localhost:8080")
             });
 
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", policy =>
+                {
+                    policy.AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader();
+                });
+            });
+
             var app = builder.Build();
 
             using (var scope = app.Services.CreateScope())
@@ -58,13 +68,24 @@ namespace AgroAdmin
                 app.UseHsts();
             }
 
+            app.UseCors("AllowAll");
             app.MapControllers();
             app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
             app.UseHttpsRedirection();
+            app.Use(async (context, next) =>
+            {
+                if (context.Request.Path == "/")
+                {
+                    context.Response.Redirect("/calendar");
+                    return;
+                }
+                await next();
+            });
 
             app.UseAntiforgery();
 
             app.MapStaticAssets();
+
             app.MapRazorComponents<App>()
                 .AddInteractiveWebAssemblyRenderMode()
                 .AddAdditionalAssemblies(typeof(Client._Imports).Assembly);

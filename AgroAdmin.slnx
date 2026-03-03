@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
   <Project Path="AgroAdmin.API/AgroAdmin.API.csproj" />
   <Project Path="AgroAdmin.Domain/AgroAdmin.Domain.csproj" />
   <Project Path="AgroAdmin.Infrastructure/AgroAdmin.Infrastructure.csproj" />

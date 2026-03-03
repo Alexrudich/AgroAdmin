@@ -1,8 +1,5 @@
 ﻿using AgroAdmin.Domain.Models;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace AgroAdmin.Infrastructure.Persistence
 {
@@ -12,6 +9,7 @@ namespace AgroAdmin.Infrastructure.Persistence
 
         public DbSet<Booking> Bookings => Set<Booking>();
         public DbSet<SaunaOrder> SaunaOrders => Set<SaunaOrder>();
+        public DbSet<Guest> Guests => Set<Guest>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -31,12 +29,36 @@ namespace AgroAdmin.Infrastructure.Persistence
                     .WithOne()
                     .HasForeignKey(s => s.BookingId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                // Настройка нового поля FeedbackComment (если нужно)
+                builder.Property(b => b.FeedbackComment)
+                    .HasMaxLength(1000);
             });
 
             // Конфигурация для SaunaOrder
             modelBuilder.Entity<SaunaOrder>(builder =>
             {
                 builder.HasKey(s => s.Id);
+            });
+
+            // Конфигурация для Guest
+            modelBuilder.Entity<Guest>(builder =>
+            {
+                builder.HasKey(g => g.Id);
+
+                builder.Property(g => g.FullName)
+                    .IsRequired()
+                    .HasMaxLength(200);
+
+                builder.Property(g => g.Phone)
+                    .IsRequired()
+                    .HasMaxLength(20);
+
+                builder.Property(g => g.Comment)
+                    .HasMaxLength(500);
+
+                builder.Property(g => g.CreatedAt)
+                    .IsRequired();
             });
         }
     }

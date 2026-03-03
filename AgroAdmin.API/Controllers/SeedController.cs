@@ -13,60 +13,103 @@ public class SeedController(AppDbContext context) : ControllerBase
     [HttpPost("generate")]
     public async Task<ActionResult<string>> GenerateTestData()
     {
-        var allExisting = await context.Bookings.ToListAsync();
+        // Проверяем, есть ли уже тестовые данные
+        var existingTestGuests = await context.Guests
+            .Where(g => g.FullName.StartsWith("[TEST]"))
+            .CountAsync();
+
+        var existingTestBookings = await context.Bookings
+            .Include(b => b.Guest)
+            .Where(b => b.Guest != null && b.Guest.FullName.StartsWith("[TEST]"))
+            .CountAsync();
+
+        if (existingTestGuests > 0 || existingTestBookings > 0)
+        {
+            return Ok($"Тестовые данные уже существуют: {existingTestGuests} гостей, {existingTestBookings} броней. " +
+                      "Если нужно создать заново, сначала вызовите clear.");
+        }
+
         var rand = new Random();
+        var newGuests = new List<Guest>();
         var newBookings = new List<Booking>();
 
-        var firstNames = new[] { "Александр", "Дмитрий", "Елена", "Ольга", "Сергей", "Татьяна", "Андрей", "Мария" };
+        var firstNames = new[] { "Александр", "Дмитрий", "Игнат", "Себастьян", "Сергей", "Лаврентий", "Андрей", "Мария" };
         var lastNames = new[] { "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Павлов", "Соколов" };
 
-        var attempts = 0;
-        // Уменьшим плотность, чтобы оставить "пустые даты" для наглядности
+        // Создаем гостей
+        for (int i = 0; i < 15; i++)
+        {
+            var firstName = firstNames[rand.Next(firstNames.Length)];
+            var lastName = lastNames[rand.Next(lastNames.Length)];
+            var fullName = $"[TEST] {firstName} {lastName}";
+            var phone = $"+37529{rand.Next(1000000, 9999999)}";
+            var comment = rand.Next(100) < 20 ? "Постоянный клиент" : null;
+
+            newGuests.Add(new Guest(fullName, phone, comment));
+        }
+
+        await context.Guests.AddRangeAsync(newGuests);
+        await context.SaveChangesAsync();
+
+        // Создаем брони
+        var guests = await context.Guests.Where(g => g.FullName.StartsWith("[TEST]")).ToListAsync();
+        var allExisting = await context.Bookings
+            .Include(b => b.Guest)
+            .Where(b => b.Guest == null || !b.Guest.FullName.StartsWith("[TEST]")) // Исключаем тестовые из проверки
+            .ToListAsync();
+
         var targetNewRecords = 25;
+        var attempts = 0;
 
         while (newBookings.Count < targetNewRecords && attempts < 1000)
         {
             attempts++;
-
-            // 1. Генерируем случайный период (на 60 дней вперед для разряженности)
+            var guest = guests[rand.Next(guests.Count)];
             var arrival = DateTime.UtcNow.AddDays(rand.Next(-5, 50)).Date;
             var departure = arrival.AddDays(rand.Next(1, 4));
             var unit = (ReservedUnits)rand.Next(0, 3);
 
-            // 2. Генерируем состав гостей СРАЗУ, чтобы проверить вместимость
             var adults = rand.Next(1, 6);
             var children = rand.Next(0, 4);
             var infants = rand.Next(0, 2);
             var total = adults + children + infants;
 
-            // ПРАВИЛО 4: Валидация вместимости
             int maxCapacity = (unit == ReservedUnits.WholeHouse) ? 14 : 7;
-            if (total > maxCapacity) continue; // Пропускаем, если людей слишком много для этого типа
+            if (total > maxCapacity) continue;
 
-            // 3. ХИРУРГИЧЕСКАЯ ПРОВЕРКА НА ПЕРЕСЕЧЕНИЕ (Overlap)
-            var combined = allExisting.Concat(newBookings).ToList();
+            // Объединяем существующие и новые брони для проверки
+            var allToCheck = allExisting.Concat(newBookings).ToList();
 
-            bool isBusy = combined.Any(b =>
-                // Проверка пересечения дат
-                (arrival < b.DepartureDate && departure > b.ArrivalDate) &&
-                // Логика конфликта объектов (Правила 1-2)
-                (
-                    b.ReservedUnit == unit ||
-                    b.ReservedUnit == ReservedUnits.WholeHouse ||
-                    unit == ReservedUnits.WholeHouse
-                )
-            );
+            // ПРАВИЛЬНАЯ ПРОВЕРКА КОНФЛИКТОВ
+            bool isBusy;
+
+            if (unit == ReservedUnits.WholeHouse)
+            {
+                // Весь дом - нельзя если ЛЮБАЯ бронь есть на эти даты
+                isBusy = allToCheck.Any(b =>
+                    arrival < b.DepartureDate && departure > b.ArrivalDate
+                );
+            }
+            else
+            {
+                // Половинка - нельзя если:
+                // 1. Есть бронь на эту же половинку
+                // 2. Есть бронь на весь дом
+                isBusy = allToCheck.Any(b =>
+                    arrival < b.DepartureDate && departure > b.ArrivalDate &&
+                    (
+                        b.ReservedUnit == unit ||                    // та же половинка
+                        b.ReservedUnit == ReservedUnits.WholeHouse    // или весь дом
+                    )
+                );
+            }
 
             if (!isBusy)
             {
-                // Шанс 20% пропустить итерацию, чтобы создать "дыры" в календаре
                 if (rand.Next(100) < 20) continue;
 
-                var firstName = firstNames[rand.Next(firstNames.Length)];
-                var lastName = lastNames[rand.Next(lastNames.Length)];
-
                 var booking = new Booking(
-                    guestName: $"[TEST] {firstName} {lastName}",
+                    guestId: guest.Id,
                     arrival: arrival,
                     departure: departure,
                     unit: unit,
@@ -77,9 +120,9 @@ public class SeedController(AppDbContext context) : ControllerBase
                     hasDog: rand.Next(100) < 20,
                     needsSauna: rand.Next(100) < 50,
                     needsBanquetHall: rand.Next(100) < 15,
-                    isFirstTimeGuest: rand.Next(100) < 40,
+                    isFirstTimeGuest: false,
                     adminNotes: rand.Next(100) < 20 ? "Нужны доп. полотенца" : null,
-                    guestPhone: $"+37529{rand.Next(1000000, 9999999)}"
+                    feedbackComment: rand.Next(100) < 30 ? "Всё отлично, приедем ещё!" : null
                 );
 
                 newBookings.Add(booking);
@@ -89,19 +132,29 @@ public class SeedController(AppDbContext context) : ControllerBase
         context.Bookings.AddRange(newBookings);
         await context.SaveChangesAsync();
 
-        return Ok($"Добавлено {newBookings.Count} броней. Пустые дни оставлены для отладки UI.");
+        return Ok($"Создано {guests.Count} тестовых гостей и добавлено {newBookings.Count} броней.");
     }
-
-
 
     [HttpDelete("clear")]
     public async Task<ActionResult<string>> ClearTestData()
     {
-        var count = await context.Bookings
-            .Where(b => b.GuestName.StartsWith("[TEST]"))
+        // Находим всех тестовых гостей (у которых имя начинается с [TEST])
+        var testGuests = await context.Guests
+            .Where(g => g.FullName.StartsWith("[TEST]"))
+            .ToListAsync();
+
+        var testGuestIds = testGuests.Select(g => g.Id).ToList();
+
+        // Удаляем их брони
+        var deletedBookings = await context.Bookings
+            .Where(b => testGuestIds.Contains(b.GuestId))
             .ExecuteDeleteAsync();
 
-        return Ok($"Удалено {count} тестовых бронирований. Реальные люди (без префикса) не пострадали.");
-    }
+        // Удаляем самих гостей
+        var deletedGuests = await context.Guests
+            .Where(g => g.FullName.StartsWith("[TEST]"))
+            .ExecuteDeleteAsync();
 
+        return Ok($"Удалено {deletedGuests} тестовых гостей и {deletedBookings} их бронирований.");
+    }
 }

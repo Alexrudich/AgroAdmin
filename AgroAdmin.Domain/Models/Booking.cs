@@ -5,22 +5,21 @@ namespace AgroAdmin.Domain.Models;
 public class Booking
 {
     public int Id { get; private set; }
-    public string GuestName { get; private set; } = string.Empty;
-    public string? GuestPhone { get; private set; } // Добавили телефон
+    public int GuestId { get; private set; }
+    public virtual Guest Guest { get; private set; } = null!;  // Навигационное свойство
     public DateTime ArrivalDate { get; private set; }
     public DateTime DepartureDate { get; private set; }
     public ReservedUnits ReservedUnit { get; private set; }
     public bool NeedsSauna { get; private set; }
     public bool NeedsBanquetHall { get; private set; }
-
     public int TotalGuestsCount { get; private set; }
     public int AdultsCount { get; private set; }
     public int ChildrenCount { get; private set; }
-    public int InfantsCount { get; private set; } // До 6 лет
+    public int InfantsCount { get; private set; }
     public bool HasDog { get; private set; }
     public bool IsFirstTimeGuest { get; private set; }
-
-    public string? AdminNotes { get; private set; } // Твои заметки
+    public string? AdminNotes { get; private set; }
+    public string? FeedbackComment { get; private set; }
 
     private readonly List<SaunaOrder> _saunaOrders = new();
     public virtual IReadOnlyCollection<SaunaOrder> SaunaOrders => _saunaOrders.AsReadOnly();
@@ -28,7 +27,7 @@ public class Booking
     private Booking() { }
 
     public Booking(
-        string guestName,
+        int guestId,
         DateTime arrival,
         DateTime departure,
         ReservedUnits unit,
@@ -38,14 +37,14 @@ public class Booking
         int infants,
         bool hasDog,
         bool isFirstTimeGuest,
-        bool needsSauna, 
+        bool needsSauna,
         bool needsBanquetHall,
         string? adminNotes = null,
-        string? guestPhone = null)
+        string? feedbackComment = null)
     {
         if (departure <= arrival) throw new Exception("Check-out must be after check-in");
 
-        GuestName = guestName;
+        GuestId = guestId;  // Сохраняем ID гостя
         ArrivalDate = DateTime.SpecifyKind(arrival, DateTimeKind.Utc);
         DepartureDate = DateTime.SpecifyKind(departure, DateTimeKind.Utc);
         ReservedUnit = unit;
@@ -60,7 +59,12 @@ public class Booking
         HasDog = hasDog;
         IsFirstTimeGuest = isFirstTimeGuest;
         AdminNotes = adminNotes;
-        GuestPhone = guestPhone;
+        FeedbackComment = feedbackComment;
+    }
+
+    public void AddFeedback(string feedback)
+    {
+        FeedbackComment = feedback;
     }
 
     public void AddSaunaOrder(DateTime scheduledTime, int durationHours)
