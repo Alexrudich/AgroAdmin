@@ -1,5 +1,7 @@
-using AgroAdmin.Client.Pages;
-using AgroAdmin.Components;
+﻿using AgroAdmin.Components;
+using AgroAdmin.Infrastructure.Persistence;
+using AgroAdmin.API.Controllers;
+using Microsoft.EntityFrameworkCore;
 
 namespace AgroAdmin
 {
@@ -12,13 +14,42 @@ namespace AgroAdmin
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveWebAssemblyComponents();
+            builder.Services.AddControllers()
+                .AddApplicationPart(typeof(BookingsController).Assembly);
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
+
+            builder.Services.AddDbContext<AppDbContext>(options =>
+                options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            builder.Services.AddScoped(sp => new HttpClient
+            {
+                BaseAddress = new Uri(builder.Configuration["FrontendUrl"] ?? "http://localhost:8080")
+            });
 
             var app = builder.Build();
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var services = scope.ServiceProvider;
+                try
+                {
+                    var context = services.GetRequiredService<AppDbContext>();
+                    context.Database.Migrate();
+                }
+                catch (Exception ex)
+                {
+                    var logger = services.GetRequiredService<ILogger<Program>>();
+                    logger.LogError(ex, "Migration applying error");
+                }
+            }
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseWebAssemblyDebugging();
+                app.UseSwagger();
+                app.UseSwaggerUI();
             }
             else
             {
@@ -27,6 +58,7 @@ namespace AgroAdmin
                 app.UseHsts();
             }
 
+            app.MapControllers();
             app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
             app.UseHttpsRedirection();
 

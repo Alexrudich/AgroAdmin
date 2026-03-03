@@ -1,0 +1,48 @@
+﻿version: '3.8'
+
+services:
+  agroadmin:
+    image: ${DOCKER_REGISTRY-}agroadmin
+    build:
+      context: .
+      dockerfile: AgroAdmin/AgroAdmin/Dockerfile 
+    container_name: agro_admin_api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      # Обрати внимание: Host=db (имя сервиса ниже)
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=agro_db;Username=postgres;Password=postgres
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - agro_network
+
+  db:
+    image: postgres:15-alpine
+    container_name: agro_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agro_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - agro_postgres_data:/var/lib/postgresql/data
+    networks:
+      - agro_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agro_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  agro_network:
+    driver: bridge
+
+volumes:
+  agro_postgres_data:

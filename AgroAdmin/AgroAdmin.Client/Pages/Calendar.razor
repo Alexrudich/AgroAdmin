@@ -1,0 +1,166 @@
+﻿@page "/calendar"
+@using AgroAdmin.Shared.Dto
+@using AgroAdmin.Shared.Enums
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Шахматка усадьбы</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">📅 Занятость: @DateTime.Now.ToString("MMMM yyyy")</h2>
+    </div>
+
+    @if (allBookings == null)
+    {
+        <div class="d-flex justify-content-center p-5">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    }
+    else
+    {
+        <div class="calendar-grid shadow-sm">
+            @* Шапка дней недели *@
+            <div class="calendar-header">
+                @foreach (var day in GetSortedDaysOfWeek())
+                {
+                    <div class="header-cell">@GetRussianDayName(day)</div>
+                }
+            </div>
+
+            @* Сетка календаря *@
+            <div class="calendar-body">
+                @foreach (var date in calendarDays)
+                {
+                    var dayBookings = GetBookingsForDate(date);
+                    var pond = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.PondSide);
+                    var park = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.ParkingSide);
+                    var whole = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.WholeHouse);
+
+                    <div class="calendar-cell @(date.Date == DateTime.Today ? "is-today" : "") @(date.Month != DateTime.Now.Month ? "other-month" : "")">
+                        <div class="date-number">@date.Day</div>
+
+                        <div class="units-container">
+                            @if (whole != null)
+                            {
+                                <div class="unit-zone full-house @(hoveredBookingId == whole.Id ? "highlight-booking" : "")"
+                                     @onclick="() => OnCellClick(date, whole)"
+                                     @onmouseover="() => hoveredBookingId = whole.Id"
+                                     @onmouseout="() => hoveredBookingId = null">
+                                    <span class="unit-text">🏠 Весь дом: @whole.GuestName</span>
+                                </div>
+                            }
+                            else
+                            {
+                                @* Половинка Пруд *@
+                                <div class="unit-zone @(pond != null ? "busy" : "free") @(pond != null && hoveredBookingId == pond.Id ? "highlight-booking" : "")"
+                                     @onclick="() => OnCellClick(date, pond, ReservedUnits.PondSide)"
+                                     @onmouseover="() => { if (pond != null) hoveredBookingId = pond.Id; }"
+                                     @onmouseout="() => hoveredBookingId = null">
+                                    <span class="unit-text">
+                                        @(pond != null ? $"🌊 {pond.GuestName}" : "🌊 Пруд (свободно)")
+                                    </span>
+                                </div>
+
+                                @* Половинка Парк *@
+                                <div class="unit-zone @(park != null ? "busy" : "free") @(park != null && hoveredBookingId == park.Id ? "highlight-booking" : "")"
+                                     @onclick="() => OnCellClick(date, park, ReservedUnits.ParkingSide)"
+                                     @onmouseover="() => { if (park != null) hoveredBookingId = park.Id; }"
+                                     @onmouseout="() => hoveredBookingId = null">
+                                    <span class="unit-text">
+                                        @(park != null ? $"🚗 {park.GuestName}" : "🚗 Парк (свободно)")
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    }
+</div>
+
+@code {
+    private List<BookingDto>? allBookings;
+    private List<DateTime> calendarDays = new();
+    private int? hoveredBookingId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Сначала загружаем данные из API
+            allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings");
+
+            // Генерируем сетку только после получения данных
+            // Используем текущий месяц и год
+            var now = DateTime.Now;
+            GenerateCalendar(now.Year, now.Month);
+        }
+        catch
+        {
+            allBookings = new();
+            GenerateCalendar(DateTime.Now.Year, DateTime.Now.Month);
+        }
+    }
+
+    private void GenerateCalendar(int year, int month)
+    {
+        // Очистка списка перед заполнением исключает дублирование ячеек в сетке
+        calendarDays.Clear();
+
+        var firstDayOfMonth = new DateTime(year, month, 1);
+
+        // Вычисляем смещение: сколько дней от предыдущего месяца нужно показать
+        // (вс = 0, пн = 1...). Нам нужно, чтобы Пн был первым.
+        int offset = ((int)firstDayOfMonth.DayOfWeek == 0) ? 6 : (int)firstDayOfMonth.DayOfWeek - 1;
+
+        // Заполняем сетку ровно на 42 дня (6 недель по 7 дней)
+        for (int i = 0; i < 42; i++)
+        {
+            calendarDays.Add(firstDayOfMonth.AddDays(i - offset));
+        }
+    }
+
+    private void OnCellClick(DateTime date, BookingDto? b, ReservedUnits? unit = null)
+    {
+        // Если кликнули по существующей брони — идем в редактирование
+        if (b != null)
+        {
+            Nav.NavigateTo($"/bookings/edit/{b.Id}");
+        }
+        else
+        {
+            // Если кликнули по пустой ячейке — идем в создание
+            // Передаем дату начала и конкретный Unit, чтобы форма сразу знала, что валидировать
+            var unitVal = (int)(unit ?? ReservedUnits.WholeHouse);
+            Nav.NavigateTo($"/bookings/create?start={date:yyyy-MM-dd}&unit={unitVal}");
+        }
+    }
+
+    // Возвращает список броней, попадающих на конкретную дату
+    // Логика d.Date < b.DepartureDate важна: день выезда считается свободным для новых заездов
+    private List<BookingDto> GetBookingsForDate(DateTime d) =>
+        allBookings?
+            .Where(b => d.Date >= b.ArrivalDate.Date && d.Date < b.DepartureDate.Date)
+            .ToList() ?? new();
+
+    // Сортировка шапки календаря так, чтобы неделя начиналась с Пн
+    private IEnumerable<DayOfWeek> GetSortedDaysOfWeek() =>
+        Enum.GetValues<DayOfWeek>()
+            .Cast<DayOfWeek>()
+            .OrderBy(d => (int)d == 0 ? 7 : (int)d);
+
+    private string GetRussianDayName(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Monday => "Пн",
+        DayOfWeek.Tuesday => "Вт",
+        DayOfWeek.Wednesday => "Ср",
+        DayOfWeek.Thursday => "Чт",
+        DayOfWeek.Friday => "Пт",
+        DayOfWeek.Saturday => "Сб",
+        DayOfWeek.Sunday => "Вс",
+        _ => ""
+    };
+}
