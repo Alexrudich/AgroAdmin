@@ -1,0 +1,260 @@
+﻿.guest-search-container {
+    position: relative;
+    width: 100%;
+}
+
+.guest-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    margin-top: 4px;
+}
+
+/* Красивые карточки гостей */
+.guest-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+    .guest-item:last-child {
+        border-bottom: none;
+    }
+
+    .guest-item:hover {
+        background: #e3f2fd;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .guest-item.selected {
+        background: #e3f2fd;
+        border-left: 4px solid #007bff;
+    }
+
+.guest-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #007bff;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.guest-info {
+    flex: 1;
+    min-width: 0; /* Для переноса текста */
+}
+
+.guest-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.guest-phone {
+    font-size: 14px;
+    color: #666;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+    .guest-phone::before {
+        content: "📞";
+        font-size: 12px;
+        opacity: 0.7;
+    }
+
+.guest-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+
+.stay-badge {
+    background: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #495057;
+    white-space: nowrap;
+}
+
+    .stay-badge i {
+        margin-right: 4px;
+    }
+
+/* Для мобильных */
+@media (max-width: 768px) {
+    .guest-dropdown {
+        max-height: 250px;
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+    }
+
+    .guest-item {
+        padding: 16px;
+    }
+
+    .guest-avatar {
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+    }
+
+    .guest-name {
+        font-size: 16px;
+    }
+
+    .guest-phone {
+        font-size: 14px;
+    }
+}
+
+/* Индикатор загрузки */
+.searching-indicator {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+}
+
+.selected-guest {
+    border-left: 4px solid #28a745;
+    background: #f0f9f0;
+    border-radius: 8px;
+    padding: 12px !important;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.selected-guest-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #28a745;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.selected-guest-info {
+    flex: 1;
+}
+
+.selected-guest-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #155724;
+}
+
+.selected-guest-phone {
+    font-size: 14px;
+    color: #6c757d;
+}
+
+.selected-guest-badge {
+    background: #d4edda;
+    color: #155724;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 12px;
+    display: inline-block;
+    margin-left: 8px;
+}
+
+.calendar-day {
+    width: 55px;
+    height: 65px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: help;
+    transition: all 0.2s;
+    background: white;
+}
+
+    .calendar-day.free {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+    }
+
+    .calendar-day.partial-busy {
+        background-color: #fff3cd;
+        border-color: #ffeeba;
+    }
+
+    .calendar-day.full-busy {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+    }
+
+    .calendar-day.selected {
+        border: 2px solid #007bff;
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0,123,255,0.3);
+        z-index: 2;
+    }
+
+    .calendar-day.weekend {
+        background: linear-gradient(45deg, rgba(0,0,0,0.02) 25%, transparent 25%);
+    }
+
+.day-number {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.day-month {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.busy-indicator {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 12px;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+}

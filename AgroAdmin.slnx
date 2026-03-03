@@ -1,4 +1,14 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="AgroAdmin.API/AgroAdmin.API.csproj" />
+  <Project Path="AgroAdmin.Domain/AgroAdmin.Domain.csproj" />
+  <Project Path="AgroAdmin.Infrastructure/AgroAdmin.Infrastructure.csproj" />
+  <Project Path="AgroAdmin.Shared/AgroAdmin.Shared.csproj" />
   <Project Path="AgroAdmin/AgroAdmin.Client/AgroAdmin.Client.csproj" />
   <Project Path="AgroAdmin/AgroAdmin/AgroAdmin.csproj" />
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
 </Solution>

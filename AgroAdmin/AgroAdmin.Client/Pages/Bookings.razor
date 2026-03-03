@@ -1,0 +1,161 @@
+﻿@page "/bookings"
+@using AgroAdmin.Shared.Dto
+@using AgroAdmin.Shared.Extensions
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Бронирования</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Учёт заездов</h1>
+        <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/bookings/create")'>
+            Новая бронь
+        </button>
+    </div>
+
+    @if (allBookings == null)
+    {
+        <div class="spinner-border" role="status"></div>
+    }
+    else if (!allBookings.Any())
+    {
+        <div class="alert alert-info">Пока нет ни одного бронирования.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Гость</th>
+                        <th>Даты</th>
+                        <th>Объект</th>
+                        <th>Люди</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var booking in allBookings)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@booking.Guest?.FullName</strong>
+                                <br />
+                                <small class="text-muted">@booking.Guest?.Phone</small>
+                            </td>
+                            <td>
+                                @booking.ArrivalDate.ToShortDateString() — @booking.DepartureDate.ToShortDateString()
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">@booking.ReservedUnit.ToFriendlyString()</span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold" style="font-size: 1.1rem;">
+                                        Всего: @booking.TotalGuestsCount
+                                    </span>
+
+                                    <div class="d-flex gap-2 align-items-center" style="font-size: 0.9rem;">
+                                        <span title="Взрослые">👨 @booking.AdultsCount</span>
+                                        @if (booking.ChildrenCount > 0)
+                                        {
+                                            <span title="Дети">👦 @booking.ChildrenCount</span>
+                                        }
+                                        @if (booking.InfantsCount > 0)
+                                        {
+                                            <span title="Младенцы">👶 @booking.InfantsCount</span>
+                                        }
+                                        @if (booking.HasDog)
+                                        {
+                                            <span title="С собакой" class="ms-1">🐕</span>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="d-flex flex-column gap-1">
+                                    @* Тип гостя *@
+                                    <div>
+                                        @if (booking.IsFirstTimeGuest)
+                                        {
+                                            <span class="badge bg-warning text-dark">Новый</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Постоянный</span>
+                                        }
+                                    </div>
+
+                                    @* Доп. услуги иконками *@
+                                    <div class="d-flex gap-2" style="font-size: 1.1rem;">
+                                        @if (booking.NeedsSauna)
+                                        {
+                                            <span title="Нужна сауна">♨️</span>
+                                        }
+                                        @if (booking.NeedsBanquetHall)
+                                        {
+                                            <span title="Нужен банкетный зал">🥂</span>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group">
+                                    <button class="btn btn-outline-primary btn-sm"
+                                            @onclick='() => Nav.NavigateTo($"/bookings/edit/{booking.Id}")'
+                                            title="Редактировать">
+                                        ✏️
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm"
+                                            @onclick="() => HandleDelete(booking.Id, booking.Guest?.FullName ?? booking.Id.ToString())">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<BookingDto>? allBookings;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ошибка загрузки: {ex.Message}");
+            allBookings = new();
+        }
+    }
+
+    private async Task HandleDelete(int id, string name)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Вы уверены, что хотите удалить бронь гостя {name}?");
+
+        if (confirmed)
+        {
+            var response = await Http.DeleteAsync($"api/bookings/{id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                allBookings?.RemoveAll(b => b.Id == id);
+                StateHasChanged();
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "Ошибка при удалении на сервере.");
+            }
+        }
+    }
+}
