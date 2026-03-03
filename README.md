@@ -6,7 +6,7 @@
 # В Package Manager Console (Visual Studio)
 # Default project: AgroAdmin.Infrastructure
 
-Add-Migration НазваниеМиграции -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin -OutputDir Persistence/Migrations
+Add-Migration InitialMigration -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin -OutputDir Persistence/Migrations
 ```
 
 ## Применение миграции к БД

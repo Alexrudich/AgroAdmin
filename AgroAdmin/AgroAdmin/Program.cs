@@ -20,7 +20,7 @@ namespace AgroAdmin
             builder.Services.AddSwaggerGen();
 
             builder.Services.AddDbContext<AppDbContext>(options =>
-                options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             builder.Services.AddScoped(sp => new HttpClient
             {
@@ -55,7 +55,7 @@ namespace AgroAdmin
             }
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
             {
                 app.UseWebAssemblyDebugging();
                 app.UseSwagger();
