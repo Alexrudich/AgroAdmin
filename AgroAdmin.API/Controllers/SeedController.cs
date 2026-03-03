@@ -10,84 +10,9 @@ namespace AgroAdmin.API.Controllers;
 [ApiController]
 public class SeedController(AppDbContext context) : ControllerBase
 {
-    private const int TargetBookingCount = 50;
-
-    //[HttpPost("generate")]
-    //public async Task<ActionResult<string>> GenerateTestData()
-    //{
-    //    var existingCount = await context.Bookings.CountAsync();
-    //    if (existingCount >= TargetBookingCount)
-    //    {
-    //        return BadRequest($"В базе уже {existingCount} записей. Генерация отменена.");
-    //    }
-
-    //    var needed = TargetBookingCount - existingCount;
-    //    var rand = new Random();
-
-    //    var firstNames = new[] { "Александр", "Дмитрий", "Елена", "Ольга", "Сергей", "Татьяна", "Андрей", "Мария" };
-    //    var lastNames = new[] { "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Павлов", "Соколов" };
-
-    //    var bookings = new List<Booking>();
-
-    //    for (var i = 0; i < needed; i++)
-    //    {
-    //        var firstName = firstNames[rand.Next(firstNames.Length)];
-    //        var lastName = lastNames[rand.Next(lastNames.Length)];
-
-    //        // Генерируем даты: заезд в ближайшие 30 дней
-    //        var arrival = DateTime.UtcNow.AddDays(rand.Next(-10, 30)).Date;
-    //        var departure = arrival.AddDays(rand.Next(1, 5));
-
-    //        var unit = (ReservedUnits)rand.Next(0, 3);
-    //        var testGuestName = $"[TEST] {firstName} {lastName}";
-
-    //        var adults = rand.Next(1, 4);
-    //        var children = rand.Next(0, 3);
-    //        var infants = rand.Next(0, 2);
-    //        var total = adults + children + infants;
-    //        var hasDog = rand.Next(100) < 30;
-    //        var needsSauna = rand.Next(100) < 70;
-    //        var needsHall = rand.Next(100) < 10;
-    //        var isFirstTimeGuest = rand.Next(100) < 40;
-    //        var adminNotes = rand.Next(100) < 30 ? "Нужен мангал и дрова" : null;
-    //        var guestPhone = $"+37529{rand.Next(1000000, 9999999)}";
-
-    //        var booking = new Booking(
-    //            guestName: testGuestName,
-    //            arrival: arrival,
-    //            departure: departure,
-    //            unit: unit,
-    //            totalGuests: total,
-    //            adults: adults,
-    //            children: children,
-    //            infants: infants,
-    //            hasDog: hasDog,
-    //            needsSauna: needsSauna,
-    //            needsBanquetHall: needsHall,
-    //            isFirstTimeGuest: isFirstTimeGuest,
-    //            adminNotes: adminNotes,
-    //            guestPhone: guestPhone
-    //        );
-
-    //        if (rand.Next(100) < 50)
-    //        {
-    //            booking.AddSaunaOrder(arrival.AddHours(18), 3);
-    //        }
-
-    //        bookings.Add(booking);
-    //    }
-
-    //    context.Bookings.AddRange(bookings);
-    //    await context.SaveChangesAsync();
-
-    //    return Ok($"Добавлено {needed} записей. Всего в базе: {TargetBookingCount}");
-    //}
-
-
     [HttpPost("generate")]
     public async Task<ActionResult<string>> GenerateTestData()
     {
-        // Загружаем существующие брони для проверки пересечений
         var allExisting = await context.Bookings.ToListAsync();
         var rand = new Random();
         var newBookings = new List<Booking>();
@@ -96,24 +21,35 @@ public class SeedController(AppDbContext context) : ControllerBase
         var lastNames = new[] { "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Павлов", "Соколов" };
 
         var attempts = 0;
-        var target = 40; // Снизим планку, так как из-за валидации 50 записей в месяц могут не влезть
+        // Уменьшим плотность, чтобы оставить "пустые даты" для наглядности
+        var targetNewRecords = 25;
 
-        while (newBookings.Count + allExisting.Count < target && attempts < 500)
+        while (newBookings.Count < targetNewRecords && attempts < 1000)
         {
             attempts++;
 
-            // Генерируем случайный период в пределах 40 дней
-            var arrival = DateTime.UtcNow.AddDays(rand.Next(-10, 30)).Date;
-            var departure = arrival.AddDays(rand.Next(1, 5));
+            // 1. Генерируем случайный период (на 60 дней вперед для разряженности)
+            var arrival = DateTime.UtcNow.AddDays(rand.Next(-5, 50)).Date;
+            var departure = arrival.AddDays(rand.Next(1, 4));
             var unit = (ReservedUnits)rand.Next(0, 3);
 
-            // ХИРУРГИЧЕСКАЯ ПРОВЕРКА НА ПЕРЕСЕЧЕНИЕ (Overlap)
+            // 2. Генерируем состав гостей СРАЗУ, чтобы проверить вместимость
+            var adults = rand.Next(1, 6);
+            var children = rand.Next(0, 4);
+            var infants = rand.Next(0, 2);
+            var total = adults + children + infants;
+
+            // ПРАВИЛО 4: Валидация вместимости
+            int maxCapacity = (unit == ReservedUnits.WholeHouse) ? 14 : 7;
+            if (total > maxCapacity) continue; // Пропускаем, если людей слишком много для этого типа
+
+            // 3. ХИРУРГИЧЕСКАЯ ПРОВЕРКА НА ПЕРЕСЕЧЕНИЕ (Overlap)
             var combined = allExisting.Concat(newBookings).ToList();
 
             bool isBusy = combined.Any(b =>
-                // 1. Проверка пересечения временных интервалов
+                // Проверка пересечения дат
                 (arrival < b.DepartureDate && departure > b.ArrivalDate) &&
-                // 2. Логика конфликта объектов
+                // Логика конфликта объектов (Правила 1-2)
                 (
                     b.ReservedUnit == unit ||
                     b.ReservedUnit == ReservedUnits.WholeHouse ||
@@ -121,25 +57,16 @@ public class SeedController(AppDbContext context) : ControllerBase
                 )
             );
 
-
             if (!isBusy)
             {
+                // Шанс 20% пропустить итерацию, чтобы создать "дыры" в календаре
+                if (rand.Next(100) < 20) continue;
+
                 var firstName = firstNames[rand.Next(firstNames.Length)];
                 var lastName = lastNames[rand.Next(lastNames.Length)];
-                var testGuestName = $"[TEST] {firstName} {lastName}";
-                var adults = rand.Next(1, 4);
-                var children = rand.Next(0, 3);
-                var infants = rand.Next(0, 2);
-                var total = adults + children + infants;
-                var hasDog = rand.Next(100) < 30;
-                var needsSauna = rand.Next(100) < 70;
-                var needsHall = rand.Next(100) < 10;
-                var isFirstTimeGuest = rand.Next(100) < 40;
-                var adminNotes = rand.Next(100) < 30 ? "Нужен мангал и дрова" : null;
-                var guestPhone = $"+37529{rand.Next(1000000, 9999999)}";
 
                 var booking = new Booking(
-                    guestName: testGuestName,
+                    guestName: $"[TEST] {firstName} {lastName}",
                     arrival: arrival,
                     departure: departure,
                     unit: unit,
@@ -147,12 +74,13 @@ public class SeedController(AppDbContext context) : ControllerBase
                     adults: adults,
                     children: children,
                     infants: infants,
-                    hasDog: hasDog,
-                    needsSauna: needsSauna,
-                    needsBanquetHall: needsHall,
-                    isFirstTimeGuest: isFirstTimeGuest,
-                    adminNotes: adminNotes,
-                    guestPhone: guestPhone);
+                    hasDog: rand.Next(100) < 20,
+                    needsSauna: rand.Next(100) < 50,
+                    needsBanquetHall: rand.Next(100) < 15,
+                    isFirstTimeGuest: rand.Next(100) < 40,
+                    adminNotes: rand.Next(100) < 20 ? "Нужны доп. полотенца" : null,
+                    guestPhone: $"+37529{rand.Next(1000000, 9999999)}"
+                );
 
                 newBookings.Add(booking);
             }
@@ -161,8 +89,9 @@ public class SeedController(AppDbContext context) : ControllerBase
         context.Bookings.AddRange(newBookings);
         await context.SaveChangesAsync();
 
-        return Ok($"Успешно добавлено {newBookings.Count} непересекающихся броней. (Попыток: {attempts})");
+        return Ok($"Добавлено {newBookings.Count} броней. Пустые дни оставлены для отладки UI.");
     }
+
 
 
     [HttpDelete("clear")]
