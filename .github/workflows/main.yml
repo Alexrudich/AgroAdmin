@@ -21,13 +21,11 @@ jobs:
         run: dotnet build AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --no-restore
 
       - name: Publish
-        # Собираем всё в папку ./publish-folder для деплоя
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish-folder --runtime win-x86 --no-self-contained
         
       - name: Deploy to MonsterASP.NET
-        # Используем твой рабочий XML профиль из секрета
         uses: azure/webapps-deploy@v3
         with:
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./publish-folder
-          clean: true # Попытка автоматической очистки wwwroot
+          clean: true
