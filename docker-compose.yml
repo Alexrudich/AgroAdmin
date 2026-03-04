@@ -5,13 +5,13 @@ services:
     image: ${DOCKER_REGISTRY-}agroadmin
     build:
       context: .
-      dockerfile: AgroAdmin/AgroAdmin/Dockerfile 
+      dockerfile: AgroAdmin/AgroAdmin/Dockerfile
     container_name: agro_admin_api
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
-      # Обрати внимание: Host=db (имя сервиса ниже)
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=agro_db;Username=postgres;Password=postgres
+      # Строка подключения к MSSQL
+      - ConnectionStrings__DefaultConnection=Server=db;Database=AgroAdminDb;User Id=sa;Password=YourStrong!Password;TrustServerCertificate=True;MultipleActiveResultSets=true
     ports:
       - "8080:80"
     depends_on:
@@ -21,28 +21,29 @@ services:
       - agro_network
 
   db:
-    image: postgres:15-alpine
-    container_name: agro_postgres
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: agro_mssql
     restart: unless-stopped
     environment:
-      POSTGRES_DB: agro_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong!Password
+      - MSSQL_PID=Express
     ports:
-      - "5432:5432"
+      - "1433:1433"
     volumes:
-      - agro_postgres_data:/var/lib/postgresql/data
+      - agro_mssql_data:/var/opt/mssql
     networks:
       - agro_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d agro_db"]
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong!Password" -C -Q "SELECT 1" || exit 1
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
 networks:
   agro_network:
     driver: bridge
 
 volumes:
-  agro_postgres_data:
+  agro_mssql_data:

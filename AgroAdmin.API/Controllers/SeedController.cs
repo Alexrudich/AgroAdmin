@@ -33,7 +33,7 @@ public class SeedController(AppDbContext context) : ControllerBase
         var newGuests = new List<Guest>();
         var newBookings = new List<Booking>();
 
-        var firstNames = new[] { "Александр", "Дмитрий", "Игнат", "Себастьян", "Сергей", "Лаврентий", "Андрей", "Мария" };
+        var firstNames = new[] { "Александр", "Дмитрий", "Игнат", "Себастьян", "Сергей", "Лаврентий", "Андрей", "Марио" };
         var lastNames = new[] { "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Павлов", "Соколов" };
 
         // Создаем гостей
