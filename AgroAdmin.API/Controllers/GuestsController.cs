@@ -53,8 +53,8 @@ public class GuestsController : ControllerBase
             return Ok(new List<GuestDto>());
 
         var guests = await _context.Guests
-            .Where(g => EF.Functions.ILike(g.FullName, $"%{term}%") ||
-                        EF.Functions.ILike(g.Phone, $"%{term}%"))
+            .Where(g => EF.Functions.Like(g.FullName, $"%{term}%") ||
+                        EF.Functions.Like(g.Phone, $"%{term}%"))
             .Select(g => new GuestDto
             {
                 Id = g.Id,
