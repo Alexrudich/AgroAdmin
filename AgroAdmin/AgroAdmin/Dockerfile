@@ -30,5 +30,10 @@ RUN dotnet publish "./AgroAdmin.csproj" -c $BUILD_CONFIGURATION -o /app/publish 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
+
+# Create folder for antiforgery keys
+RUN mkdir -p /root/.aspnet/DataProtection-Keys && \
+    chmod 700 /root/.aspnet/DataProtection-Keys
+
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "AgroAdmin.dll"]

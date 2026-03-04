@@ -1,117 +1,23 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using AgroAdmin.Domain.Models;
+using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Domain.Models;
 using AgroAdmin.Shared.Dto;
+using AgroAdmin.Shared.Extensions;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AgroAdmin.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BookingsController(AppDbContext context) : ControllerBase
+public class BookingsController(AppDbContext context, ITelegramService telegramService, ILogger<BookingsController> logger) : ControllerBase
 {
-    [HttpPost]
-    public async Task<ActionResult<int>> Create([FromBody] BookingDto dto, [FromServices] AgroAdmin.API.Services.TelegramService tg)
-    {
-        try
-        {
-            // 1. Ищем или создаем гостя
-            Guest? guest = null;
-
-            if (dto.Guest?.Id > 0)
-            {
-                guest = await context.Guests.FindAsync(dto.Guest.Id);
-            }
-
-            if (guest == null && !string.IsNullOrEmpty(dto.Guest?.Phone))
-            {
-                guest = await context.Guests.FirstOrDefaultAsync(g => g.Phone == dto.Guest.Phone);
-            }
-
-            if (guest == null && !string.IsNullOrEmpty(dto.Guest?.FullName))
-            {
-                guest = await context.Guests.FirstOrDefaultAsync(g => g.FullName == dto.Guest.FullName);
-            }
-
-            int guestId;
-            if (guest != null)
-            {
-                guestId = guest.Id;
-                if (dto.Guest != null)
-                {
-                    guest.UpdateInfo(
-                        dto.Guest.FullName ?? guest.FullName,
-                        dto.Guest.Phone ?? guest.Phone,
-                        guest.Comment
-                    );
-                }
-            }
-            else
-            {
-                var newGuest = new Guest(
-                    dto.Guest?.FullName ?? "Без имени",
-                    dto.Guest?.Phone ?? "нет телефона",
-                    dto.Guest?.Comment
-                );
-                context.Guests.Add(newGuest);
-                await context.SaveChangesAsync();
-                guestId = newGuest.Id;
-                guest = newGuest; // Сохраняем для сообщения в ТГ
-            }
-
-            // 2. Создаем бронь
-            var booking = new Booking(
-                guestId: guestId,
-                arrival: dto.ArrivalDate,
-                departure: dto.DepartureDate,
-                unit: dto.ReservedUnit,
-                totalGuests: dto.TotalGuestsCount,
-                adults: dto.AdultsCount,
-                children: dto.ChildrenCount,
-                infants: dto.InfantsCount,
-                hasDog: dto.HasDog,
-                needsSauna: dto.NeedsSauna,
-                needsBanquetHall: dto.NeedsBanquetHall,
-                isFirstTimeGuest: dto.IsFirstTimeGuest,
-                adminNotes: dto.AdminNotes,
-                feedbackComment: dto.FeedbackComment
-            );
-
-            context.Bookings.Add(booking);
-            await context.SaveChangesAsync();
-
-            // 3. ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ В TELEGRAM
-            var saunaIcon = dto.NeedsSauna ? "🌡️🌿" : "";
-            var hallIcon = dto.NeedsBanquetHall ? "🥂" : "";
-            var dogIcon = dto.HasDog ? "🐕" : "";
-
-            var message = $"🔔 *Новая бронь!*\n" +
-                          $"👤 *Гость:* {guest.FullName}\n" +
-                          $"📞 *Тел:* `{guest.Phone}`\n" +
-                          $"📅 *Даты:* {dto.ArrivalDate:dd.MM} — {dto.DepartureDate:dd.MM}\n" +
-                          $"🏠 *Объект:* {dto.ReservedUnit}\n" +
-                          $"👥 *Состав:* {dto.TotalGuestsCount} чел. (👨{dto.AdultsCount} 👦{dto.ChildrenCount} 👶{dto.InfantsCount})\n" +
-                          $"🛠 *Допы:* {saunaIcon} {hallIcon} {dogIcon}\n" +
-                          $"📝 *Заметка:* {dto.AdminNotes ?? "нет"}";
-
-            // Запускаем задачу отправки в фоне, чтобы не тормозить ответ API
-            _ = Task.Run(() => tg.SendNotification(message));
-
-            return Ok(booking.Id);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ex.Message);
-        }
-    }
-
-
-
     [HttpGet]
     public async Task<ActionResult<IEnumerable<BookingDto>>> GetAll()
     {
         var bookings = await context.Bookings
-            .Include(b => b.Guest)  // ВАЖНО Подгружаем гостя
+            .Include(b => b.Guest)
             .Include(b => b.SaunaOrders)
             .OrderByDescending(b => b.ArrivalDate)
             .Select(b => new BookingDto
@@ -142,6 +48,111 @@ public class BookingsController(AppDbContext context) : ControllerBase
             .ToListAsync();
 
         return Ok(bookings);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<int>> Create([FromBody] BookingDto dto)
+    {
+        try
+        {
+            // 1. Ищем или создаем гостя
+            Guest? guest = null;
+            int guestId;
+
+            if (dto.Guest?.Id > 0)
+            {
+                guest = await context.Guests.FindAsync(dto.Guest.Id);
+            }
+
+            if (guest == null && !string.IsNullOrEmpty(dto.Guest?.Phone))
+            {
+                guest = await context.Guests.FirstOrDefaultAsync(g => g.Phone == dto.Guest.Phone);
+            }
+
+            if (guest == null && !string.IsNullOrEmpty(dto.Guest?.FullName))
+            {
+                guest = await context.Guests.FirstOrDefaultAsync(g => g.FullName == dto.Guest.FullName);
+            }
+
+            if (guest != null)
+            {
+                guestId = guest.Id;
+                if (dto.Guest != null)
+                {
+                    guest.UpdateInfo(
+                        dto.Guest.FullName ?? guest.FullName,
+                        dto.Guest.Phone ?? guest.Phone,
+                        guest.Comment
+                    );
+                }
+            }
+            else
+            {
+                var newGuest = new Guest(
+                    dto.Guest?.FullName ?? "Без имени",
+                    dto.Guest?.Phone ?? "нет телефона",
+                    dto.Guest?.Comment
+                );
+                context.Guests.Add(newGuest);
+                await context.SaveChangesAsync();
+                guestId = newGuest.Id;
+                guest = newGuest;
+            }
+
+            // 2. Создаем бронь
+            var booking = new Booking(
+                guestId: guestId,
+                arrival: dto.ArrivalDate,
+                departure: dto.DepartureDate,
+                unit: dto.ReservedUnit,
+                totalGuests: dto.TotalGuestsCount,
+                adults: dto.AdultsCount,
+                children: dto.ChildrenCount,
+                infants: dto.InfantsCount,
+                hasDog: dto.HasDog,
+                needsSauna: dto.NeedsSauna,
+                needsBanquetHall: dto.NeedsBanquetHall,
+                isFirstTimeGuest: dto.IsFirstTimeGuest,
+                adminNotes: dto.AdminNotes,
+                feedbackComment: dto.FeedbackComment
+            );
+
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+
+            // 3. ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ В TELEGRAM (не блокируем ответ)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var unitName = dto.ReservedUnit.ToFriendlyString();
+
+                    var message = $"""
+                        🔔 <b>Новая бронь!</b>
+                        
+                        👤 <b>Гость:</b> {guest.FullName}
+                        📞 <b>Тел:</b> {guest.Phone}
+                        📅 <b>Даты:</b> {dto.ArrivalDate:dd.MM} — {dto.DepartureDate:dd.MM}
+                        🏠 <b>Объект:</b> {unitName}
+                        👥 <b>Состав:</b> {dto.TotalGuestsCount} чел. (👨{dto.AdultsCount} 👦{dto.ChildrenCount} 👶{dto.InfantsCount})
+                        🛠 <b>Допы:</b> {(dto.NeedsSauna ? "🌡️" : "")} {(dto.NeedsBanquetHall ? "🥂" : "")} {(dto.HasDog ? "🐕" : "")}
+                        📝 <b>Заметка:</b> {dto.AdminNotes ?? "нет"}
+                        """;
+
+                    await telegramService.SendMessageAsync(message);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to send Telegram notification");
+                }
+            });
+
+            return Ok(booking.Id);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpGet("{id}")]
@@ -229,31 +240,50 @@ public class BookingsController(AppDbContext context) : ControllerBase
         return NoContent();
     }
 
+
     [HttpDelete("{id}")]
-    public async Task<ActionResult> Delete(int id, [FromServices] Services.TelegramService tg)
+    public async Task<ActionResult> Delete(int id)
     {
-        // 1. Ищем бронь вместе с данными гостя
+        // 1. Находим бронь с гостем (чтобы отправить уведомление)
         var booking = await context.Bookings
             .Include(b => b.Guest)
             .FirstOrDefaultAsync(b => b.Id == id);
 
-        if (booking == null) return NotFound();
+        if (booking == null)
+            return NotFound();
 
-        // 2. Формируем сообщение ДО удаления
-        var msg = $"🗑 *ОТМЕНА БРОНИ!*\n" +
-                  $"👤 *Гость:* {booking.Guest?.FullName ?? "Неизвестен"}\n" +
-                  $"📅 *Было на:* {booking.ArrivalDate:dd.MM} — {booking.DepartureDate:dd.MM}\n" +
-                  $"🏠 *Объект:* {booking.ReservedUnit}";
+        // 2. Сохраняем данные для уведомления ДО удаления
+        var guestName = booking.Guest?.FullName ?? "Неизвестный гость";
+        var arrivalDate = booking.ArrivalDate;
+        var departureDate = booking.DepartureDate;
+        var unitName = booking.ReservedUnit.ToFriendlyString();
 
-        // 3. Удаляем классическим способом (чтобы сохранить связь с объектом в памяти)
+        // 3. Удаляем
         context.Bookings.Remove(booking);
         await context.SaveChangesAsync();
 
-        // 4. Шлем пуш (рассылка пойдет по всем ID из твоего списка)
-        _ = tg.SendNotification(msg);
+        // 4. Отправляем уведомление в Telegram (в фоне)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var message = $"""
+                               ❌ <b>Бронь отменена!</b>
+
+                               👤 <b>Гость:</b> {guestName}
+                               📅 <b>Даты:</b> {arrivalDate:dd.MM.yyyy} — {departureDate:dd.MM.yyyy}
+                               🏠 <b>Объект:</b> {unitName}
+                               """;
+
+                await telegramService.SendMessageAsync(message);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to send Telegram notification for deleted booking {BookingId}", id);
+            }
+        });
 
         return NoContent();
     }
-
 
 }
