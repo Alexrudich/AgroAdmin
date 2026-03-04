@@ -11,39 +11,32 @@ namespace AgroAdmin.API.Controllers;
 public class BookingsController(AppDbContext context) : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<int>> Create([FromBody] BookingDto dto)
+    public async Task<ActionResult<int>> Create([FromBody] BookingDto dto, [FromServices] AgroAdmin.API.Services.TelegramService tg)
     {
         try
         {
             // 1. Ищем или создаем гостя
-            int guestId;
-
             Guest? guest = null;
 
-            // Если есть выбранный гость с Id
             if (dto.Guest?.Id > 0)
             {
                 guest = await context.Guests.FindAsync(dto.Guest.Id);
             }
 
-            // Если не нашли по Id, ищем по телефону
             if (guest == null && !string.IsNullOrEmpty(dto.Guest?.Phone))
             {
-                guest = await context.Guests
-                    .FirstOrDefaultAsync(g => g.Phone == dto.Guest.Phone);
+                guest = await context.Guests.FirstOrDefaultAsync(g => g.Phone == dto.Guest.Phone);
             }
 
-            // Если не нашли по телефону, ищем по имени
             if (guest == null && !string.IsNullOrEmpty(dto.Guest?.FullName))
             {
-                guest = await context.Guests
-                    .FirstOrDefaultAsync(g => g.FullName == dto.Guest.FullName);
+                guest = await context.Guests.FirstOrDefaultAsync(g => g.FullName == dto.Guest.FullName);
             }
 
+            int guestId;
             if (guest != null)
             {
                 guestId = guest.Id;
-                // Обновляем данные гостя если изменились
                 if (dto.Guest != null)
                 {
                     guest.UpdateInfo(
@@ -55,7 +48,6 @@ public class BookingsController(AppDbContext context) : ControllerBase
             }
             else
             {
-                // Создаем нового гостя
                 var newGuest = new Guest(
                     dto.Guest?.FullName ?? "Без имени",
                     dto.Guest?.Phone ?? "нет телефона",
@@ -64,9 +56,10 @@ public class BookingsController(AppDbContext context) : ControllerBase
                 context.Guests.Add(newGuest);
                 await context.SaveChangesAsync();
                 guestId = newGuest.Id;
+                guest = newGuest; // Сохраняем для сообщения в ТГ
             }
 
-            // 2. Создаем бронь с guestId
+            // 2. Создаем бронь
             var booking = new Booking(
                 guestId: guestId,
                 arrival: dto.ArrivalDate,
@@ -87,6 +80,23 @@ public class BookingsController(AppDbContext context) : ControllerBase
             context.Bookings.Add(booking);
             await context.SaveChangesAsync();
 
+            // 3. ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ В TELEGRAM
+            var saunaIcon = dto.NeedsSauna ? "🌡️🌿" : "";
+            var hallIcon = dto.NeedsBanquetHall ? "🥂" : "";
+            var dogIcon = dto.HasDog ? "🐕" : "";
+
+            var message = $"🔔 *Новая бронь!*\n" +
+                          $"👤 *Гость:* {guest.FullName}\n" +
+                          $"📞 *Тел:* `{guest.Phone}`\n" +
+                          $"📅 *Даты:* {dto.ArrivalDate:dd.MM} — {dto.DepartureDate:dd.MM}\n" +
+                          $"🏠 *Объект:* {dto.ReservedUnit}\n" +
+                          $"👥 *Состав:* {dto.TotalGuestsCount} чел. (👨{dto.AdultsCount} 👦{dto.ChildrenCount} 👶{dto.InfantsCount})\n" +
+                          $"🛠 *Допы:* {saunaIcon} {hallIcon} {dogIcon}\n" +
+                          $"📝 *Заметка:* {dto.AdminNotes ?? "нет"}";
+
+            // Запускаем задачу отправки в фоне, чтобы не тормозить ответ API
+            _ = Task.Run(() => tg.SendNotification(message));
+
             return Ok(booking.Id);
         }
         catch (Exception ex)
@@ -94,6 +104,7 @@ public class BookingsController(AppDbContext context) : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
 
 
     [HttpGet]
@@ -218,15 +229,31 @@ public class BookingsController(AppDbContext context) : ControllerBase
         return NoContent();
     }
 
-
     [HttpDelete("{id}")]
-    public async Task<ActionResult> Delete(int id)
+    public async Task<ActionResult> Delete(int id, [FromServices] Services.TelegramService tg)
     {
-        var affected = await context.Bookings
-            .Where(b => b.Id == id)
-            .ExecuteDeleteAsync();
+        // 1. Ищем бронь вместе с данными гостя
+        var booking = await context.Bookings
+            .Include(b => b.Guest)
+            .FirstOrDefaultAsync(b => b.Id == id);
 
-        return affected > 0 ? NoContent() : NotFound();
+        if (booking == null) return NotFound();
+
+        // 2. Формируем сообщение ДО удаления
+        var msg = $"🗑 *ОТМЕНА БРОНИ!*\n" +
+                  $"👤 *Гость:* {booking.Guest?.FullName ?? "Неизвестен"}\n" +
+                  $"📅 *Было на:* {booking.ArrivalDate:dd.MM} — {booking.DepartureDate:dd.MM}\n" +
+                  $"🏠 *Объект:* {booking.ReservedUnit}";
+
+        // 3. Удаляем классическим способом (чтобы сохранить связь с объектом в памяти)
+        context.Bookings.Remove(booking);
+        await context.SaveChangesAsync();
+
+        // 4. Шлем пуш (рассылка пойдет по всем ID из твоего списка)
+        _ = tg.SendNotification(msg);
+
+        return NoContent();
     }
+
 
 }

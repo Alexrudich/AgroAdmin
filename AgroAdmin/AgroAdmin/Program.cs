@@ -37,6 +37,8 @@ namespace AgroAdmin
                 });
             });
 
+            builder.Services.AddHttpClient<API.Services.TelegramService>();
+
             var app = builder.Build();
 
             using (var scope = app.Services.CreateScope())

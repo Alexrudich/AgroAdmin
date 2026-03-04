@@ -10,7 +10,6 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
-      # Строка подключения к MSSQL
       - ConnectionStrings__DefaultConnection=Server=db;Database=AgroAdminDb;User Id=sa;Password=YourStrong!Password;TrustServerCertificate=True;MultipleActiveResultSets=true
     ports:
       - "8080:80"
