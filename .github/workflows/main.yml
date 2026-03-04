@@ -21,11 +21,17 @@ jobs:
         run: dotnet build AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --no-restore
 
       - name: Publish
+        # Собираем файлы в папку для деплоя
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish-folder --runtime win-x86 --no-self-contained
         
-      - name: Deploy to MonsterASP.NET
-        uses: azure/webapps-deploy@v3
-        with:
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./publish-folder
-          clean: true
+      - name: Deploy to MonsterASP.NET via WebDeploy
+        # Используем нативный msdeploy.exe (как в Visual Studio)
+        # Параметр -verb:sync и -allowUntrusted:true решают проблемы с сертификатом и очисткой
+        run: |
+          "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe" `
+          -verb:sync `
+          -source:package='${{ github.workspace }}\publish-folder' `
+          -dest:auto,computerName='https://site57408.siteasp.net' `
+          -allowUntrusted:true `
+          -enableRule:AppOffline `
+          -retryAttempts:3
