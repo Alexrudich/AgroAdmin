@@ -1,13 +1,24 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+    @* Показываем сайдбар только если мы НЕ на логине *@
+    @if (!IsLoginPage)
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    }
 
     <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        <div class="top-row px-4 d-flex justify-content-end align-items-center">
+            @if (!IsLoginPage)
+            {
+                <button class="btn btn-outline-danger btn-sm" @onclick="HandleLogout">
+                    🚪 Выйти
+                </button>
+            }
         </div>
 
         <article class="content px-4">
@@ -21,3 +32,20 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    // Проверка: на странице логина мы или нет
+    private bool IsLoginPage => Navigation.Uri.Contains("/login", StringComparison.OrdinalIgnoreCase);
+
+    private async Task HandleLogout()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", "is_auth");
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+
+    // Подписываемся на события навигации, чтобы макет обновлялся при переходе
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += (s, e) => StateHasChanged();
+    }
+}
