@@ -13,6 +13,8 @@ namespace AgroAdmin.Client
                 BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
             });
 
+            builder.Services.AddAuthorizationCore();
+
             await builder.Build().RunAsync();
         }
     }

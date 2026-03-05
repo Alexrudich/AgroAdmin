@@ -1,0 +1,72 @@
+﻿@page "/login"
+@using AgroAdmin.Shared.Dto.Auth
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h3 class="mb-0">🔐 Вход</h3>
+                </div>
+                <div class="card-body p-4">
+                    <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Логин</label>
+                            <InputText @bind-Value="_loginModel.Username" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Пароль</label>
+                            <InputText type="password" @bind-Value="_loginModel.Password" class="form-control" />
+                        </div>
+                        @if (!string.IsNullOrEmpty(_errorMessage))
+                        {
+                            <div class="alert alert-danger py-2 small">@_errorMessage</div>
+                        }
+                        <button type="submit" class="btn btn-primary w-100" disabled="@_isLoading">Войти</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly LoginRequestDto _loginModel = new();
+    private string? _errorMessage;
+    private bool _isLoading;
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/login", _loginModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Если бэк ответил 200, принудительно пишем в память
+                await Js.InvokeVoidAsync("localStorage.setItem", "is_auth", "true");
+
+                Navigation.NavigateTo("/calendar", forceLoad: true);
+            }
+            else
+            {
+                _errorMessage = "Неверный логин или пароль";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Ошибка: " + ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

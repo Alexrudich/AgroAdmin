@@ -135,6 +135,19 @@ public class SeedController(AppDbContext context) : ControllerBase
         return Ok($"Создано {guests.Count} тестовых гостей и добавлено {newBookings.Count} броней.");
     }
 
+    [HttpPost("create-admin")]
+    public async Task<ActionResult<string>> CreateAdmin(string username, string password)
+    {
+        if (await context.AdminUsers.AnyAsync())
+            return BadRequest("Admin already exists");
+
+        var admin = new AdminUser(username, password);
+        context.AdminUsers.Add(admin);
+        await context.SaveChangesAsync();
+
+        return Ok("Admin created");
+    }
+
     [HttpDelete("clear")]
     public async Task<ActionResult<string>> ClearTestData()
     {

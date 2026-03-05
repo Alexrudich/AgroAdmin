@@ -3,13 +3,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AgroAdmin.Infrastructure.Persistence
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
         public DbSet<Booking> Bookings => Set<Booking>();
         public DbSet<SaunaOrder> SaunaOrders => Set<SaunaOrder>();
         public DbSet<Guest> Guests => Set<Guest>();
+        public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -59,6 +58,19 @@ namespace AgroAdmin.Infrastructure.Persistence
 
                 builder.Property(g => g.CreatedAt)
                     .IsRequired();
+            });
+
+            // Конфигурация для AdminUser
+            modelBuilder.Entity<AdminUser>(builder =>
+            {
+                builder.HasKey(a => a.Id);
+                builder.Property(a => a.Username)
+                    .IsRequired()
+                    .HasMaxLength(50);
+                builder.Property(a => a.PasswordHash)
+                    .IsRequired();
+                builder.HasIndex(a => a.Username)
+                    .IsUnique();
             });
         }
     }
