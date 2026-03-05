@@ -3,6 +3,7 @@
 @using AgroAdmin.Shared.Dto
 @using AgroAdmin.Shared.Enums
 @using AgroAdmin.Shared.Extensions
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
 @implements IDisposable
 @inject HttpClient Http
 @inject NavigationManager Nav
@@ -496,9 +497,16 @@
     {
         booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
 
-        var response = Id.HasValue
-            ? await Http.PutAsJsonAsync($"api/bookings/{Id}", booking)
-            : await Http.PostAsJsonAsync("api/bookings", booking);
+        var request = new HttpRequestMessage(
+            Id.HasValue ? HttpMethod.Put : HttpMethod.Post,
+            Id.HasValue ? $"api/bookings/{Id}" : "api/bookings")
+        {
+            Content = JsonContent.Create(booking)
+        };
+
+        request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+
+        var response = await Http.SendAsync(request);
 
         if (response.IsSuccessStatusCode)
             Nav.NavigateTo("/calendar");
