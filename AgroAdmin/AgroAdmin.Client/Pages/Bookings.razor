@@ -3,7 +3,7 @@
 @using AgroAdmin.Shared.Extensions
 @inject HttpClient Http
 @inject NavigationManager Nav
-@inject IJSRuntime JS
+@inject IJSRuntime Js
 
 <PageTitle>Бронирования</PageTitle>
 
@@ -122,7 +122,6 @@
         </div>
     }
 </div>
-
 @code {
     private List<BookingDto>? allBookings;
 
@@ -141,7 +140,7 @@
 
     private async Task HandleDelete(int id, string name)
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Вы уверены, что хотите удалить бронь гостя {name}?");
+        bool confirmed = await Js.InvokeAsync<bool>("confirm", $"Вы уверены, что хотите удалить бронь гостя {name}?");
 
         if (confirmed)
         {
@@ -154,7 +153,7 @@
             }
             else
             {
-                await JS.InvokeVoidAsync("alert", "Ошибка при удалении на сервере.");
+                await Js.InvokeVoidAsync("alert", "Ошибка при удалении на сервере.");
             }
         }
     }

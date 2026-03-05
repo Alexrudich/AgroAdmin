@@ -1,0 +1,47 @@
+﻿@inject IJSRuntime Js
+@inject NavigationManager Navigation
+
+@if (_isAuthorized || IsLoginPage)
+{
+    @ChildContent
+}
+else
+{
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Проверка доступа...</p>
+    </div>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool _isAuthorized = false;
+    private bool IsLoginPage => Navigation.Uri.Contains("/login", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsLoginPage)
+        {
+            try
+            {
+                var authFlag = await Js.InvokeAsync<string>("localStorage.getItem", "is_auth");
+                
+                if (authFlag == "true")
+                {
+                    _isAuthorized = true;
+                    StateHasChanged();
+                }
+                else
+                {
+                    Navigation.NavigateTo("/login");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"AuthGuard Error: {ex.Message}");
+                Navigation.NavigateTo("/login");
+            }
+        }
+    }
+}

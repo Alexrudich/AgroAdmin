@@ -1,6 +1,15 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+﻿@using AgroAdmin.Client.Components.Auth
+@using AgroAdmin.Client.Pages
+
+<Router AppAssembly="typeof(Program).Assembly" 
+        AdditionalAssemblies="new[] { typeof(AgroAdmin.Client._Imports).Assembly }">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <AuthGuard>
+            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        </AuthGuard>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        <NotFound />
+    </NotFound>
 </Router>

@@ -1,4 +1,5 @@
 ﻿@page "/guests"
+@using AgroAdmin.Client.Components.Auth
 @using AgroAdmin.Shared.Dto
 @inject HttpClient Http
 @inject NavigationManager Nav
@@ -6,44 +7,45 @@
 
 <PageTitle>Гости</PageTitle>
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>👥 Гости</h1>
-        <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/guests/create")'>
-            Новый гость
-        </button>
-    </div>
+<AuthorizeView>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>👥 Гости</h1>
+            <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/guests/create")'>
+                Новый гость
+            </button>
+        </div>
 
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="input-group">
-                <span class="input-group-text">🔍</span>
-                <input type="text" class="form-control" placeholder="Поиск по имени или телефону..." 
-                       @oninput="OnSearchInput" value="@searchTerm" />
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text">🔍</span>
+                    <input type="text" class="form-control" placeholder="Поиск по имени или телефону..." 
+                           @oninput="OnSearchInput" value="@searchTerm" />
+                </div>
             </div>
         </div>
-    </div>
 
-    @if (isLoading)
-    {
-        <div class="text-center p-5">
-            <div class="spinner-border text-primary" role="status"></div>
-        </div>
-    }
-    else if (guests == null || !guests.Any())
-    {
-        <div class="alert alert-info text-center p-5">
-            <i class="bi bi-people fs-1 d-block mb-3"></i>
-            @(string.IsNullOrWhiteSpace(searchTerm) 
-                ? "Пока нет ни одного гостя" 
-                : "Ничего не найдено")
-        </div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-light">
+        @if (isLoading)
+        {
+            <div class="text-center p-5">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        }
+        else if (guests == null || !guests.Any())
+        {
+            <div class="alert alert-info text-center p-5">
+                <i class="bi bi-people fs-1 d-block mb-3"></i>
+                @(string.IsNullOrWhiteSpace(searchTerm) 
+                    ? "Пока нет ни одного гостя" 
+                    : "Ничего не найдено")
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-light">
                     <tr>
                         <th>Имя</th>
                         <th>Телефон</th>
@@ -53,8 +55,8 @@
                         <th>Комментарий</th>
                         <th></th>
                     </tr>
-                </thead>
-                <tbody>
+                    </thead>
+                    <tbody>
                     @foreach (var guest in guests)
                     {
                         <tr>
@@ -100,11 +102,12 @@
                             </td>
                         </tr>
                     }
-                </tbody>
-            </table>
-        </div>
-    }
-</div>
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</AuthorizeView>
 
 @code {
     private List<GuestDto>? guests;
