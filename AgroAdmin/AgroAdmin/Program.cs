@@ -19,6 +19,9 @@ builder.Services.AddRazorComponents()
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 // 3. HttpClient
 var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:8080";
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(frontendUrl) });
@@ -37,7 +40,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
-// 5. Твой Телеграм (Singleton как ты просил ранее)
+// 5. Твой Телеграм (Singleton)
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ITelegramService>(sp =>
 {
@@ -60,14 +63,14 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
 }
 
-// 7. Pipeline (ПОРЯДОК КРИТИЧЕН)
+// 7. Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseWebAssemblyDebugging();
 }
 
-app.UseStaticFiles(); // БЕЗ ЭТОГО БУДЕТ 404
-app.MapStaticAssets(); // Для .NET 10
+app.UseStaticFiles();
+app.MapStaticAssets();
 
 app.UseRouting();
 app.UseAntiforgery();
@@ -75,6 +78,19 @@ app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseWebAssemblyDebugging();
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+}
 app.MapControllers();
 
 // Редирект корня
