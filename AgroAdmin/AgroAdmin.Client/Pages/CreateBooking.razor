@@ -70,7 +70,7 @@
                                 {
                                     <div class="selected-guest mt-2">
                                         <div class="selected-guest-avatar">
-                                            @selectedGuest.FullName.Substring(0, 1).ToUpper()
+                                            @(selectedGuest.FullName?.Length > 0 ? selectedGuest.FullName.Substring(0, 1).ToUpper() : "?")
                                         </div>
                                         <div class="selected-guest-info">
                                             <div class="selected-guest-name">
@@ -91,7 +91,7 @@
                             <div class="row mb-3">
                                 <div class="col-md-7">
                                     <label class="form-label fw-bold">👤 Имя гостя</label>
-                                    <InputText @bind-Value="booking.Guest.FullName" class="form-control" placeholder="Имя Фамилия" />
+                                    <InputText @bind-Value="booking.Guest!.FullName" class="form-control" placeholder="Имя Фамилия" />
                                     @if (!string.IsNullOrWhiteSpace(guestSearchTerm) && !isSearching && guestSearchTerm.Length >= 2 && !searchResults.Any())
                                     {
                                         <div class="alert alert-info mt-2 py-1 small">
@@ -226,7 +226,10 @@
 
 @code {
     [Parameter] public int? Id { get; set; }
-    private BookingDto booking = new();
+    private BookingDto booking = new() 
+    { 
+        Guest = new GuestDto() 
+    };
     private List<BookingDto> allBookings = new();
 
     // Поля для поиска гостей
@@ -455,7 +458,7 @@
     {
         selectedGuest = null;
         guestSearchTerm = string.Empty;
-        booking.Guest = new GuestDto();  // Очищаем для нового ввода
+        booking.Guest = new GuestDto { FullName = "", Phone = "" };
         searchResults.Clear();
     }
 

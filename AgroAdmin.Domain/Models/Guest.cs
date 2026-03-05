@@ -1,7 +1,4 @@
-﻿// Domain/Models/Guest.cs
-using AgroAdmin.Domain.Models;
-
-namespace AgroAdmin.Domain.Models;
+﻿namespace AgroAdmin.Domain.Models;
 
 public class Guest
 {

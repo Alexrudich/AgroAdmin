@@ -6,7 +6,7 @@ public class Booking
 {
     public int Id { get; private set; }
     public int GuestId { get; private set; }
-    public virtual Guest Guest { get; private set; } = null!;  // Навигационное свойство
+    public virtual Guest Guest { get; private set; } = null!;
     public DateTime ArrivalDate { get; private set; }
     public DateTime DepartureDate { get; private set; }
     public ReservedUnits ReservedUnit { get; private set; }

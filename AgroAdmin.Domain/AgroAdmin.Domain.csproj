@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AgroAdmin.Shared\AgroAdmin.Shared.csproj" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
   </ItemGroup>
 
 </Project>

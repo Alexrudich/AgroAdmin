@@ -1,6 +1,9 @@
-﻿using AgroAdmin.Components;
+﻿using AgroAdmin.API.Controllers;
+using AgroAdmin.Components;
+using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.API.Controllers;
+using AgroAdmin.Infrastructure.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgroAdmin
@@ -22,9 +25,18 @@ namespace AgroAdmin
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+            var frontendUrl = builder.Configuration["FrontendUrl"];
+            if (string.IsNullOrEmpty(frontendUrl))
+            {
+                // В разработке используем порт из launchSettings
+                frontendUrl = builder.Environment.IsDevelopment()
+                    ? "http://localhost:5141"
+                    : "http://localhost:8080";
+            }
+
             builder.Services.AddScoped(sp => new HttpClient
             {
-                BaseAddress = new Uri(builder.Configuration["FrontendUrl"] ?? "http://localhost:8080")
+                BaseAddress = new Uri(frontendUrl)
             });
 
             builder.Services.AddCors(options =>
@@ -36,6 +48,19 @@ namespace AgroAdmin
                         .AllowAnyHeader();
                 });
             });
+
+            builder.Services.AddHttpClient();
+            builder.Services.AddSingleton<ITelegramService>(sp =>
+            {
+                var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+                var configuration = sp.GetRequiredService<IConfiguration>();
+                var logger = sp.GetRequiredService<ILogger<TelegramService>>();
+                return new TelegramService(httpClientFactory, configuration, logger);
+            });
+
+            builder.Services.AddDataProtection()
+                .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
+                .SetApplicationName("AgroAdmin");
 
             var app = builder.Build();
 
