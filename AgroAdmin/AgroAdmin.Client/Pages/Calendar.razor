@@ -88,7 +88,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Сначала проверяем авторизацию
         try
         {
             var status = await Http.GetFromJsonAsync<AuthStatusDto>("api/auth/status");
@@ -104,10 +103,14 @@
             return;
         }
 
-        // Потом грузим данные
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
         try
         {
-            _allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings");
+            _allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("/api/bookings");
             var now = DateTime.Now;
             GenerateCalendar(now.Year, now.Month);
         }
