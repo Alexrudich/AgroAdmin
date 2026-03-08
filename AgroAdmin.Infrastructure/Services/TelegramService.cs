@@ -32,13 +32,13 @@ public class TelegramService(IHttpClientFactory httpClientFactory, IConfiguratio
         }
     }
 
-    public async Task SendBookingNotificationAsync(BookingDto booking)
+    public async Task SendBookingNotificationAsync(CreateBookingDto booking)
     {
         var message = FormatBookingMessage(booking);
         await SendMessageAsync(message);
     }
 
-    private string FormatBookingMessage(BookingDto booking)
+    private string FormatBookingMessage(CreateBookingDto booking)
     {
         var unitName = booking.ReservedUnit.ToFriendlyString();
 

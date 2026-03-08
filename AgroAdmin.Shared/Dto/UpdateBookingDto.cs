@@ -2,7 +2,7 @@
 
 namespace AgroAdmin.Shared.Dto;
 
-public class BookingDto
+public class UpdateBookingDto
 {
     public int Id { get; set; }
     public GuestDto? Guest { get; set; }

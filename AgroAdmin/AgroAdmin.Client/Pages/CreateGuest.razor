@@ -1,0 +1,62 @@
+﻿@page "/guests/create"
+@page "/guests/edit/{Id:int}"
+@using AgroAdmin.Shared.Dto
+@using AgroAdmin.Client.Components
+@using AgroAdmin.Shared.Services
+@inject BookingFormService Service
+@inject NavigationManager Nav
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">@(Id.HasValue ? "✏️ Редактирование гостя" : "✨ Новый гость")</h3>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@guest" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+
+                        <!-- Используем наш компонент GuestForm -->
+                        <GuestForm Guest="guest" ShowForm="true" />
+
+                        <div class="d-flex justify-content-between border-top pt-3 mt-3">
+                            <button type="button" class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("/guests")'>
+                                Отмена
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                @(Id.HasValue ? "Сохранить" : "Создать")
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    private GuestDto guest = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id.HasValue)
+        {
+            var loadedGuest = await Service.GetGuestAsync(Id.Value);
+            if (loadedGuest != null)
+            {
+                guest = loadedGuest;
+            }
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (await Service.SaveGuestAsync(guest, Id))
+        {
+            Nav.NavigateTo("/guests");
+        }
+    }
+}

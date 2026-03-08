@@ -50,8 +50,47 @@ public class BookingsController(AppDbContext context, ITelegramService telegramS
         return Ok(bookings);
     }
 
+    [HttpGet("{id}")]
+    public async Task<ActionResult<BookingDto>> GetById(int id)
+    {
+        // Include Guest!
+        var b = await context.Bookings
+            .Include(b => b.Guest)  // Подгружаем гостя
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (b == null) return NotFound();
+
+        var dto = new BookingDto
+        {
+            Id = b.Id,
+            Guest = new GuestDto
+            {
+                Id = b.Guest.Id,
+                FullName = b.Guest.FullName,
+                Phone = b.Guest.Phone,
+                CreatedAt = b.Guest.CreatedAt,
+                Comment = b.Guest.Comment
+            },
+            ArrivalDate = b.ArrivalDate,
+            DepartureDate = b.DepartureDate,
+            ReservedUnit = b.ReservedUnit,
+            TotalGuestsCount = b.TotalGuestsCount,
+            AdultsCount = b.AdultsCount,
+            ChildrenCount = b.ChildrenCount,
+            InfantsCount = b.InfantsCount,
+            HasDog = b.HasDog,
+            NeedsSauna = b.NeedsSauna,
+            NeedsBanquetHall = b.NeedsBanquetHall,
+            IsFirstTimeGuest = b.IsFirstTimeGuest,
+            AdminNotes = b.AdminNotes,
+            FeedbackComment = b.FeedbackComment
+        };
+
+        return Ok(dto);
+    }
+
     [HttpPost]
-    public async Task<ActionResult<int>> Create([FromBody] BookingDto dto)
+    public async Task<ActionResult<int>> Create([FromBody] CreateBookingDto dto)
     {
         try
         {
@@ -155,47 +194,8 @@ public class BookingsController(AppDbContext context, ITelegramService telegramS
         }
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<BookingDto>> GetById(int id)
-    {
-        // Include Guest!
-        var b = await context.Bookings
-            .Include(b => b.Guest)  // Подгружаем гостя
-            .FirstOrDefaultAsync(b => b.Id == id);
-
-        if (b == null) return NotFound();
-
-        var dto = new BookingDto
-        {
-            Id = b.Id,
-            Guest = new GuestDto
-            {
-                Id = b.Guest.Id,
-                FullName = b.Guest.FullName,
-                Phone = b.Guest.Phone,
-                CreatedAt = b.Guest.CreatedAt,
-                Comment = b.Guest.Comment
-            },
-            ArrivalDate = b.ArrivalDate,
-            DepartureDate = b.DepartureDate,
-            ReservedUnit = b.ReservedUnit,
-            TotalGuestsCount = b.TotalGuestsCount,
-            AdultsCount = b.AdultsCount,
-            ChildrenCount = b.ChildrenCount,
-            InfantsCount = b.InfantsCount,
-            HasDog = b.HasDog,
-            NeedsSauna = b.NeedsSauna,
-            NeedsBanquetHall = b.NeedsBanquetHall,
-            IsFirstTimeGuest = b.IsFirstTimeGuest,
-            AdminNotes = b.AdminNotes,
-            FeedbackComment = b.FeedbackComment
-        };
-
-        return Ok(dto);
-    }
-
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, BookingDto dto)
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateBookingDto dto)
     {
         var booking = await context.Bookings
             .Include(b => b.Guest)
@@ -217,13 +217,9 @@ public class BookingsController(AppDbContext context, ITelegramService telegramS
             }
         }
 
-        // Обновляем бронь
-        var arrivalUtc = DateTime.SpecifyKind(dto.ArrivalDate, DateTimeKind.Utc);
-        var departureUtc = DateTime.SpecifyKind(dto.DepartureDate, DateTimeKind.Utc);
-
-        // Ручное обновление полей (можно использовать AutoMapper позже)
-        booking.GetType().GetProperty("ArrivalDate")?.SetValue(booking, arrivalUtc);
-        booking.GetType().GetProperty("DepartureDate")?.SetValue(booking, departureUtc);
+        // Обновляем поля брони
+        booking.GetType().GetProperty("ArrivalDate")?.SetValue(booking, DateTime.SpecifyKind(dto.ArrivalDate, DateTimeKind.Utc));
+        booking.GetType().GetProperty("DepartureDate")?.SetValue(booking, DateTime.SpecifyKind(dto.DepartureDate, DateTimeKind.Utc));
         booking.GetType().GetProperty("ReservedUnit")?.SetValue(booking, dto.ReservedUnit);
         booking.GetType().GetProperty("TotalGuestsCount")?.SetValue(booking, dto.TotalGuestsCount);
         booking.GetType().GetProperty("AdultsCount")?.SetValue(booking, dto.AdultsCount);
@@ -239,7 +235,6 @@ public class BookingsController(AppDbContext context, ITelegramService telegramS
         await context.SaveChangesAsync();
         return NoContent();
     }
-
 
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)

@@ -2,6 +2,7 @@
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
+using AgroAdmin.Shared.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -40,7 +41,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
-// 5. Твой Телеграм (Singleton)
+// 5. Телеграм (Singleton)
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ITelegramService>(sp =>
 {
@@ -49,6 +50,8 @@ builder.Services.AddSingleton<ITelegramService>(sp =>
     var logger = sp.GetRequiredService<ILogger<TelegramService>>();
     return new TelegramService(httpClientFactory, configuration, logger);
 });
+
+builder.Services.AddScoped<BookingFormService>();
 
 // 6. Защита ключей (для Docker)
 builder.Services.AddDataProtection()
