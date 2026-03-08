@@ -76,19 +76,16 @@
     overflow: hidden;
 }
 
-/* Свободно */
+/* Свободно - НЕЖНЫЙ ЗЕЛЕНЫЙ */
 .free {
-    background-color: transparent;
-    color: #ced4da;
-    border: 1px dashed #e9ecef;
-    border-left: 4px solid transparent;
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+    border-left: 4px solid #2e7d32;
 }
 
     .free:hover {
-        background-color: #f1f8f5;
-        color: #198754;
-        border-style: solid;
-        border-color: #198754;
+        background-color: #c8e6c9;
     }
 
 /* Занятая половинка */
@@ -167,19 +164,6 @@
     }
 }
 
-/* Ускоряем для мобильных */
-@media (max-width: 768px) {
-    .marquee-content.active {
-        animation-duration: 6s;
-    }
-}
-
-@media (max-width: 480px) {
-    .marquee-content.active {
-        animation-duration: 5s;
-    }
-}
-
 /* Градиенты по краям для плавного исчезновения */
 .marquee-wrapper::before,
 .marquee-wrapper::after {
@@ -210,98 +194,68 @@
     opacity: 1;
 }
 
-/* ========================================
-   4. МОБИЛЬНАЯ АДАПТАЦИЯ (до 768px)
-   ======================================== */
-@media (max-width: 768px) {
-    .calendar-cell {
-        min-height: 90px;
-    }
-
-    .date-number {
-        padding: 4px 6px;
-        font-size: 0.75rem;
-    }
-
-    .unit-zone {
-        padding: 4px;
-        font-size: 0.7rem;
-    }
-
-    .header-cell {
-        padding: 8px 4px;
-        font-size: 0.8rem;
-    }
-
-    /* Анимация только на мобильных */
-    .marquee-container.active .marquee-content {
-        animation: marquee 6s linear forwards;
-    }
-}
-
-/* Для очень маленьких экранов (до 480px) */
-@media (max-width: 480px) {
-    .calendar-cell {
-        min-height: 70px;
-    }
-
-    .date-number {
-        font-size: 0.7rem;
-        padding: 2px 4px;
-    }
-
-    .unit-zone {
-        font-size: 0.65rem;
-        padding: 3px;
-    }
-
-    .marquee-container.active .marquee-content {
-        animation-duration: 5s; /* Быстрее на маленьких экранах */
-    }
-}
-
 
 /* ========================================
    4. МОБИЛЬНАЯ АДАПТАЦИЯ (до 768px)
    ======================================== */
 @media (max-width: 768px) {
     .calendar-cell {
-        min-height: 90px;
+        min-height: 140px; /* Увеличили для мобильных */
     }
 
     .date-number {
-        padding: 4px 6px;
-        font-size: 0.75rem;
+        padding: 8px 10px;
+        font-size: 1rem;
     }
 
     .unit-zone {
-        padding: 4px;
-        font-size: 0.7rem;
+        padding: 8px;
+        font-size: 0.85rem;
     }
 
     .header-cell {
-        padding: 8px 4px;
-        font-size: 0.8rem;
+        padding: 12px 8px;
+        font-size: 0.9rem;
+    }
+
+    /* Ускоряем анимацию на мобильных */
+    .marquee-content.active {
+        animation-duration: 6s;
+    }
+
+    /* Вертикальный скролл для мобильных */
+    .calendar-body {
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Фиксируем шапку при скролле */
+    .calendar-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: #f8f9fa;
     }
 }
 
 /* Для очень маленьких экранов (до 480px) */
 @media (max-width: 480px) {
     .calendar-cell {
-        min-height: 70px;
+        min-height: 160px; /* Еще крупнее */
     }
 
     .date-number {
-        font-size: 0.7rem;
-        padding: 2px 4px;
+        font-size: 1.1rem;
+        padding: 10px 12px;
     }
 
     .unit-zone {
-        font-size: 0.65rem;
-        padding: 3px;
+        font-size: 0.9rem;
+        padding: 10px;
     }
 
-    .marquee-content {
-        animation-duration: 6s; /* Быстрее на маленьких экранах */
+    .marquee-content.active {
+        animation-duration: 5s;
     }
 }
