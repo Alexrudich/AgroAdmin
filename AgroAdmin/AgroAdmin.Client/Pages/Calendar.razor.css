@@ -1,11 +1,14 @@
-﻿.calendar-grid {
+﻿/* ========================================
+   1. ОСНОВНАЯ СЕТКА КАЛЕНДАРЯ
+   ======================================== */
+.calendar-grid {
     display: flex;
     flex-direction: column;
     border: 1px solid #dee2e6;
-    min-width: 900px;
     background: #fff;
     border-radius: 8px;
     overflow: hidden;
+    width: 100%;
 }
 
 .calendar-header {
@@ -33,7 +36,6 @@
     border: 0.5px solid #f1f1f1;
     display: flex;
     flex-direction: column;
-    transition: transform 0.1s;
 }
 
 .other-month {
@@ -56,7 +58,10 @@
     padding: 4px;
 }
 
-/* Базовый стиль ячейки */
+
+/* ========================================
+   2. СТИЛИ ЯЧЕЕК БРОНИРОВАНИЯ
+   ======================================== */
 .unit-zone {
     flex-grow: 1;
     border-radius: 4px;
@@ -64,19 +69,14 @@
     font-size: 0.75rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    border-left: 4px solid transparent; /* Акцентная полоска слева */
-    background-color: #f8f9fa; /* Светлый нейтральный фон */
+    border-left: 4px solid transparent;
+    background-color: #f8f9fa;
     color: #495057;
     margin-bottom: 2px;
-}
-
-.unit-text {
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-/* Свободная зона — максимально легкая */
+/* Свободно */
 .free {
     background-color: transparent;
     color: #ced4da;
@@ -85,18 +85,18 @@
 }
 
     .free:hover {
-        background-color: #f1f8f5; /* Легкий мятный при наведении */
+        background-color: #f1f8f5;
         color: #198754;
         border-style: solid;
         border-color: #198754;
     }
 
-/* Занятая половинка — спокойный голубой/синий */
+/* Занятая половинка */
 .busy {
-    background-color: #e7f1ff; /* Нежно-голубой */
+    background-color: #e7f1ff;
     color: #084298;
     border: 1px solid #cfe2ff;
-    border-left: 4px solid #0d6efd; /* Яркий акцент синего */
+    border-left: 4px solid #0d6efd;
     font-weight: 500;
 }
 
@@ -105,9 +105,9 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
-/* Весь дом — благородный фиолетовый или глубокий зеленый */
+/* Весь дом */
 .full-house {
-    background-color: #f3e5f5; /* Лавандовый */
+    background-color: #f3e5f5;
     color: #4a148c;
     border: 1px solid #e1bee7;
     border-left: 4px solid #9c27b0;
@@ -121,7 +121,6 @@
     background-color: #fff !important;
 }
 
-/* Вместо scale используем внутреннюю тень и яркую границу, чтобы не двигать соседние ячейки */
 .unit-zone.highlight-booking {
     background-color: #fff3cd !important;
     border: 2px solid #ffc107 !important;
@@ -131,3 +130,178 @@
     z-index: 5;
 }
 
+
+/* ========================================
+   3. НЕПРЕРЫВНАЯ БЕГУЩАЯ СТРОКА
+   ======================================== */
+.marquee-wrapper {
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+}
+
+.marquee-content {
+    display: inline-block;
+    transform: translateX(0);
+    will-change: transform;
+}
+
+    /* Непрерывное движение влево */
+    .marquee-content.active {
+        animation: marquee-scroll 8s linear infinite;
+    }
+
+    /* Увеличиваем длительность для длинных текстов */
+    .marquee-content.long-text.active {
+        animation-duration: 12s;
+    }
+
+@keyframes marquee-scroll {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* Ускоряем для мобильных */
+@media (max-width: 768px) {
+    .marquee-content.active {
+        animation-duration: 6s;
+    }
+}
+
+@media (max-width: 480px) {
+    .marquee-content.active {
+        animation-duration: 5s;
+    }
+}
+
+/* Градиенты по краям для плавного исчезновения */
+.marquee-wrapper::before,
+.marquee-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.marquee-wrapper::before {
+    left: 0;
+    background: linear-gradient(to right, rgba(255,255,255,0.95), transparent);
+}
+
+.marquee-wrapper::after {
+    right: 0;
+    background: linear-gradient(to left, rgba(255,255,255,0.95), transparent);
+}
+
+/* Показываем градиенты при активной анимации */
+.marquee-wrapper:has(.marquee-content.active)::before,
+.marquee-wrapper:has(.marquee-content.active)::after {
+    opacity: 1;
+}
+
+/* ========================================
+   4. МОБИЛЬНАЯ АДАПТАЦИЯ (до 768px)
+   ======================================== */
+@media (max-width: 768px) {
+    .calendar-cell {
+        min-height: 90px;
+    }
+
+    .date-number {
+        padding: 4px 6px;
+        font-size: 0.75rem;
+    }
+
+    .unit-zone {
+        padding: 4px;
+        font-size: 0.7rem;
+    }
+
+    .header-cell {
+        padding: 8px 4px;
+        font-size: 0.8rem;
+    }
+
+    /* Анимация только на мобильных */
+    .marquee-container.active .marquee-content {
+        animation: marquee 6s linear forwards;
+    }
+}
+
+/* Для очень маленьких экранов (до 480px) */
+@media (max-width: 480px) {
+    .calendar-cell {
+        min-height: 70px;
+    }
+
+    .date-number {
+        font-size: 0.7rem;
+        padding: 2px 4px;
+    }
+
+    .unit-zone {
+        font-size: 0.65rem;
+        padding: 3px;
+    }
+
+    .marquee-container.active .marquee-content {
+        animation-duration: 5s; /* Быстрее на маленьких экранах */
+    }
+}
+
+
+/* ========================================
+   4. МОБИЛЬНАЯ АДАПТАЦИЯ (до 768px)
+   ======================================== */
+@media (max-width: 768px) {
+    .calendar-cell {
+        min-height: 90px;
+    }
+
+    .date-number {
+        padding: 4px 6px;
+        font-size: 0.75rem;
+    }
+
+    .unit-zone {
+        padding: 4px;
+        font-size: 0.7rem;
+    }
+
+    .header-cell {
+        padding: 8px 4px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Для очень маленьких экранов (до 480px) */
+@media (max-width: 480px) {
+    .calendar-cell {
+        min-height: 70px;
+    }
+
+    .date-number {
+        font-size: 0.7rem;
+        padding: 2px 4px;
+    }
+
+    .unit-zone {
+        font-size: 0.65rem;
+        padding: 3px;
+    }
+
+    .marquee-content {
+        animation-duration: 6s; /* Быстрее на маленьких экранах */
+    }
+}

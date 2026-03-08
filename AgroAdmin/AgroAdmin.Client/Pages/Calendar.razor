@@ -38,42 +38,51 @@
                     var park = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.ParkingSide);
                     var whole = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.WholeHouse);
 
-                    <div class="calendar-cell @(date.Date == DateTime.Today ? "is-today" : "") @(date.Month != DateTime.Now.Month ? "other-month" : "")">
+                    <div class="calendar-cell @(date.Date == DateTime.Today ? "is-today" : "") @(date.Month != DateTime.Now.Month ? "other-month" : "")"
+                         @onclick="() => ToggleMarquee(date)">
+
                         <div class="date-number">@date.Day</div>
 
-                        <div class="units-container">
-                            @if (whole != null)
-                            {
-                                <div class="unit-zone full-house @(_hoveredBookingId == whole.Id ? "highlight-booking" : "")"
-                                     @onclick="() => OnCellClick(date, whole)"
-                                     @onmouseover="() => _hoveredBookingId = whole.Id"
-                                     @onmouseout="() => _hoveredBookingId = null">
-                                    <span class="unit-text">🏠 Весь дом: @whole.Guest?.FullName</span>
+                        @if (whole != null)
+                        {
+                            <div class="unit-zone full-house"
+                                 @onclick:stopPropagation="true"
+                                 @onclick="() => OnCellClick(date, whole)">
+                                <div class="marquee-wrapper">
+                                    <div class="marquee-content @(IsMarqueeActive(date) ? "active" : "")">
+                                        <span class="unit-text">🏠 @whole.Guest?.FullName</span>
+                                    </div>
                                 </div>
-                            }
-                            else
-                            {
-                                @* Половинка Пруд *@
-                                <div class="unit-zone @(pond != null ? "busy" : "free") @(pond != null && _hoveredBookingId == pond.Id ? "highlight-booking" : "")"
-                                     @onclick="() => OnCellClick(date, pond, ReservedUnits.PondSide)"
-                                     @onmouseover="() => { if (pond != null) _hoveredBookingId = pond.Id; }"
-                                     @onmouseout="() => _hoveredBookingId = null">
-                                    <span class="unit-text">
-                                        @(pond != null ? $"🌊 {pond.Guest?.FullName}" : "🌊 Пруд (свободно)")
-                                    </span>
+                            </div>
+                        }
+                        else
+                        {
+                            @* Половинка Пруд *@
+                            <div class="unit-zone @(pond != null ? "busy" : "free")"
+                                 @onclick:stopPropagation="true"
+                                 @onclick="() => OnCellClick(date, pond, ReservedUnits.PondSide)">
+                                <div class="marquee-wrapper">
+                                    <div class="marquee-content @(IsMarqueeActive(date) ? "active" : "")">
+                                        <span class="unit-text">
+                                            @(pond != null ? $"🌊 {pond.Guest?.FullName}" : "🌊 Пруд (свободно)")
+                                        </span>
+                                    </div>
                                 </div>
+                            </div>
 
-                                @* Половинка Парк *@
-                                <div class="unit-zone @(park != null ? "busy" : "free") @(park != null && _hoveredBookingId == park.Id ? "highlight-booking" : "")"
-                                     @onclick="() => OnCellClick(date, park, ReservedUnits.ParkingSide)"
-                                     @onmouseover="() => { if (park != null) _hoveredBookingId = park.Id; }"
-                                     @onmouseout="() => _hoveredBookingId = null">
-                                    <span class="unit-text">
-                                        @(park != null ? $"🚗 {park.Guest?.FullName}" : "🚗 Парк (свободно)")
-                                    </span>
+                            @* Половинка Парк *@
+                            <div class="unit-zone @(park != null ? "busy" : "free")"
+                                 @onclick:stopPropagation="true"
+                                 @onclick="() => OnCellClick(date, park, ReservedUnits.ParkingSide)">
+                                <div class="marquee-wrapper">
+                                    <div class="marquee-content @(IsMarqueeActive(date) ? "active" : "")">
+                                        <span class="unit-text">
+                                            @(park != null ? $"🚗 {park.Guest?.FullName}" : "🚗 Парк (свободно)")
+                                        </span>
+                                    </div>
                                 </div>
-                            }
-                        </div>
+                            </div>
+                        }
                     </div>
                 }
             </div>
@@ -84,11 +93,10 @@
 @code {
     private List<BookingDto>? _allBookings;
     private readonly List<DateTime> _calendarDays = new();
-    private int? _hoveredBookingId;
+    private string? _activeMarqueeDate;
 
     protected override async Task OnInitializedAsync()
     {
-        // Сначала проверяем авторизацию
         try
         {
             var status = await Http.GetFromJsonAsync<AuthStatusDto>("api/auth/status");
@@ -104,7 +112,6 @@
             return;
         }
 
-        // Потом грузим данные
         try
         {
             _allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings");
@@ -128,6 +135,39 @@
         {
             _calendarDays.Add(firstDayOfMonth.AddDays(i - offset));
         }
+    }
+
+    private bool IsMarqueeActive(DateTime date)
+    {
+        var key = date.ToString("yyyyMMdd");
+        return _activeMarqueeDate == key;
+    }
+
+    private void ToggleMarquee(DateTime date)
+    {
+        var key = date.ToString("yyyyMMdd");
+
+        if (_activeMarqueeDate == key)
+        {
+            _activeMarqueeDate = null; // останавливаем
+        }
+        else
+        {
+            _activeMarqueeDate = key; // запускаем
+            // Автоматически останавливаем через 10 секунд
+            _ = Task.Delay(10000).ContinueWith(_ =>
+            {
+                InvokeAsync(() =>
+                {
+                    if (_activeMarqueeDate == key)
+                    {
+                        _activeMarqueeDate = null;
+                        StateHasChanged();
+                    }
+                });
+            });
+        }
+        StateHasChanged();
     }
 
     private void OnCellClick(DateTime date, BookingDto? b, ReservedUnits? unit = null)
