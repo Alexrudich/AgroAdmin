@@ -1,519 +1,459 @@
 ﻿@page "/bookings/create"
 @page "/bookings/edit/{Id:int}"
-@using AgroAdmin.Shared.Dto
-@using AgroAdmin.Shared.Enums
-@using AgroAdmin.Shared.Extensions
-@using Microsoft.AspNetCore.Components.WebAssembly.Http
 @implements IDisposable
-@inject HttpClient Http
+@inject BookingFormService Service
 @inject NavigationManager Nav
 
-<div class="container-fluid mt-4">
-    <div class="row justify-content-center">
-        <div class="col-xl-8 col-lg-10">
-            <div class="card shadow border-0">
-                <div class="card-header bg-primary text-white py-3">
-                    <h3 class="mb-0">@(Id.HasValue ? "✏️ Редактирование" : "✨ Новое бронирование")</h3>
-                </div>
-                <div class="card-body p-4">
-                    <EditForm Model="@booking" OnValidSubmit="HandleSubmit">
+<div class="container-fluid p-3">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white py-2">
+            <h5 class="mb-0">@(Id.HasValue ? "✏️ Редактирование" : "✨ Новое бронирование")</h5>
+        </div>
 
-                        <!-- Поиск гостя -->
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <label class="form-label fw-bold">👤 Поиск существующего гостя</label>
-                                <div class="guest-search-container">
-                                    <input type="text"
-                                           class="form-control"
-                                           placeholder="🔍 Начните вводить имя или телефон..."
-                                           @bind="guestSearchTerm"
-                                           @oninput="OnSearchInput"
-                                           @onfocus="() => showGuestDropdown = true"
-                                           @onblur="HideDropdown" />
+        <div class="card-body p-3">
+            <EditForm Model="@Service.Booking" OnValidSubmit="HandleSubmit">
 
-                                    @if (isSearching)
+                <!-- 1️ УМНОЕ ПОЛЕ ПОИСКА ПО ИМЕНИ -->
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">👤 Имя гостя (поиск по имени)</label>
+                        <div class="smart-search-container">
+                            <input type="text"
+                                   class="form-control @(Service.SelectedGuest != null ? "is-valid" : "")"
+                                   placeholder="Например: Афанасий Фет"
+                                   @bind="Service.GuestNameSearchTerm"
+                                   @oninput="OnNameSearchInput"
+                                   @onfocus="() => Service.ShowNameDropdown = true"
+                                   @onblur="HideNameDropdown"
+                                   autocomplete="off" />
+
+                            @if (Service.IsSearching)
+                            {
+                                <span class="searching-indicator">🔍</span>
+                            }
+
+                            @if (Service.ShowNameDropdown && Service.NameSearchResults.Any())
+                            {
+                                <div class="guest-dropdown">
+                                    @foreach (var guest in Service.NameSearchResults.Take(10))
                                     {
-                                        <span class="searching-indicator">🔍</span>
-                                    }
-
-                                    @if (showGuestDropdown && searchResults.Any())
-                                    {
-                                        <div class="guest-dropdown">
-                                            @foreach (var guest in searchResults.Take(15))
-                                            {
-                                                <div class="guest-item @(selectedGuest?.Id == guest.Id ? "selected" : "")"
-                                                     @onmousedown="() => SelectGuest(guest)">
-                                                    <div class="guest-avatar">
-                                                        @guest.FullName.Substring(0, 1).ToUpper()
-                                                    </div>
-                                                    <div class="guest-info">
-                                                        <div class="guest-name">@guest.FullName</div>
-                                                        <div class="guest-phone">@guest.Phone</div>
-                                                    </div>
-                                                    <div class="guest-stats">
-                                                        <span class="stay-badge">
-                                                            <i>🏨</i> @guest.TotalStays
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            }
-                                            @if (searchResults.Count > 15)
-                                            {
-                                                <div class="guest-item text-muted text-center">
-                                                    И еще @(searchResults.Count - 15) гостей...
-                                                </div>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-
-                                @if (selectedGuest != null)
-                                {
-                                    <div class="selected-guest mt-2">
-                                        <div class="selected-guest-avatar">
-                                            @(selectedGuest.FullName?.Length > 0 ? selectedGuest.FullName.Substring(0, 1).ToUpper() : "?")
-                                        </div>
-                                        <div class="selected-guest-info">
-                                            <div class="selected-guest-name">
-                                                @selectedGuest.FullName
-                                                <span class="selected-guest-badge">Был @selectedGuest.TotalStays раз(а)</span>
+                                        <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
+                                             @onmousedown="() => Service.SelectGuest(guest)">
+                                            <div class="guest-avatar">
+                                                @guest.FullName.Substring(0, 1).ToUpper()
                                             </div>
-                                            <div class="selected-guest-phone">📞 @selectedGuest.Phone</div>
+                                            <div class="guest-info">
+                                                <div class="guest-name">@guest.FullName</div>
+                                                <div class="guest-phone">@guest.Phone</div>
+                                            </div>
+                                            <div class="guest-stats">
+                                                <span class="stay-badge">🏨 @guest.TotalStays</span>
+                                            </div>
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearGuest">✕</button>
-                                    </div>
-                                }
-                            </div>
-                        </div>
+                                    }
 
-                        <!-- Если гость не найден или не выбран - показываем поля для ввода -->
-                        @if (selectedGuest == null)
-                        {
-                            <div class="row mb-3">
-                                <div class="col-md-7">
-                                    <label class="form-label fw-bold">👤 Имя гостя</label>
-                                    <InputText @bind-Value="booking.Guest!.FullName" class="form-control" placeholder="Имя Фамилия" />
-                                    @if (!string.IsNullOrWhiteSpace(guestSearchTerm) && !isSearching && guestSearchTerm.Length >= 2 && !searchResults.Any())
+                                    @if (!Service.NameSearchResults.Any() && Service.GuestNameSearchTerm.Length >= 2)
                                     {
-                                        <div class="alert alert-info mt-2 py-1 small">
-                                            <i class="bi bi-info-circle"></i> Будет создан новый гость
+                                        <div class="guest-item new-guest"
+                                             @onmousedown="() => Service.CreateNewGuestFromName()">
+                                            <div class="guest-avatar">➕</div>
+                                            <div class="guest-info">
+                                                <div class="guest-name">Создать нового гостя</div>
+                                                <div class="guest-phone">@Service.GuestNameSearchTerm</div>
+                                            </div>
                                         </div>
                                     }
                                 </div>
-                                <div class="col-md-5">
-                                    <label class="form-label fw-bold">📞 Телефон</label>
-                                    <InputText @bind-Value="booking.Guest.Phone" class="form-control" placeholder="+375..." />
-                                </div>
-                            </div>
-                        }
-
-                        <!-- Даты и Объект -->
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">📅 Заезд</label>
-                                <InputDate @bind-Value="booking.ArrivalDate" @onchange="OnDateChanged" class="form-control" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">📅 Выезд</label>
-                                <InputDate @bind-Value="booking.DepartureDate" @onchange="OnDateChanged" class="form-control" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">🏠 Объект</label>
-                                <InputSelect @bind-Value="booking.ReservedUnit" @onchange="OnUnitChanged" class="form-select">
-                                    @foreach (var unit in Enum.GetValues<ReservedUnits>())
-                                    {
-                                        <option value="@unit">@unit.ToFriendlyString()</option>
-                                    }
-                                </InputSelect>
-                            </div>
+                            }
                         </div>
+                    </div>
+                </div>
 
-                        <!-- Визуальный календарь занятости -->
-                        @if (booking.ArrivalDate != default && booking.DepartureDate != default)
-                        {
-                            <div class="card mb-3 border-info">
-                                <div class="card-header bg-info text-white py-2">
-                                    <h6 class="mb-0">📅 @(booking.ReservedUnit.ToFriendlyString())</h6>
+                <!-- 2️ УМНОЕ ПОЛЕ ПОИСКА ПО ТЕЛЕФОНУ -->
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">📞 Телефон (поиск по телефону)</label>
+                        <div class="smart-search-container">
+                            <input type="text"
+                                   class="form-control"
+                                   placeholder="+375..."
+                                   @bind="Service.GuestPhoneSearchTerm"
+                                   @oninput="OnPhoneSearchInput"
+                                   @onfocus="() => Service.ShowPhoneDropdown = true"
+                                   @onblur="HidePhoneDropdown"
+                                   autocomplete="off" />
+
+                            @if (Service.IsSearching)
+                            {
+                                <span class="searching-indicator">🔍</span>
+                            }
+
+                            @if (Service.ShowPhoneDropdown && Service.PhoneSearchResults.Any())
+                            {
+                                <div class="guest-dropdown">
+                                    @foreach (var guest in Service.PhoneSearchResults.Take(10))
+                                    {
+                                        <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
+                                             @onmousedown="() => Service.SelectGuest(guest)">
+                                            <div class="guest-avatar">
+                                                @guest.FullName.Substring(0, 1).ToUpper()
+                                            </div>
+                                            <div class="guest-info">
+                                                <div class="guest-name">@guest.FullName</div>
+                                                <div class="guest-phone">@guest.Phone</div>
+                                            </div>
+                                            <div class="guest-stats">
+                                                <span class="stay-badge">🏨 @guest.TotalStays</span>
+                                            </div>
+                                        </div>
+                                    }
                                 </div>
-                                <div class="card-body">
-                                    <div class="d-flex flex-wrap gap-1 justify-content-center">
-                                        @for (int i = -3; i < 14; i++)
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3️ Карточка выбранного гостя (если есть) -->
+                @if (Service.SelectedGuest != null)
+                {
+                    <div class="selected-guest-card mb-3">
+                        <div class="selected-guest-avatar">
+                            @(Service.SelectedGuest.FullName?.Length > 0 ? Service.SelectedGuest.FullName.Substring(0, 1).ToUpper() : "?")
+                        </div>
+                        <div class="selected-guest-info">
+                            <div class="selected-guest-name">
+                                @Service.SelectedGuest.FullName
+                                <span class="selected-guest-badge">Был @Service.SelectedGuest.TotalStays раз(а)</span>
+                            </div>
+                            <div class="selected-guest-phone">📞 @Service.SelectedGuest.Phone</div>
+                        </div>
+                        <button type="button" class="selected-guest-clear" @onclick="Service.ClearGuest" title="Очистить">
+                            ✕
+                        </button>
+                    </div>
+                }
+
+                <!-- 4️ Даты и объект -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">📅 Заезд</label>
+                        <InputDate @bind-Value="Service.Booking.ArrivalDate" @onchange="OnDateChanged" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">📅 Выезд</label>
+                        <InputDate @bind-Value="Service.Booking.DepartureDate" @onchange="OnDateChanged" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">🏠 Объект</label>
+                        <InputSelect @bind-Value="Service.Booking.ReservedUnit" @onchange="OnUnitChanged" class="form-select">
+                            @foreach (var unit in Enum.GetValues<ReservedUnits>())
+                            {
+                                <option value="@unit">@unit.ToFriendlyString()</option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+
+                <!-- 5️ Календарь занятости с тап-выбором выезда -->
+                @if (Service.Booking.ArrivalDate != default)
+                {
+                    <div class="card mb-3 border-info">
+                        <div class="card-header bg-info text-white py-2">
+                            <h6 class="mb-0">📅 @(Service.Booking.ReservedUnit.ToFriendlyString())</h6>
+                        </div>
+                        <div class="card-body p-2">
+                            <div class="calendar-grid-container">
+                                <div class="calendar-days-grid">
+                                    @{
+                                        var baseDate = Service.Booking.ArrivalDate != default
+                                        ? Service.Booking.ArrivalDate
+                                        : DateTime.Today;
+
+                                        var startDate = baseDate.AddDays(-5);
+                                        var endDate = baseDate.AddDays(20);
+                                        var totalDays = (endDate - startDate).Days;
+                                    }
+
+                                    @for (int i = 0; i < totalDays; i++)
+                                    {
+                                        var date = startDate.AddDays(i);
+                                        if (date < DateTime.Today.AddDays(-30)) continue;
+
+                                        var status = Service.GetDateStatus(date);
+                                        var isSelected = date >= Service.Booking.ArrivalDate && date < Service.Booking.DepartureDate;
+                                        var busyUnits = Service.GetBusyUnitsOnDate(date);
+
+                                        var dayOfWeek = date.DayOfWeek switch
                                         {
-                                            var date = booking.ArrivalDate.AddDays(i);
-                                            if (date < DateTime.Today.AddDays(-30)) continue;
+                                            DayOfWeek.Monday => "Пн",
+                                            DayOfWeek.Tuesday => "Вт",
+                                            DayOfWeek.Wednesday => "Ср",
+                                            DayOfWeek.Thursday => "Чт",
+                                            DayOfWeek.Friday => "Пт",
+                                            DayOfWeek.Saturday => "Сб",
+                                            DayOfWeek.Sunday => "Вс",
+                                            _ => ""
+                                        };
 
-                                            var status = GetDateStatus(date);
-                                            var isSelected = date >= booking.ArrivalDate && date < booking.DepartureDate;
-                                            var isWeekend = date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday;
+                                        // Можно тапать только по датам позже заезда
+                                        var canTap = date > Service.Booking.ArrivalDate && status != "full-busy";
+                                        var isInSelectedRange = date >= Service.Booking.ArrivalDate && date < Service.Booking.DepartureDate;
+                                        var isInFutureRange = date >= Service.Booking.ArrivalDate && date < GetMaxAvailableDate();
 
-                                            <div class="calendar-day @GetCalendarDayStatus(date) @(isSelected ? "selected" : "")"
-                                                 title="@GetDateTooltip(date)">
-                                                <div class="day-number">@date.Day</div>
-                                                <div class="day-month">@date.ToString("MMM")</div>
-                                                @if (status == "busy")
-                                                {
-                                                    <div class="busy-indicator">⛔</div>
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                    <div class="d-flex justify-content-center gap-4 mt-3 small">
-                                        <span class="badge bg-success px-3 py-2">✅ Свободно</span>
-                                        <span class="badge bg-danger px-3 py-2">⛔ Занято</span>
-                                        <span class="badge bg-primary px-3 py-2">📅 Выбранные даты</span>
-                                    </div>
-                                </div>
-                            </div>
-                        }
+                                        <div class="calendar-cell @status
+                                             @(isInSelectedRange ? "selected" : "")
+                                             @(isInFutureRange && !isInSelectedRange ? "available-range" : "")
+                                             @(canTap ? "tapable" : "not-tapable")"
+                                             @onclick="() => OnDateTap(date, status)">
 
-                        <!-- Состав гостей -->
-                        <div class="p-3 bg-light rounded mb-3 border">
-                            <div class="row g-3">
-                                <div class="col-4">
-                                    <label class="form-label small text-muted">👨 Взрослые</label>
-                                    <InputNumber @bind-Value="booking.AdultsCount" @oninput="UpdateTotal" class="form-control" />
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label small text-muted">👦 Дети</label>
-                                    <InputNumber @bind-Value="booking.ChildrenCount" @oninput="UpdateTotal" class="form-control" />
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label small text-muted">👶 Младенцы</label>
-                                    <InputNumber @bind-Value="booking.InfantsCount" @oninput="UpdateTotal" class="form-control" />
-                                </div>
-                            </div>
-                            <div class="mt-2 text-primary fw-bold text-end">
-                                Итого гостей: @booking.TotalGuestsCount
-                            </div>
-                        </div>
+                                            <div class="cell-day">@date.Day</div>
+                                            <div class="cell-weekday">@dayOfWeek</div>
+                                            <div class="cell-month">@date.ToString("MMM")</div>
 
-                        <!-- Опции -->
-                        <div class="row mb-3">
-                            <div class="col-6 col-md-3">
-                                <div class="form-check form-switch">
-                                    <InputCheckbox @bind-Value="booking.NeedsSauna" class="form-check-input" id="sauna" />
-                                    <label class="form-check-label" for="sauna">🌡️ Баня</label>
+                                            @if (busyUnits != 0)
+                                            {
+                                                <div class="cell-icons">
+                                                    @if (busyUnits.HasFlag(ReservedUnits.PondSide))
+                                                    {
+                                                        <span class="unit-icon pond-icon" title="Пруд занят">🌊</span>
+                                                    }
+                                                    @if (busyUnits.HasFlag(ReservedUnits.ParkingSide))
+                                                    {
+                                                        <span class="unit-icon park-icon" title="Парковка занята">🚗</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
                                 </div>
                             </div>
-                            <div class="col-6 col-md-4">
-                                <div class="form-check form-switch">
-                                    <InputCheckbox @bind-Value="booking.NeedsBanquetHall" class="form-check-input" id="hall" />
-                                    <label class="form-check-label" for="hall">🥂 Зал</label>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="form-check form-switch">
-                                    <InputCheckbox @bind-Value="booking.HasDog" class="form-check-input" id="dog" />
-                                    <label class="form-check-label" for="dog">🐕 Собака</label>
-                                </div>
+
+                            <div class="calendar-legend">
+                                <span class="legend-item"><span class="color-box free"></span> Свободно</span>
+                                <span class="legend-item">
+                                    <span class="color-box partial-busy"></span>
+                                    <span class="legend-icons">🌊/🚗</span> Частично
+                                </span>
+                                <span class="legend-item">
+                                    <span class="color-box full-busy"></span>
+                                    <span class="legend-icons">⛔</span> Занято
+                                </span>
+                                <span class="legend-item"><span class="color-box selected"></span> Выбрано</span>
                             </div>
                         </div>
+                    </div>
+                }
 
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Заметки</label>
-                            <InputTextArea @bind-Value="booking.AdminNotes" class="form-control" rows="2" />
-                        </div>
-
-                        <div class="d-flex justify-content-between border-top pt-3">
-                            <button type="button" class="btn btn-outline-secondary px-4" @onclick='() => Nav.NavigateTo("/bookings")'>Отмена</button>
-                            <button type="submit" class="btn btn-success px-5 fw-bold">@(Id.HasValue ? "Обновить" : "Забронировать")</button>
-                        </div>
-                    </EditForm>
+                <!-- 6️ Состав гостей -->
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <label class="form-label small mb-1">👨 Взрослые</label>
+                        <InputNumber @bind-Value="Service.Booking.AdultsCount" @oninput="Service.UpdateTotal" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small mb-1">👦 Дети</label>
+                        <InputNumber @bind-Value="Service.Booking.ChildrenCount" @oninput="Service.UpdateTotal" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small mb-1">👶 Младенцы</label>
+                        <InputNumber @bind-Value="Service.Booking.InfantsCount" @oninput="Service.UpdateTotal" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-12 text-end mt-1">
+                        <small class="text-primary fw-bold">Итого: @Service.Booking.TotalGuestsCount чел.</small>
+                    </div>
                 </div>
-            </div>
+
+                <!-- 7️ Опции -->
+                <div class="row mb-3 g-2">
+                    <div class="col-4">
+                        <div class="option-card @(Service.Booking.NeedsSauna ? "active" : "")">
+                            <div class="form-check form-switch d-flex justify-content-center">
+                                <InputCheckbox @bind-Value="Service.Booking.NeedsSauna" class="form-check-input" id="sauna" />
+                                <label class="form-check-label ms-1" for="sauna">🌡️</label>
+                            </div>
+                            <div class="option-label">Баня</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="option-card @(Service.Booking.NeedsBanquetHall ? "active" : "")">
+                            <div class="form-check form-switch d-flex justify-content-center">
+                                <InputCheckbox @bind-Value="Service.Booking.NeedsBanquetHall" class="form-check-input" id="hall" />
+                                <label class="form-check-label ms-1" for="hall">🥂</label>
+                            </div>
+                            <div class="option-label">Зал</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="option-card @(Service.Booking.HasDog ? "active" : "")">
+                            <div class="form-check form-switch d-flex justify-content-center">
+                                <InputCheckbox @bind-Value="Service.Booking.HasDog" class="form-check-input" id="dog" />
+                                <label class="form-check-label ms-1" for="dog">🐕</label>
+                            </div>
+                            <div class="option-label">Собака</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 8️ Заметки -->
+                <div class="mb-3">
+                    <InputTextArea @bind-Value="Service.Booking.AdminNotes" class="form-control" rows="2" placeholder="Заметки..." />
+                </div>
+
+                <!-- 9️ Кнопки -->
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary flex-fill" @onclick='() => Nav.NavigateTo("/bookings")'>Отмена</button>
+                    <button type="submit" class="btn btn-success flex-fill">@(Id.HasValue ? "Обновить" : "Создать")</button>
+                </div>
+            </EditForm>
         </div>
     </div>
 </div>
 
 @code {
     [Parameter] public int? Id { get; set; }
-    private BookingDto booking = new() 
-    { 
-        Guest = new GuestDto() 
-    };
-    private List<BookingDto> allBookings = new();
-
-    // Поля для поиска гостей
-    private string guestSearchTerm = string.Empty;
-    private List<GuestDto> searchResults = new();
-    private GuestDto? selectedGuest;
-    private bool showGuestDropdown;
-    private bool isSearching;
-    private Timer? debounceTimer;
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings") ?? new();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Ошибка загрузки броней: {ex.Message}");
-            allBookings = new();
-        }
-
-        // Если перешли из календаря (start в URL)
-        var uri = Nav.ToAbsoluteUri(Nav.Uri);
-        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("start", out var startVal))
-        {
-            booking.ArrivalDate = DateTime.Parse(startVal!);
-            booking.DepartureDate = booking.ArrivalDate.AddDays(1);
-
-            if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("unit", out var unitVal))
-            {
-                if (int.TryParse(unitVal, out var unit))
-                {
-                    booking.ReservedUnit = (ReservedUnits)unit;
-                }
-            }
-        }
-
-        // Если режим редактирования
-        if (Id.HasValue)
-        {
-            var result = await Http.GetFromJsonAsync<BookingDto>($"api/bookings/{Id}");
-            if (result != null)
-            {
-                booking = result;
-                if (booking.Guest != null)
-                {
-                    selectedGuest = booking.Guest;
-                    guestSearchTerm = booking.Guest.FullName ?? string.Empty;
-                }
-            }
-        }
-
-        if (booking.Guest == null)
-        {
-            booking.Guest = new GuestDto();
-        }
+        Service.StateChanged += StateHasChanged;
+        await Service.InitializeAsync(Id, Nav.Uri);
     }
 
-    private string GetDateStatus(DateTime date)
+    private void OnNameSearchInput(ChangeEventArgs e)
     {
-        if (allBookings == null || !allBookings.Any()) return "free";
-    
-        // Находим все брони на эту дату (исключая текущую)
-        var bookingsOnDate = allBookings.Where(b =>
-            b.Id != (Id ?? 0) &&
-            date >= b.ArrivalDate.Date &&
-            date < b.DepartureDate.Date
-        ).ToList();
-
-        // Если броней нет - полностью свободно
-        if (!bookingsOnDate.Any()) return "free";
-
-        // Проверяем, есть ли бронь на весь дом
-        bool hasWholeHouse = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.WholeHouse);
-    
-        // Проверяем, какие половинки заняты
-        bool pondSideBusy = bookingsOnDate.Any(b => 
-            b.ReservedUnit == ReservedUnits.PondSide || b.ReservedUnit == ReservedUnits.WholeHouse);
-    
-        bool parkingSideBusy = bookingsOnDate.Any(b => 
-            b.ReservedUnit == ReservedUnits.ParkingSide || b.ReservedUnit == ReservedUnits.WholeHouse);
-
-        // Определяем статус в зависимости от выбранного объекта
-        if (booking.ReservedUnit == ReservedUnits.WholeHouse)
-        {
-            // Для всего дома - красный если есть ЛЮБАЯ бронь
-            return bookingsOnDate.Any() ? "busy" : "free";
-        }
-        else
-        {
-            // Для половинки - смотрим статус конкретной половинки
-            bool selectedSideBusy = booking.ReservedUnit == ReservedUnits.PondSide ? pondSideBusy : parkingSideBusy;
-        
-            if (!selectedSideBusy)
-            {
-                // Выбранная половинка свободна
-                return "free";
-            }
-            else
-            {
-                // Выбранная половинка занята
-                return "busy";
-            }
-        }
+        Service.OnNameSearchInput(e.Value?.ToString() ?? "");
     }
 
-    private string GetCalendarDayStatus(DateTime date)
+    private void OnPhoneSearchInput(ChangeEventArgs e)
     {
-        if (allBookings == null || !allBookings.Any()) return "free";
-    
-        // Находим все брони на эту дату (исключая текущую)
-        var bookingsOnDate = allBookings.Where(b =>
-            b.Id != (Id ?? 0) &&
-            date >= b.ArrivalDate.Date &&
-            date < b.DepartureDate.Date
-        ).ToList();
-
-        // Если броней нет - свободно
-        if (!bookingsOnDate.Any()) return "free";
-
-        // Проверяем, есть ли бронь на весь дом
-        bool hasWholeHouse = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.WholeHouse);
-    
-        // Если есть бронь на весь дом - всё красное
-        if (hasWholeHouse) return "full-busy";
-
-        // Проверяем, какие половинки заняты
-        bool pondSideBusy = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.PondSide);
-        bool parkingSideBusy = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.ParkingSide);
-
-        // Если заняты обе половинки - красный
-        if (pondSideBusy && parkingSideBusy) return "full-busy";
-    
-        // Если занята одна половинка - желтый
-        if (pondSideBusy || parkingSideBusy) return "partial-busy";
-    
-        return "free";
-    }
-
-    private string GetDateTooltip(DateTime date)
-    {
-        var bookingsOnDate = allBookings?.Where(b =>
-            b.Id != (Id ?? 0) &&
-            date >= b.ArrivalDate.Date &&
-            date < b.DepartureDate.Date
-        ).ToList();
-
-        if (bookingsOnDate == null || !bookingsOnDate.Any())
-            return $"📅 {date:dd.MM.yyyy} - свободно";
-
-        var pond = bookingsOnDate.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.PondSide);
-        var park = bookingsOnDate.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.ParkingSide);
-        var whole = bookingsOnDate.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.WholeHouse);
-
-        if (whole != null)
-            return $"📅 {date:dd.MM.yyyy}\n🏠 Весь дом занят: {whole.Guest?.FullName}";
-
-        if (pond != null && park != null)
-            return $"📅 {date:dd.MM.yyyy}\n🌊 Пруд: {pond.Guest?.FullName}\n🚗 Парковка: {park.Guest?.FullName}";
-
-        if (pond != null)
-            return $"📅 {date:dd.MM.yyyy}\n🌊 Пруд занят: {pond.Guest?.FullName}\n🚗 Парковка свободна";
-
-        if (park != null)
-            return $"📅 {date:dd.MM.yyyy}\n🚗 Парковка занята: {park.Guest?.FullName}\n🌊 Пруд свободен";
-
-        return $"📅 {date:dd.MM.yyyy} - свободно";
-    }
-
-    private void OnSearchInput(ChangeEventArgs e)
-    {
-        guestSearchTerm = e.Value?.ToString() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(guestSearchTerm) || guestSearchTerm.Length < 2)
-        {
-            searchResults.Clear();
-            showGuestDropdown = false;
-            return;
-        }
-
-        debounceTimer?.Dispose();
-        debounceTimer = new Timer(async _ =>
-        {
-            await InvokeAsync(async () =>
-            {
-                await SearchGuests();
-                StateHasChanged();
-            });
-        }, null, 300, Timeout.Infinite);
-    }
-
-    private async Task SearchGuests()
-    {
-        if (string.IsNullOrWhiteSpace(guestSearchTerm) || guestSearchTerm.Length < 2)
-            return;
-
-        isSearching = true;
-        try
-        {
-            searchResults = await Http.GetFromJsonAsync<List<GuestDto>>(
-                $"api/guests/search?term={Uri.EscapeDataString(guestSearchTerm)}") ?? new();
-            showGuestDropdown = true;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Ошибка поиска: {ex.Message}");
-        }
-        finally
-        {
-            isSearching = false;
-        }
-    }
-
-    private void SelectGuest(GuestDto guest)
-    {
-        selectedGuest = guest;
-        guestSearchTerm = guest.FullName;
-        showGuestDropdown = false;
-
-        // Просто присваиваем ссылку, не создаем новый объект!
-        booking.Guest = guest;
-    }
-
-    private void ClearGuest()
-    {
-        selectedGuest = null;
-        guestSearchTerm = string.Empty;
-        booking.Guest = new GuestDto { FullName = "", Phone = "" };
-        searchResults.Clear();
-    }
-
-    private async void HideDropdown()
-    {
-        await Task.Delay(200);
-        showGuestDropdown = false;
-        StateHasChanged();
+        Service.OnPhoneSearchInput(e.Value?.ToString() ?? "");
     }
 
     private void OnDateChanged()
     {
-        if (booking.DepartureDate <= booking.ArrivalDate)
+        if (Service.Booking.DepartureDate <= Service.Booking.ArrivalDate)
         {
-            booking.DepartureDate = booking.ArrivalDate.AddDays(1);
+            Service.Booking.DepartureDate = Service.Booking.ArrivalDate.AddDays(1);
         }
         StateHasChanged();
     }
 
-    private void OnUnitChanged()
+    private void OnUnitChanged() => StateHasChanged();
+
+    private async void HideNameDropdown()
     {
+        await Task.Delay(200);
+        Service.HideNameDropdown();
+    }
+
+    private async void HidePhoneDropdown()
+    {
+        await Task.Delay(200);
+        Service.HidePhoneDropdown();
+    }
+
+    private string GetDateTooltip(DateTime date)
+    {
+        var busyUnits = Service.GetBusyUnitsOnDate(date);
+        if (busyUnits == 0)
+            return $"📅 {date:dd.MM.yyyy} - свободно";
+
+        var parts = new List<string>();
+        if (busyUnits.HasFlag(ReservedUnits.PondSide))
+            parts.Add("🌊 Пруд");
+        if (busyUnits.HasFlag(ReservedUnits.ParkingSide))
+            parts.Add("🚗 Парковка");
+
+        return $"📅 {date:dd.MM.yyyy}\nЗанято: {string.Join(", ", parts)}";
+    }
+
+    private void OnDateTap(DateTime date, string status)
+    {
+        // Если дата занята полностью - ничего не делаем
+        if (status == "full-busy") return;
+
+        // Если это дата раньше заезда - игнорируем
+        if (date < Service.Booking.ArrivalDate) return;
+
+        // Если это дата заезда - игнорируем
+        if (date.Date == Service.Booking.ArrivalDate.Date) return;
+
+        // Проверяем, свободен ли выбранный объект во все дни до выбранной даты
+        var isPeriodFree = true;
+        var checkDate = Service.Booking.ArrivalDate;
+    
+        while (checkDate <= date)
+        {
+            var dayStatus = Service.GetDateStatus(checkDate);
+            if (dayStatus == "full-busy" || 
+                (dayStatus == "partial-busy" && Service.Booking.ReservedUnit != ReservedUnits.WholeHouse))
+            {
+                isPeriodFree = false;
+                break;
+            }
+            checkDate = checkDate.AddDays(1);
+        }
+
+        if (!isPeriodFree)
+        {
+            // Находим последнюю свободную дату
+            var lastFreeDate = Service.Booking.ArrivalDate;
+            checkDate = Service.Booking.ArrivalDate.AddDays(1);
+        
+            while (checkDate <= date)
+            {
+                var dayStatus = Service.GetDateStatus(checkDate);
+                if (dayStatus == "full-busy" || 
+                    (dayStatus == "partial-busy" && Service.Booking.ReservedUnit != ReservedUnits.WholeHouse))
+                {
+                    break;
+                }
+                lastFreeDate = checkDate;
+                checkDate = checkDate.AddDays(1);
+            }
+        
+            // Устанавливаем выезд на последнюю свободную дату
+            Service.Booking.DepartureDate = lastFreeDate.AddDays(1);
+            StateHasChanged();
+        
+            // Показываем предупреждение (опционально)
+            // await ShowWarning($"Можно забронировать только до {lastFreeDate:dd.MM}");
+        
+            return;
+        }
+
+        // Если всё свободно - устанавливаем выезд
+        Service.Booking.DepartureDate = date.AddDays(1);
         StateHasChanged();
     }
 
-    private void UpdateTotal()
+    private DateTime GetMaxAvailableDate()
     {
-        Task.Delay(5).ContinueWith(_ =>
+        var maxDate = Service.Booking.ArrivalDate.AddDays(30); // Максимум 30 дней
+        var checkDate = Service.Booking.ArrivalDate.AddDays(1);
+    
+        while (checkDate <= maxDate)
         {
-            booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
-            InvokeAsync(StateHasChanged);
-        });
+            var status = Service.GetDateStatus(checkDate);
+            if (status == "full-busy" || 
+                (status == "partial-busy" && Service.Booking.ReservedUnit != ReservedUnits.WholeHouse))
+            {
+                return checkDate.AddDays(-1);
+            }
+            checkDate = checkDate.AddDays(1);
+        }
+    
+        return maxDate;
     }
 
     private async Task HandleSubmit()
     {
-        booking.TotalGuestsCount = booking.AdultsCount + booking.ChildrenCount + booking.InfantsCount;
-
-        var request = new HttpRequestMessage(
-            Id.HasValue ? HttpMethod.Put : HttpMethod.Post,
-            Id.HasValue ? $"api/bookings/{Id}" : "api/bookings")
-        {
-            Content = JsonContent.Create(booking)
-        };
-
-        request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
-
-        var response = await Http.SendAsync(request);
-
-        if (response.IsSuccessStatusCode)
+        if (await Service.SubmitAsync(Id))
             Nav.NavigateTo("/calendar");
     }
 
     public void Dispose()
     {
-        debounceTimer?.Dispose();
+        Service.StateChanged -= StateHasChanged;
+        Service.Dispose();
     }
 }

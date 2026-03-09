@@ -1,149 +1,141 @@
-﻿using AgroAdmin.API.Controllers;
-using AgroAdmin.Components;
+﻿using AgroAdmin.Components;
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
+using AgroAdmin.Shared.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
-namespace AgroAdmin
+var builder = WebApplication.CreateBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File("logs/agroadmin-.txt",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+
+builder.Services.AddControllers()
+    .AddApplicationPart(typeof(AgroAdmin.API.Controllers.AuthController).Assembly);
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveWebAssemblyComponents();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:8080";
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(frontendUrl) });
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+var allowedOrigins = new[] { "https://agroadmin.runasp.net" };
+builder.Services.AddCors(options =>
 {
-    public class Program
+    options.AddPolicy("AllowSpecificOrigin", policy =>
     {
-        public static void Main(string[] args)
-        {
-            Log.Logger = new LoggerConfiguration()
-                .WriteTo.Console()
-                .WriteTo.File("logs/agroadmin-.txt",
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 7,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
-                .CreateLogger();
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    });
+});
 
-            try
-            {
-                Log.Information("Starting AgroAdmin application");
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options => {
+        options.Cookie.Name = "AgroAdmin.Auth";
+        options.LoginPath = "/login";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    });
 
-                var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddAuthorization();
 
-                // 👇 ПОДКЛЮЧАЕМ SERILOG
-                builder.Host.UseSerilog();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ITelegramService>(sp =>
+{
+    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var logger = sp.GetRequiredService<ILogger<TelegramService>>();
+    return new TelegramService(httpClientFactory, configuration, logger);
+});
 
-                // Add services to the container.
-                builder.Services.AddRazorComponents()
-                    .AddInteractiveWebAssemblyComponents();
-                builder.Services.AddControllers()
-                    .AddApplicationPart(typeof(BookingsController).Assembly);
-                builder.Services.AddEndpointsApiExplorer();
-                builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<BookingFormService>();
 
-                builder.Services.AddDbContext<AppDbContext>(options =>
-                    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+if (OperatingSystem.IsWindows())
+{
+    // На Windows Server/IIS ключи хранятся в реестре или профиле пользователя
+    builder.Services.AddDataProtection()
+        .SetApplicationName("AgroAdmin");
+}
+else
+{
+    // Для Linux/Docker
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
+        .SetApplicationName("AgroAdmin");
+}
 
-                var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:8080";
-                builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(frontendUrl) });
+var app = builder.Build();
 
-                var allowedOrigins = new[] { "https://agroadmin.runasp.net" };
-
-                builder.Services.AddCors(options =>
-                {
-                    options.AddPolicy("AllowSpecificOrigin", policy =>
-                    {
-                        policy.WithOrigins(allowedOrigins)
-                            .AllowAnyMethod()
-                            .AllowAnyHeader()
-                            .AllowCredentials();
-                    });
-                });
-
-                builder.Services.AddHttpContextAccessor();
-                builder.Services.AddScoped<IAuthService, AuthService>();
-
-                // 👇 АВТОРИЗАЦИЯ (минимально)
-                builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-                    .AddCookie(options =>
-                    {
-                        options.LoginPath = "/login";
-                        options.Cookie.Name = ".AgroAdmin.Auth";
-                        options.Cookie.SameSite = SameSiteMode.Lax;
-                        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-                    });
-                builder.Services.AddAuthorization();
-
-                // 👇 ТЕЛЕГРАМ
-                builder.Services.AddHttpClient();
-                builder.Services.AddSingleton<ITelegramService>(sp =>
-                {
-                    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-                    var configuration = sp.GetRequiredService<IConfiguration>();
-                    var logger = sp.GetRequiredService<ILogger<TelegramService>>();
-                    return new TelegramService(httpClientFactory, configuration, logger);
-                });
-
-                var app = builder.Build();
-
-                // Миграции
-                using (var scope = app.Services.CreateScope())
-                {
-                    try
-                    {
-                        scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex, "Migration applying error");
-                    }
-                }
-
-                // Pipeline
-                if (app.Environment.IsDevelopment())
-                {
-                    app.UseWebAssemblyDebugging();
-                    app.UseSwagger();
-                    app.UseSwaggerUI();
-                }
-                else
-                {
-                    app.UseExceptionHandler("/Error");
-                    app.UseHsts();
-                }
-
-                app.UseHttpsRedirection();
-                app.UseCors("AllowSpecificOrigin"); // 👈 ИСПРАВЛЕНО
-                app.UseRouting();
-                app.UseAuthentication();
-                app.UseAuthorization();
-                app.UseAntiforgery();
-
-                app.MapControllers();
-                app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-
-                app.Use(async (context, next) =>
-                {
-                    if (context.Request.Path == "/")
-                    {
-                        context.Response.Redirect("/calendar");
-                        return;
-                    }
-                    await next();
-                });
-
-                app.MapStaticAssets();
-                app.MapRazorComponents<App>()
-                    .AddInteractiveWebAssemblyRenderMode()
-                    .AddAdditionalAssemblies(typeof(AgroAdmin.Client._Imports).Assembly);
-
-                app.Run();
-            }
-            catch (Exception ex)
-            {
-                Log.Fatal(ex, "Application terminated unexpectedly");
-            }
-            finally
-            {
-                Log.CloseAndFlush();
-            }
-        }
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Migration applying error");
     }
 }
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseWebAssemblyDebugging();
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseCors("AllowSpecificOrigin");
+app.UseStaticFiles();
+app.MapStaticAssets();
+
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
+
+app.MapControllers();
+
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path == "/")
+    {
+        context.Response.Redirect("/calendar");
+        return;
+    }
+    await next();
+});
+
+app.MapRazorComponents<App>()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AddAdditionalAssemblies(typeof(AgroAdmin.Client._Imports).Assembly);
+
+app.Run();

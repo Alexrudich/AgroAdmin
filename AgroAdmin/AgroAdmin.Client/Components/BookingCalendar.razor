@@ -1,0 +1,71 @@
+﻿@using AgroAdmin.Shared.Dto
+@using AgroAdmin.Shared.Enums
+@* Components/BookingCalendar.razor *@
+@if (ShowCalendar)
+{
+    <div class="mobile-calendar">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">📅 Занятость</h6>
+            <button class="btn btn-sm btn-outline-primary" @onclick="ToggleWeekRange">
+                @(showFullWeek ? "Скрыть" : "Показать больше")
+            </button>
+        </div>
+
+        <div class="calendar-grid-mobile">
+            @for (int i = startOffset; i < endOffset; i++)
+            {
+                var date = Booking.ArrivalDate.AddDays(i);
+                if (date < DateTime.Today.AddDays(-30)) continue;
+
+                var status = GetCalendarDayStatus(date);
+                var isSelected = date >= Booking.ArrivalDate && date < Booking.DepartureDate;
+
+                <div class="calendar-day-mobile @status @(isSelected ? "selected" : "")"
+                     title="@GetDateTooltip(date)"
+                     @onclick="() => OnDateClick(date)">
+                    <div class="day-number">@date.Day</div>
+                    <div class="day-month">@date.ToString("MMM")</div>
+                    @if (status == "full-busy")
+                    {
+                        <div class="busy-dot"></div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public CreateBookingDto Booking { get; set; } = new();
+    [Parameter] public List<BookingDto> AllBookings { get; set; } = new();
+    [Parameter] public int? CurrentBookingId { get; set; }
+    [Parameter] public bool ShowCalendar { get; set; } = true;
+    [Parameter] public EventCallback<DateTime> OnDateSelected { get; set; }
+
+    private bool showFullWeek = false;
+    private int startOffset => showFullWeek ? -7 : -2;
+    private int endOffset => showFullWeek ? 14 : 5;
+
+    private void ToggleWeekRange() => showFullWeek = !showFullWeek;
+
+    private string GetCalendarDayStatus(DateTime date)
+    {
+        var bookingsOnDate = AllBookings.Where(b =>
+            b.Id != (CurrentBookingId ?? 0) &&
+            date >= b.ArrivalDate.Date &&
+            date < b.DepartureDate.Date
+        ).ToList();
+
+        if (!bookingsOnDate.Any()) return "free";
+        if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.WholeHouse)) return "full-busy";
+
+        bool pondBusy = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.PondSide);
+        bool parkBusy = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.ParkingSide);
+
+        return (pondBusy && parkBusy) ? "full-busy" : "partial-busy";
+    }
+
+    private string GetDateTooltip(DateTime date) => $"📅 {date:dd.MM}";
+
+    private async Task OnDateClick(DateTime date) => await OnDateSelected.InvokeAsync(date);
+}

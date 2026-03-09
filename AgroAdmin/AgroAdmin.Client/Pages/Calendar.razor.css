@@ -1,11 +1,14 @@
-﻿.calendar-grid {
+﻿/* ========================================
+   1. ОСНОВНАЯ СЕТКА КАЛЕНДАРЯ
+   ======================================== */
+.calendar-grid {
     display: flex;
     flex-direction: column;
     border: 1px solid #dee2e6;
-    min-width: 900px;
     background: #fff;
     border-radius: 8px;
     overflow: hidden;
+    width: 100%;
 }
 
 .calendar-header {
@@ -33,7 +36,6 @@
     border: 0.5px solid #f1f1f1;
     display: flex;
     flex-direction: column;
-    transition: transform 0.1s;
 }
 
 .other-month {
@@ -56,7 +58,9 @@
     padding: 4px;
 }
 
-/* Базовый стиль ячейки */
+/* ========================================
+   2. СТИЛИ ЯЧЕЕК БРОНИРОВАНИЯ
+   ======================================== */
 .unit-zone {
     flex-grow: 1;
     border-radius: 4px;
@@ -64,50 +68,39 @@
     font-size: 0.75rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    border-left: 4px solid transparent; /* Акцентная полоска слева */
-    background-color: #f8f9fa; /* Светлый нейтральный фон */
+    border-left: 4px solid transparent;
+    background-color: #f8f9fa;
     color: #495057;
     margin-bottom: 2px;
-}
-
-.unit-text {
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-/* Свободная зона — максимально легкая */
 .free {
-    background-color: transparent;
-    color: #ced4da;
-    border: 1px dashed #e9ecef;
-    border-left: 4px solid transparent;
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+    border-left: 4px solid #2e7d32;
 }
 
     .free:hover {
-        background-color: #f1f8f5; /* Легкий мятный при наведении */
-        color: #198754;
-        border-style: solid;
-        border-color: #198754;
+        background-color: #c8e6c9;
     }
 
-/* Занятая половинка — спокойный голубой/синий */
 .busy {
-    background-color: #e7f1ff; /* Нежно-голубой */
-    color: #084298;
-    border: 1px solid #cfe2ff;
-    border-left: 4px solid #0d6efd; /* Яркий акцент синего */
+    background-color: #ffebee;
+    color: #b71c1c;
+    border: 1px solid #ef9a9a;
+    border-left: 4px solid #b71c1c;
     font-weight: 500;
 }
 
     .busy:hover {
-        background-color: #d1e7ff;
+        background-color: #ffcdd2;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
-/* Весь дом — благородный фиолетовый или глубокий зеленый */
 .full-house {
-    background-color: #f3e5f5; /* Лавандовый */
+    background-color: #f3e5f5;
     color: #4a148c;
     border: 1px solid #e1bee7;
     border-left: 4px solid #9c27b0;
@@ -115,19 +108,323 @@
     font-weight: bold;
 }
 
-/* Подсветка текущего дня */
-.is-today {
-    border: 2px solid #0d6efd !important;
-    background-color: #fff !important;
+/* ========================================
+   3. НЕПРЕРЫВНАЯ БЕГУЩАЯ СТРОКА
+   ======================================== */
+.marquee-wrapper {
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
 }
 
-/* Вместо scale используем внутреннюю тень и яркую границу, чтобы не двигать соседние ячейки */
-.unit-zone.highlight-booking {
-    background-color: #fff3cd !important;
-    border: 2px solid #ffc107 !important;
-    border-left: 4px solid #ffc107 !important;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
-    color: #856404 !important;
-    z-index: 5;
+.marquee-content {
+    display: inline-block;
+    transform: translateX(0);
+    will-change: transform;
 }
 
+    .marquee-content.active {
+        animation: marquee-scroll 8s linear infinite;
+    }
+
+    .marquee-content.long-text.active {
+        animation-duration: 12s;
+    }
+
+@keyframes marquee-scroll {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+.marquee-wrapper::before,
+.marquee-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.marquee-wrapper::before {
+    left: 0;
+    background: linear-gradient(to right, rgba(255,255,255,0.95), transparent);
+}
+
+.marquee-wrapper::after {
+    right: 0;
+    background: linear-gradient(to left, rgba(255,255,255,0.95), transparent);
+}
+
+.marquee-wrapper:has(.marquee-content.active)::before,
+.marquee-wrapper:has(.marquee-content.active)::after {
+    opacity: 1;
+}
+
+/* ========================================
+   4. МОБИЛЬНАЯ АДАПТАЦИЯ
+   ======================================== */
+@media (max-width: 768px) {
+    .calendar-cell {
+        min-height: 140px;
+    }
+
+    .date-number {
+        padding: 8px 10px;
+        font-size: 1rem;
+    }
+
+    .unit-zone {
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+
+    .header-cell {
+        padding: 12px 8px;
+        font-size: 0.9rem;
+    }
+
+    .marquee-content.active {
+        animation-duration: 6s;
+    }
+
+    .calendar-body {
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .calendar-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: #f8f9fa;
+    }
+}
+
+@media (max-width: 480px) {
+    .calendar-cell {
+        min-height: 160px;
+    }
+
+    .date-number {
+        font-size: 1.1rem;
+        padding: 10px 12px;
+    }
+
+    .unit-zone {
+        font-size: 0.9rem;
+        padding: 10px;
+    }
+
+    .marquee-content.active {
+        animation-duration: 5s;
+    }
+}
+
+/* ========================================
+   5. УЛУЧШЕННАЯ НАВИГАЦИЯ
+   ======================================== */
+.month-navigation-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.month-navigation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 4px;
+    border-radius: 40px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border: 1px solid #e9ecef;
+}
+
+.month-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #f8f9fa;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 160px;
+    justify-content: center;
+}
+
+    .month-selector:hover {
+        background: #e9ecef;
+    }
+
+.current-month-display {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    text-transform: capitalize;
+}
+
+.dropdown-icon {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.month-nav-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #495057;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+    .month-nav-btn:hover {
+        background: #f1f3f5;
+    }
+
+.today-nav-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: #1976d2;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 4px;
+}
+
+    .today-nav-btn:hover {
+        background: #1565c0;
+        transform: scale(1.05);
+    }
+
+.month-picker-dropdown {
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 16px;
+    z-index: 1000;
+    min-width: 280px;
+    border: 1px solid #e9ecef;
+}
+
+.month-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding: 0 8px;
+}
+
+.month-picker-year {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.month-picker-nav {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid #dee2e6;
+    background: white;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+    .month-picker-nav:hover {
+        background: #f8f9fa;
+    }
+
+.month-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.month-picker-item {
+    padding: 10px;
+    text-align: center;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+}
+
+    .month-picker-item:hover {
+        background: #f1f3f5;
+    }
+
+    .month-picker-item.selected {
+        background: #1976d2;
+        color: white;
+    }
+
+@media (max-width: 768px) {
+    .month-navigation {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .month-selector {
+        min-width: 140px;
+        padding: 6px 12px;
+    }
+
+    .current-month-display {
+        font-size: 14px;
+    }
+
+    .month-picker-dropdown {
+        width: calc(100% - 32px);
+        left: 16px;
+        transform: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .month-selector {
+        min-width: 120px;
+        padding: 6px 8px;
+    }
+
+    .current-month-display {
+        font-size: 13px;
+    }
+
+    .month-nav-btn, .today-nav-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+}

@@ -2,8 +2,7 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
-<div class="page">
-    @* Показываем сайдбар только если мы НЕ на логине *@
+<div class="page @(IsLoginPage ? "login-page" : "app-page")">
     @if (!IsLoginPage)
     {
         <div class="sidebar">
@@ -11,19 +10,19 @@
         </div>
     }
 
-    <main>
-        <div class="top-row px-4 d-flex justify-content-end align-items-center">
-            @if (!IsLoginPage)
-            {
+    <main class="@(IsLoginPage ? "login-main" : "app-main")">
+        @if (!IsLoginPage)
+        {
+            <div class="top-row px-4 d-flex justify-content-end align-items-center">
                 <button class="btn btn-outline-danger btn-sm" @onclick="HandleLogout">
                     🚪 Выйти
                 </button>
-            }
-        </div>
+            </div>
+        }
 
-        <article class="content px-4">
+        <div class="content-container">
             @Body
-        </article>
+        </div>
     </main>
 </div>
 
@@ -34,7 +33,6 @@
 </div>
 
 @code {
-    // Проверка: на странице логина мы или нет
     private bool IsLoginPage => Navigation.Uri.Contains("/login", StringComparison.OrdinalIgnoreCase);
 
     private async Task HandleLogout()
@@ -43,7 +41,6 @@
         Navigation.NavigateTo("/login", forceLoad: true);
     }
 
-    // Подписываемся на события навигации, чтобы макет обновлялся при переходе
     protected override void OnInitialized()
     {
         Navigation.LocationChanged += (s, e) => StateHasChanged();

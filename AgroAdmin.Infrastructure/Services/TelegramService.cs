@@ -10,8 +10,7 @@ namespace AgroAdmin.Infrastructure.Services;
 public class TelegramService(
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration,
-    ILogger<TelegramService> logger)
-    : ITelegramService
+    ILogger<TelegramService> logger) : ITelegramService
 {
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient();
     private readonly string _botToken = configuration["Telegram:BotToken"] ?? throw new InvalidOperationException("Telegram:BotToken not configured");
@@ -70,7 +69,6 @@ public class TelegramService(
     private string FormatBookingMessage(BookingDto booking)
     {
         var unitName = booking.ReservedUnit.ToFriendlyString();
-
         var unitEmoji = booking.ReservedUnit switch
         {
             ReservedUnits.PondSide => "🌊",

@@ -1,0 +1,27 @@
+﻿@if (ShowForm)
+{
+    <div class="guest-form">
+        <div class="mb-3">
+            <label class="form-label fw-bold">👤 Имя <span class="text-danger">*</span></label>
+            <InputText @bind-Value="Guest.FullName" class="form-control" placeholder="Имя Фамилия" />
+            <ValidationMessage For="@(() => Guest.FullName)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">📞 Телефон <span class="text-danger">*</span></label>
+            <InputText @bind-Value="Guest.Phone" class="form-control" placeholder="+375..." />
+            <ValidationMessage For="@(() => Guest.Phone)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">📝 Комментарий</label>
+            <InputTextArea @bind-Value="Guest.Comment" class="form-control" rows="3"
+                           placeholder="Особые отметки, пожелания..." />
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public GuestDto Guest { get; set; } = new();
+    [Parameter] public bool ShowForm { get; set; } = true;
+}
