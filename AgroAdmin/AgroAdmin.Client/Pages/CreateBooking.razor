@@ -1,9 +1,5 @@
 ﻿@page "/bookings/create"
 @page "/bookings/edit/{Id:int}"
-@using AgroAdmin.Shared.Dto
-@using AgroAdmin.Shared.Enums
-@using AgroAdmin.Shared.Extensions
-@using AgroAdmin.Shared.Services
 @implements IDisposable
 @inject BookingFormService Service
 @inject NavigationManager Nav
@@ -17,46 +13,85 @@
         <div class="card-body p-3">
             <EditForm Model="@Service.Booking" OnValidSubmit="HandleSubmit">
 
-                <!-- 1️⃣ Выбранный гость (если есть) -->
-                @if (Service.SelectedGuest != null)
-                {
-                    <div class="selected-guest-card mb-3">
-                        <div class="selected-guest-avatar">
-                            @(Service.SelectedGuest.FullName?.Length > 0 ? Service.SelectedGuest.FullName.Substring(0, 1).ToUpper() : "?")
-                        </div>
-                        <div class="selected-guest-info">
-                            <div class="selected-guest-name">
-                                @Service.SelectedGuest.FullName
-                                <span class="selected-guest-badge">Был @Service.SelectedGuest.TotalStays раз(а)</span>
-                            </div>
-                            <div class="selected-guest-phone">📞 @Service.SelectedGuest.Phone</div>
-                        </div>
-                        <span class="selected-guest-check">✓</span>
-                    </div>
-                }
-
-                <!-- 2️⃣ Поиск гостя -->
+                <!-- 1️⃣ УМНОЕ ПОЛЕ ПОИСКА ПО ИМЕНИ -->
                 <div class="row mb-3">
                     <div class="col-md-12">
-                        <label class="form-label fw-bold">👤 Поиск существующего гостя</label>
-                        <div class="guest-search-container">
+                        <label class="form-label fw-bold">👤 Имя гостя (поиск по имени)</label>
+                        <div class="smart-search-container">
                             <input type="text"
                                    class="form-control @(Service.SelectedGuest != null ? "is-valid" : "")"
-                                   placeholder="🔍 Начните вводить имя или телефон..."
-                                   @bind="Service.GuestSearchTerm"
-                                   @oninput="OnSearchInput"
-                                   @onfocus="() => Service.ShowGuestDropdown = true"
-                                   @onblur="HideDropdown" />
+                                   placeholder="Например: Афанасий Фет"
+                                   @bind="Service.GuestNameSearchTerm"
+                                   @oninput="OnNameSearchInput"
+                                   @onfocus="() => Service.ShowNameDropdown = true"
+                                   @onblur="HideNameDropdown"
+                                   autocomplete="off" />
 
                             @if (Service.IsSearching)
                             {
                                 <span class="searching-indicator">🔍</span>
                             }
 
-                            @if (Service.ShowGuestDropdown && Service.SearchResults.Any())
+                            @if (Service.ShowNameDropdown && Service.NameSearchResults.Any())
                             {
                                 <div class="guest-dropdown">
-                                    @foreach (var guest in Service.SearchResults.Take(10))
+                                    @foreach (var guest in Service.NameSearchResults.Take(10))
+                                    {
+                                        <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
+                                             @onmousedown="() => Service.SelectGuest(guest)">
+                                            <div class="guest-avatar">
+                                                @guest.FullName.Substring(0, 1).ToUpper()
+                                            </div>
+                                            <div class="guest-info">
+                                                <div class="guest-name">@guest.FullName</div>
+                                                <div class="guest-phone">@guest.Phone</div>
+                                            </div>
+                                            <div class="guest-stats">
+                                                <span class="stay-badge">🏨 @guest.TotalStays</span>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    @if (!Service.NameSearchResults.Any() && Service.GuestNameSearchTerm.Length >= 2)
+                                    {
+                                        <div class="guest-item new-guest"
+                                             @onmousedown="() => Service.CreateNewGuestFromName()">
+                                            <div class="guest-avatar">➕</div>
+                                            <div class="guest-info">
+                                                <div class="guest-name">Создать нового гостя</div>
+                                                <div class="guest-phone">@Service.GuestNameSearchTerm</div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2️⃣ УМНОЕ ПОЛЕ ПОИСКА ПО ТЕЛЕФОНУ -->
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">📞 Телефон (поиск по телефону)</label>
+                        <div class="smart-search-container">
+                            <input type="text"
+                                   class="form-control"
+                                   placeholder="+375..."
+                                   @bind="Service.GuestPhoneSearchTerm"
+                                   @oninput="OnPhoneSearchInput"
+                                   @onfocus="() => Service.ShowPhoneDropdown = true"
+                                   @onblur="HidePhoneDropdown"
+                                   autocomplete="off" />
+
+                            @if (Service.IsSearching)
+                            {
+                                <span class="searching-indicator">🔍</span>
+                            }
+
+                            @if (Service.ShowPhoneDropdown && Service.PhoneSearchResults.Any())
+                            {
+                                <div class="guest-dropdown">
+                                    @foreach (var guest in Service.PhoneSearchResults.Take(10))
                                     {
                                         <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
                                              @onmousedown="() => Service.SelectGuest(guest)">
@@ -78,29 +113,25 @@
                     </div>
                 </div>
 
-                <!-- 3️⃣ Поля для ввода ФИО и телефона -->
-                <div class="row mb-3">
-                    <div class="col-md-7">
-                        <label class="form-label fw-bold">👤 Имя гостя</label>
-                        <InputText @bind-Value="Service.Booking.Guest!.FullName"
-                                   @oninput="OnGuestNameChanged"
-                                   class="form-control"
-                                   placeholder="Имя Фамилия" />
-                        @if (!string.IsNullOrWhiteSpace(Service.GuestSearchTerm) && !Service.IsSearching && Service.GuestSearchTerm.Length >= 2 && !Service.SearchResults.Any())
-                        {
-                            <div class="alert alert-info mt-2 py-1 small">
-                                <i class="bi bi-info-circle"></i> Будет создан новый гость
+                <!-- 3️⃣ Карточка выбранного гостя (если есть) -->
+                @if (Service.SelectedGuest != null)
+                {
+                    <div class="selected-guest-card mb-3">
+                        <div class="selected-guest-avatar">
+                            @(Service.SelectedGuest.FullName?.Length > 0 ? Service.SelectedGuest.FullName.Substring(0, 1).ToUpper() : "?")
+                        </div>
+                        <div class="selected-guest-info">
+                            <div class="selected-guest-name">
+                                @Service.SelectedGuest.FullName
+                                <span class="selected-guest-badge">Был @Service.SelectedGuest.TotalStays раз(а)</span>
                             </div>
-                        }
+                            <div class="selected-guest-phone">📞 @Service.SelectedGuest.Phone</div>
+                        </div>
+                        <button type="button" class="selected-guest-clear" @onclick="Service.ClearGuest" title="Очистить">
+                            ✕
+                        </button>
                     </div>
-                    <div class="col-md-5">
-                        <label class="form-label fw-bold">📞 Телефон</label>
-                        <InputText @bind-Value="Service.Booking.Guest!.Phone"
-                                   @oninput="OnGuestPhoneChanged"
-                                   class="form-control"
-                                   placeholder="+375..." />
-                    </div>
-                </div>
+                }
 
                 <!-- 4️⃣ Даты и объект -->
                 <div class="row mb-3">
@@ -158,7 +189,6 @@
                                             <div class="cell-day">@date.Day</div>
                                             <div class="cell-month">@date.ToString("MMM")</div>
 
-                                            <!-- Эмодзи для всех типов занятости -->
                                             @if (busyUnits != 0)
                                             {
                                                 <div class="cell-icons">
@@ -173,7 +203,6 @@
                                                 </div>
                                             }
 
-                                            <!-- Дополнительный индикатор для красных ячеек -->
                                             @if (status == "full-busy")
                                             {
                                                 <div class="busy-indicator" title="Полностью занято">⛔</div>
@@ -281,28 +310,14 @@
         await Service.InitializeAsync(Id, Nav.Uri);
     }
 
-    private void OnSearchInput(ChangeEventArgs e)
+    private void OnNameSearchInput(ChangeEventArgs e)
     {
-        Service.OnSearchInput(e.Value?.ToString() ?? "");
+        Service.OnNameSearchInput(e.Value?.ToString() ?? "");
     }
 
-    private void OnGuestNameChanged(ChangeEventArgs e)
+    private void OnPhoneSearchInput(ChangeEventArgs e)
     {
-        var newName = e.Value?.ToString() ?? "";
-        if (Service.SelectedGuest != null && newName != Service.SelectedGuest.FullName)
-        {
-            Service.ClearGuest();
-            Service.GuestSearchTerm = newName;
-        }
-    }
-
-    private void OnGuestPhoneChanged(ChangeEventArgs e)
-    {
-        var newPhone = e.Value?.ToString() ?? "";
-        if (Service.SelectedGuest != null && newPhone != Service.SelectedGuest.Phone)
-        {
-            Service.ClearGuest();
-        }
+        Service.OnPhoneSearchInput(e.Value?.ToString() ?? "");
     }
 
     private void OnDateChanged()
@@ -316,10 +331,16 @@
 
     private void OnUnitChanged() => StateHasChanged();
 
-    private async void HideDropdown()
+    private async void HideNameDropdown()
     {
         await Task.Delay(200);
-        Service.HideDropdown();
+        Service.HideNameDropdown();
+    }
+
+    private async void HidePhoneDropdown()
+    {
+        await Task.Delay(200);
+        Service.HidePhoneDropdown();
     }
 
     private string GetDateTooltip(DateTime date)

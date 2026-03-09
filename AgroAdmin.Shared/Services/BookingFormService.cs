@@ -1,11 +1,9 @@
 ﻿using AgroAdmin.Shared.Dto;
 using AgroAdmin.Shared.Enums;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.WebAssembly.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
-using System.Timers;
 using Timer = System.Timers.Timer;
 
 namespace AgroAdmin.Shared.Services;
@@ -16,7 +14,7 @@ public class BookingFormService : IDisposable
     private readonly NavigationManager _nav;
     private readonly ILogger<BookingFormService> _logger;
     private Timer? _debounceTimer;
-    private int? _currentBookingId; // 👈 Добавили поле
+    private int? _currentBookingId;
 
     public BookingFormService(
         HttpClient http,
@@ -32,18 +30,25 @@ public class BookingFormService : IDisposable
     public CreateBookingDto Booking { get; set; } = new() { Guest = new GuestDto() };
     public List<BookingDto> AllBookings { get; set; } = new();
 
-    // Поиск гостей
-    public string GuestSearchTerm { get; set; } = string.Empty;
-    public List<GuestDto> SearchResults { get; set; } = new();
+    // Поиск по имени
+    public string GuestNameSearchTerm { get; set; } = string.Empty;
+    public List<GuestDto> NameSearchResults { get; set; } = new();
+    public bool ShowNameDropdown { get; set; }
+
+    // Поиск по телефону
+    public string GuestPhoneSearchTerm { get; set; } = string.Empty;
+    public List<GuestDto> PhoneSearchResults { get; set; } = new();
+    public bool ShowPhoneDropdown { get; set; }
+
+    // Общие поля
     public GuestDto? SelectedGuest { get; set; }
-    public bool ShowGuestDropdown { get; set; }
     public bool IsSearching { get; set; }
 
     public event Action? StateChanged;
 
     public async Task InitializeAsync(int? id, string uri)
     {
-        _currentBookingId = id; // 👈 Сохраняем ID редактируемой брони
+        _currentBookingId = id;
 
         try
         {
@@ -100,7 +105,8 @@ public class BookingFormService : IDisposable
             if (result.Guest != null)
             {
                 SelectedGuest = result.Guest;
-                GuestSearchTerm = result.Guest.FullName ?? string.Empty;
+                GuestNameSearchTerm = result.Guest.FullName ?? string.Empty;
+                GuestPhoneSearchTerm = result.Guest.Phone ?? string.Empty;
                 Booking.Guest = result.Guest;
             }
         }
@@ -110,28 +116,53 @@ public class BookingFormService : IDisposable
         }
     }
 
-    public void OnSearchInput(string value)
+    public void OnNameSearchInput(string value)
     {
-        GuestSearchTerm = value;
+        GuestNameSearchTerm = value;
 
-        if (string.IsNullOrWhiteSpace(GuestSearchTerm) || GuestSearchTerm.Length < 2)
+        // Если есть выбранный гость и имя изменилось - сбрасываем
+        if (SelectedGuest != null && value != SelectedGuest.FullName)
         {
-            SearchResults.Clear();
-            ShowGuestDropdown = false;
+            ClearGuest();
+        }
+
+        if (string.IsNullOrWhiteSpace(GuestNameSearchTerm) || GuestNameSearchTerm.Length < 2)
+        {
+            NameSearchResults.Clear();
+            ShowNameDropdown = false;
             StateChanged?.Invoke();
             return;
         }
 
         _debounceTimer?.Dispose();
         _debounceTimer = new Timer(300);
-        _debounceTimer.Elapsed += async (_, _) => await SearchGuests();
+        _debounceTimer.Elapsed += async (_, _) => await SearchByName();
         _debounceTimer.AutoReset = false;
         _debounceTimer.Start();
     }
 
-    private async Task SearchGuests()
+    public void OnPhoneSearchInput(string value)
     {
-        if (string.IsNullOrWhiteSpace(GuestSearchTerm) || GuestSearchTerm.Length < 2)
+        GuestPhoneSearchTerm = value;
+
+        if (string.IsNullOrWhiteSpace(GuestPhoneSearchTerm) || GuestPhoneSearchTerm.Length < 3)
+        {
+            PhoneSearchResults.Clear();
+            ShowPhoneDropdown = false;
+            StateChanged?.Invoke();
+            return;
+        }
+
+        _debounceTimer?.Dispose();
+        _debounceTimer = new Timer(300);
+        _debounceTimer.Elapsed += async (_, _) => await SearchByPhone();
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
+    }
+
+    private async Task SearchByName()
+    {
+        if (string.IsNullOrWhiteSpace(GuestNameSearchTerm) || GuestNameSearchTerm.Length < 2)
             return;
 
         IsSearching = true;
@@ -139,13 +170,38 @@ public class BookingFormService : IDisposable
 
         try
         {
-            SearchResults = await _http.GetFromJsonAsync<List<GuestDto>>(
-                $"api/guests/search?term={Uri.EscapeDataString(GuestSearchTerm)}") ?? new();
-            ShowGuestDropdown = true;
+            NameSearchResults = await _http.GetFromJsonAsync<List<GuestDto>>(
+                $"api/guests/search?term={Uri.EscapeDataString(GuestNameSearchTerm)}") ?? new();
+            ShowNameDropdown = true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка поиска гостей");
+            _logger.LogError(ex, "Ошибка поиска гостей по имени");
+        }
+        finally
+        {
+            IsSearching = false;
+            StateChanged?.Invoke();
+        }
+    }
+
+    private async Task SearchByPhone()
+    {
+        if (string.IsNullOrWhiteSpace(GuestPhoneSearchTerm) || GuestPhoneSearchTerm.Length < 3)
+            return;
+
+        IsSearching = true;
+        StateChanged?.Invoke();
+
+        try
+        {
+            PhoneSearchResults = await _http.GetFromJsonAsync<List<GuestDto>>(
+                $"api/guests/search?term={Uri.EscapeDataString(GuestPhoneSearchTerm)}") ?? new();
+            ShowPhoneDropdown = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка поиска гостей по телефону");
         }
         finally
         {
@@ -157,29 +213,48 @@ public class BookingFormService : IDisposable
     public void SelectGuest(GuestDto guest)
     {
         SelectedGuest = guest;
-        GuestSearchTerm = guest.FullName;
-        ShowGuestDropdown = false;
+        GuestNameSearchTerm = guest.FullName;
+        GuestPhoneSearchTerm = guest.Phone;
+        ShowNameDropdown = false;
+        ShowPhoneDropdown = false;
 
-        Booking.Guest?.Id = guest.Id;
-        Booking.Guest?.FullName = guest.FullName;
-        Booking.Guest?.Phone = guest.Phone;
-        Booking.Guest?.Comment = guest.Comment;
+        Booking.Guest.Id = guest.Id;
+        Booking.Guest.FullName = guest.FullName;
+        Booking.Guest.Phone = guest.Phone;
+        Booking.Guest.Comment = guest.Comment;
 
+        StateChanged?.Invoke();
+    }
+
+    public void CreateNewGuestFromName()
+    {
+        Booking.Guest.FullName = GuestNameSearchTerm;
+        Booking.Guest.Phone = "";
+        SelectedGuest = null;
+        ShowNameDropdown = false;
         StateChanged?.Invoke();
     }
 
     public void ClearGuest()
     {
         SelectedGuest = null;
-        GuestSearchTerm = string.Empty;
+        GuestNameSearchTerm = string.Empty;
+        GuestPhoneSearchTerm = string.Empty;
         Booking.Guest = new GuestDto { FullName = "", Phone = "" };
-        SearchResults.Clear();
+        NameSearchResults.Clear();
+        PhoneSearchResults.Clear();
         StateChanged?.Invoke();
     }
 
-    public void HideDropdown()
+    public void HideNameDropdown()
     {
-        ShowGuestDropdown = false;
+        ShowNameDropdown = false;
+        StateChanged?.Invoke();
+    }
+
+    public void HidePhoneDropdown()
+    {
+        ShowPhoneDropdown = false;
         StateChanged?.Invoke();
     }
 
