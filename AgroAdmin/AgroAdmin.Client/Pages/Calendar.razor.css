@@ -87,15 +87,15 @@
     }
 
 .busy {
-    background-color: #e7f1ff;
-    color: #084298;
-    border: 1px solid #cfe2ff;
-    border-left: 4px solid #0d6efd;
+    background-color: #ffebee;
+    color: #b71c1c;
+    border: 1px solid #ef9a9a;
+    border-left: 4px solid #b71c1c;
     font-weight: 500;
 }
 
     .busy:hover {
-        background-color: #d1e7ff;
+        background-color: #ffcdd2;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
@@ -106,20 +106,6 @@
     border-left: 4px solid #9c27b0;
     justify-content: center;
     font-weight: bold;
-}
-
-.is-today {
-    border: 2px solid #0d6efd !important;
-    background-color: #fff !important;
-}
-
-.unit-zone.highlight-booking {
-    background-color: #fff3cd !important;
-    border: 2px solid #ffc107 !important;
-    border-left: 4px solid #ffc107 !important;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
-    color: #856404 !important;
-    z-index: 5;
 }
 
 /* ========================================
