@@ -277,6 +277,15 @@
         transform: scale(1.02);
         z-index: 2;
     }
+    .calendar-cell.available-range {
+        opacity: 0.8;
+        border: 1px dashed #1976d2;
+    }
+
+        .calendar-cell.available-range:hover {
+            opacity: 1;
+            background-color: #e3f2fd;
+        }
 
 .cell-day {
     font-weight: bold;

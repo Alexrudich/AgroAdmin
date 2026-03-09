@@ -197,12 +197,14 @@
 
                                         // Можно тапать только по датам позже заезда
                                         var canTap = date > Service.Booking.ArrivalDate && status != "full-busy";
+                                        var isInSelectedRange = date >= Service.Booking.ArrivalDate && date < Service.Booking.DepartureDate;
+                                        var isInFutureRange = date >= Service.Booking.ArrivalDate && date < GetMaxAvailableDate();
 
                                         <div class="calendar-cell @status
-                                     @(isSelected ? "selected" : "")
-                                     @(canTap ? "tapable" : "not-tapable")"
-                                             @onclick="() => OnDateTap(date, status)"
-                                             title="@GetDateTooltip(date)">
+                                             @(isInSelectedRange ? "selected" : "")
+                                             @(isInFutureRange && !isInSelectedRange ? "available-range" : "")
+                                             @(canTap ? "tapable" : "not-tapable")"
+                                             @onclick="() => OnDateTap(date, status)">
 
                                             <div class="cell-day">@date.Day</div>
                                             <div class="cell-weekday">@dayOfWeek</div>
@@ -369,18 +371,78 @@
         // Если дата занята полностью - ничего не делаем
         if (status == "full-busy") return;
 
-        // Если это дата раньше заезда - игнорируем (меняем через дропдаут)
+        // Если это дата раньше заезда - игнорируем
         if (date < Service.Booking.ArrivalDate) return;
 
-        // Если это дата заезда - игнорируем (меняем через дропдаут)
+        // Если это дата заезда - игнорируем
         if (date.Date == Service.Booking.ArrivalDate.Date) return;
 
-        // Если это дата позже заезда - устанавливаем выезд
-        if (date > Service.Booking.ArrivalDate)
+        // Проверяем, свободен ли выбранный объект во все дни до выбранной даты
+        var isPeriodFree = true;
+        var checkDate = Service.Booking.ArrivalDate;
+    
+        while (checkDate <= date)
         {
-            Service.Booking.DepartureDate = date.AddDays(1);
-            StateHasChanged();
+            var dayStatus = Service.GetDateStatus(checkDate);
+            if (dayStatus == "full-busy" || 
+                (dayStatus == "partial-busy" && Service.Booking.ReservedUnit != ReservedUnits.WholeHouse))
+            {
+                isPeriodFree = false;
+                break;
+            }
+            checkDate = checkDate.AddDays(1);
         }
+
+        if (!isPeriodFree)
+        {
+            // Находим последнюю свободную дату
+            var lastFreeDate = Service.Booking.ArrivalDate;
+            checkDate = Service.Booking.ArrivalDate.AddDays(1);
+        
+            while (checkDate <= date)
+            {
+                var dayStatus = Service.GetDateStatus(checkDate);
+                if (dayStatus == "full-busy" || 
+                    (dayStatus == "partial-busy" && Service.Booking.ReservedUnit != ReservedUnits.WholeHouse))
+                {
+                    break;
+                }
+                lastFreeDate = checkDate;
+                checkDate = checkDate.AddDays(1);
+            }
+        
+            // Устанавливаем выезд на последнюю свободную дату
+            Service.Booking.DepartureDate = lastFreeDate.AddDays(1);
+            StateHasChanged();
+        
+            // Показываем предупреждение (опционально)
+            // await ShowWarning($"Можно забронировать только до {lastFreeDate:dd.MM}");
+        
+            return;
+        }
+
+        // Если всё свободно - устанавливаем выезд
+        Service.Booking.DepartureDate = date.AddDays(1);
+        StateHasChanged();
+    }
+
+    private DateTime GetMaxAvailableDate()
+    {
+        var maxDate = Service.Booking.ArrivalDate.AddDays(30); // Максимум 30 дней
+        var checkDate = Service.Booking.ArrivalDate.AddDays(1);
+    
+        while (checkDate <= maxDate)
+        {
+            var status = Service.GetDateStatus(checkDate);
+            if (status == "full-busy" || 
+                (status == "partial-busy" && Service.Booking.ReservedUnit != ReservedUnits.WholeHouse))
+            {
+                return checkDate.AddDays(-1);
+            }
+            checkDate = checkDate.AddDays(1);
+        }
+    
+        return maxDate;
     }
 
     private async Task HandleSubmit()
