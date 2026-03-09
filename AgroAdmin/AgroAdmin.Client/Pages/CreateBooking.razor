@@ -13,7 +13,7 @@
         <div class="card-body p-3">
             <EditForm Model="@Service.Booking" OnValidSubmit="HandleSubmit">
 
-                <!-- 1️⃣ УМНОЕ ПОЛЕ ПОИСКА ПО ИМЕНИ -->
+                <!-- 1️ УМНОЕ ПОЛЕ ПОИСКА ПО ИМЕНИ -->
                 <div class="row mb-3">
                     <div class="col-md-12">
                         <label class="form-label fw-bold">👤 Имя гостя (поиск по имени)</label>
@@ -69,7 +69,7 @@
                     </div>
                 </div>
 
-                <!-- 2️⃣ УМНОЕ ПОЛЕ ПОИСКА ПО ТЕЛЕФОНУ -->
+                <!-- 2️ УМНОЕ ПОЛЕ ПОИСКА ПО ТЕЛЕФОНУ -->
                 <div class="row mb-3">
                     <div class="col-md-12">
                         <label class="form-label fw-bold">📞 Телефон (поиск по телефону)</label>
@@ -113,7 +113,7 @@
                     </div>
                 </div>
 
-                <!-- 3️⃣ Карточка выбранного гостя (если есть) -->
+                <!-- 3️ Карточка выбранного гостя (если есть) -->
                 @if (Service.SelectedGuest != null)
                 {
                     <div class="selected-guest-card mb-3">
@@ -133,7 +133,7 @@
                     </div>
                 }
 
-                <!-- 4️⃣ Даты и объект -->
+                <!-- 4️ Даты и объект -->
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label class="form-label fw-bold">📅 Заезд</label>
@@ -154,7 +154,7 @@
                     </div>
                 </div>
 
-                <!-- 5️⃣ Календарь занятости -->
+                <!-- 5️ Календарь занятости с тап-выбором выезда -->
                 @if (Service.Booking.ArrivalDate != default)
                 {
                     <div class="card mb-3 border-info">
@@ -162,17 +162,16 @@
                             <h6 class="mb-0">📅 @(Service.Booking.ReservedUnit.ToFriendlyString())</h6>
                         </div>
                         <div class="card-body p-2">
-                            <div class="calendar-week-grid">
-                                <div class="calendar-weekdays">
-                                    <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
-                                </div>
-
+                            <div class="calendar-grid-container">
                                 <div class="calendar-days-grid">
                                     @{
-                                        var startDate = Service.Booking.ArrivalDate.AddDays(-3);
-                                        var endDate = Service.Booking.DepartureDate.AddDays(7);
+                                        var baseDate = Service.Booking.ArrivalDate != default
+                                        ? Service.Booking.ArrivalDate
+                                        : DateTime.Today;
+
+                                        var startDate = baseDate.AddDays(-5);
+                                        var endDate = baseDate.AddDays(20);
                                         var totalDays = (endDate - startDate).Days;
-                                        if (totalDays > 21) totalDays = 21;
                                     }
 
                                     @for (int i = 0; i < totalDays; i++)
@@ -184,9 +183,29 @@
                                         var isSelected = date >= Service.Booking.ArrivalDate && date < Service.Booking.DepartureDate;
                                         var busyUnits = Service.GetBusyUnitsOnDate(date);
 
-                                        <div class="calendar-cell @status @(isSelected ? "selected" : "")"
+                                        var dayOfWeek = date.DayOfWeek switch
+                                        {
+                                            DayOfWeek.Monday => "Пн",
+                                            DayOfWeek.Tuesday => "Вт",
+                                            DayOfWeek.Wednesday => "Ср",
+                                            DayOfWeek.Thursday => "Чт",
+                                            DayOfWeek.Friday => "Пт",
+                                            DayOfWeek.Saturday => "Сб",
+                                            DayOfWeek.Sunday => "Вс",
+                                            _ => ""
+                                        };
+
+                                        // Можно тапать только по датам позже заезда
+                                        var canTap = date > Service.Booking.ArrivalDate && status != "full-busy";
+
+                                        <div class="calendar-cell @status
+                                     @(isSelected ? "selected" : "")
+                                     @(canTap ? "tapable" : "not-tapable")"
+                                             @onclick="() => OnDateTap(date, status)"
                                              title="@GetDateTooltip(date)">
+
                                             <div class="cell-day">@date.Day</div>
+                                            <div class="cell-weekday">@dayOfWeek</div>
                                             <div class="cell-month">@date.ToString("MMM")</div>
 
                                             @if (busyUnits != 0)
@@ -202,15 +221,6 @@
                                                     }
                                                 </div>
                                             }
-
-                                            @if (status == "full-busy")
-                                            {
-                                                <div class="busy-indicator" title="Полностью занято">⛔</div>
-                                            }
-                                            else if (status == "partial-busy")
-                                            {
-                                                <div class="partial-indicator" title="Частично занято">⚠️</div>
-                                            }
                                         </div>
                                     }
                                 </div>
@@ -220,23 +230,19 @@
                                 <span class="legend-item"><span class="color-box free"></span> Свободно</span>
                                 <span class="legend-item">
                                     <span class="color-box partial-busy"></span>
-                                    <span class="legend-icons">
-                                        <span class="legend-icon">🌊</span> или <span class="legend-icon">🚗</span>
-                                    </span> Частично
+                                    <span class="legend-icons">🌊/🚗</span> Частично
                                 </span>
                                 <span class="legend-item">
                                     <span class="color-box full-busy"></span>
-                                    <span class="legend-icons">
-                                        <span class="legend-icon">🌊+🚗</span>
-                                    </span> Занято
+                                    <span class="legend-icons">⛔</span> Занято
                                 </span>
-                                <span class="legend-item"><span class="color-box selected"></span> Выбранные даты</span>
+                                <span class="legend-item"><span class="color-box selected"></span> Выбрано</span>
                             </div>
                         </div>
                     </div>
                 }
 
-                <!-- 6️⃣ Состав гостей -->
+                <!-- 6️ Состав гостей -->
                 <div class="row g-2 mb-3">
                     <div class="col-4">
                         <label class="form-label small mb-1">👨 Взрослые</label>
@@ -255,7 +261,7 @@
                     </div>
                 </div>
 
-                <!-- 7️⃣ Опции -->
+                <!-- 7️ Опции -->
                 <div class="row mb-3 g-2">
                     <div class="col-4">
                         <div class="option-card @(Service.Booking.NeedsSauna ? "active" : "")">
@@ -286,12 +292,12 @@
                     </div>
                 </div>
 
-                <!-- 8️⃣ Заметки -->
+                <!-- 8️ Заметки -->
                 <div class="mb-3">
                     <InputTextArea @bind-Value="Service.Booking.AdminNotes" class="form-control" rows="2" placeholder="Заметки..." />
                 </div>
 
-                <!-- 9️⃣ Кнопки -->
+                <!-- 9️ Кнопки -->
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary flex-fill" @onclick='() => Nav.NavigateTo("/bookings")'>Отмена</button>
                     <button type="submit" class="btn btn-success flex-fill">@(Id.HasValue ? "Обновить" : "Создать")</button>
@@ -356,6 +362,25 @@
             parts.Add("🚗 Парковка");
 
         return $"📅 {date:dd.MM.yyyy}\nЗанято: {string.Join(", ", parts)}";
+    }
+
+    private void OnDateTap(DateTime date, string status)
+    {
+        // Если дата занята полностью - ничего не делаем
+        if (status == "full-busy") return;
+
+        // Если это дата раньше заезда - игнорируем (меняем через дропдаут)
+        if (date < Service.Booking.ArrivalDate) return;
+
+        // Если это дата заезда - игнорируем (меняем через дропдаут)
+        if (date.Date == Service.Booking.ArrivalDate.Date) return;
+
+        // Если это дата позже заезда - устанавливаем выезд
+        if (date > Service.Booking.ArrivalDate)
+        {
+            Service.Booking.DepartureDate = date.AddDays(1);
+            StateHasChanged();
+        }
     }
 
     private async Task HandleSubmit()

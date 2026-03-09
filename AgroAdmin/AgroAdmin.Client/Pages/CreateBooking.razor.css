@@ -1,11 +1,10 @@
 ﻿/* ========================================
-   1. КОНТЕЙНЕРЫ И ОБЩИЕ ЭЛЕМЕНТЫ
+   1. БАЗОВЫЕ СТИЛИ (работают везде)
    ======================================== */
 .smart-search-container {
     position: relative;
     width: 100%;
 }
-
 
 /* ========================================
    2. ВЫПАДАЮЩИЙ СПИСОК ПОИСКА ГОСТЕЙ
@@ -25,7 +24,6 @@
     margin-top: 4px;
 }
 
-/* Карточки гостей в выпадающем списке */
 .guest-item {
     padding: 12px 16px;
     cursor: pointer;
@@ -41,8 +39,6 @@
 
     .guest-item:hover {
         background: #e3f2fd;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
     .guest-item.selected {
@@ -55,7 +51,6 @@
         border-left: 4px solid #28a745;
     }
 
-/* Аватар гостя */
 .guest-avatar {
     width: 40px;
     height: 40px;
@@ -70,7 +65,6 @@
     flex-shrink: 0;
 }
 
-/* Информация о госте */
 .guest-info {
     flex: 1;
     min-width: 0;
@@ -98,7 +92,6 @@
         margin-right: 4px;
     }
 
-/* Статистика гостя */
 .guest-stats {
     display: flex;
     align-items: center;
@@ -117,7 +110,6 @@
     white-space: nowrap;
 }
 
-/* Индикатор загрузки поиска */
 .searching-indicator {
     position: absolute;
     right: 10px;
@@ -125,7 +117,6 @@
     transform: translateY(-50%);
     color: #999;
 }
-
 
 /* ========================================
    3. КАРТОЧКА ВЫБРАННОГО ГОСТЯ
@@ -157,7 +148,7 @@
     width: 48px;
     height: 48px;
     border-radius: 24px;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255,255,255,0.2);
     color: white;
     display: flex;
     align-items: center;
@@ -179,7 +170,7 @@
 }
 
 .selected-guest-badge {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255,255,255,0.2);
     padding: 2px 8px;
     border-radius: 20px;
     font-size: 12px;
@@ -195,7 +186,7 @@
 .selected-guest-clear {
     width: 40px;
     height: 40px;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255,255,255,0.2);
     border: none;
     border-radius: 20px;
     color: white;
@@ -211,40 +202,24 @@
 
     .selected-guest-clear:hover,
     .selected-guest-clear:active {
-        background: rgba(255, 255, 255, 0.3);
+        background: rgba(255,255,255,0.3);
         transform: scale(1.1);
     }
 
-
 /* ========================================
-   4. КАЛЕНДАРЬ ЗАНЯТОСТИ
-   ======================================== */
-.calendar-week-grid {
+4. КАЛЕНДАРЬ ЗАНЯТОСТИ (БАЗОВЫЙ)
+======================================== */
+.calendar-grid-container {
     width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
 
-.calendar-weekdays {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(80px, 1fr));
-    gap: 4px;
-    margin-bottom: 8px;
-    padding: 0 2px;
-}
-
-    .calendar-weekdays span {
-        text-align: center;
-        font-size: 13px;
-        font-weight: 600;
-        color: #6c757d;
-        text-transform: uppercase;
-    }
-
 .calendar-days-grid {
     display: grid;
-    grid-template-columns: repeat(7, minmax(80px, 1fr));
+    grid-template-columns: repeat(7, 1fr);
     gap: 4px;
+    min-width: 100%; /* По умолчанию занимает всю ширину */
 }
 
 .calendar-cell {
@@ -257,32 +232,50 @@
     font-size: 14px;
     position: relative;
     transition: all 0.2s;
-    padding: 8px 4px;
-    min-width: 70px;
-    min-height: 70px;
+    padding: 4px;
+    cursor: pointer;
+    width: 100%;
+    border: 1px solid transparent;
 }
+    .calendar-cell.not-tapable {
+        cursor: default;
+        opacity: 0.9;
+    }
 
+    .calendar-cell.tapable {
+        cursor: pointer;
+    }
+
+        .calendar-cell.tapable:hover {
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+    /* Цветовые состояния */
     .calendar-cell.free {
         background-color: #e8f5e9;
         color: #2e7d32;
-        border: 1px solid #a5d6a7;
+        border-color: #a5d6a7;
     }
 
     .calendar-cell.partial-busy {
         background-color: #fff3e0;
         color: #bf360c;
-        border: 1px solid #ffb74d;
+        border-color: #ffb74d;
     }
 
     .calendar-cell.full-busy {
         background-color: #ffebee;
         color: #b71c1c;
-        border: 1px solid #ef9a9a;
+        border-color: #ef9a9a;
     }
 
+    /* Выбранные даты - просто толстая синяя граница со всех сторон */
     .calendar-cell.selected {
-        border: 3px solid #1976d2;
+        border: 3px solid #1976d2 !important;
         background-color: #e3f2fd;
+        transform: scale(1.02);
+        z-index: 2;
     }
 
 .cell-day {
@@ -291,38 +284,29 @@
     line-height: 1.2;
 }
 
+.cell-weekday {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-top: -2px;
+}
+
 .cell-month {
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
     opacity: 0.8;
 }
 
 .cell-icons {
     display: flex;
-    gap: 4px;
+    gap: 2px;
     justify-content: center;
-    margin-top: 4px;
-    min-height: 20px;
+    margin-top: 2px;
 }
 
 .unit-icon {
-    font-size: 14px;
-}
-
-.pond-icon {
-    color: #0d6efd;
-}
-
-.park-icon {
-    color: #6c757d;
-}
-
-.busy-indicator,
-.partial-indicator {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 /* Легенда */
@@ -330,6 +314,7 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
+    align-items: center;
     gap: 16px;
     margin-top: 20px;
     padding-top: 16px;
@@ -339,26 +324,19 @@
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-size: 13px;
     color: #495057;
 }
 
 .legend-icons {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-right: 4px;
-}
-
-.legend-icon {
     font-size: 14px;
 }
 
 .color-box {
     width: 20px;
     height: 20px;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
     .color-box.free {
@@ -381,9 +359,8 @@
         background-color: #e3f2fd;
     }
 
-
 /* ========================================
-   5. КАРТОЧКИ ОПЦИЙ (БАНЯ/ЗАЛ/СОБАКА)
+   5. КАРТОЧКИ ОПЦИЙ
    ======================================== */
 .option-card {
     background: #f8f9fa;
@@ -397,7 +374,7 @@
     .option-card.active {
         background: #e7f1ff;
         border-color: #0d6efd;
-        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.2);
+        box-shadow: 0 2px 8px rgba(13,110,253,0.2);
     }
 
 .option-label {
@@ -411,104 +388,86 @@
     font-weight: 500;
 }
 
-
 /* ========================================
-   6. МОБИЛЬНАЯ АДАПТАЦИЯ (до 768px)
+   6. ДЕСКТОП (от 769px)
    ======================================== */
-@media (max-width: 768px) {
-    /* Дропдаун всегда под полем, не внизу экрана */
-    .guest-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        bottom: auto;
-        max-height: 250px;
-        border-radius: 8px;
-        margin-top: 4px;
-    }
-
-    /* Увеличиваем элементы для тапа */
-    .guest-item {
-        padding: 16px 20px;
-    }
-
-    .guest-avatar {
-        width: 48px;
-        height: 48px;
-        font-size: 20px;
-    }
-
-    .guest-name {
-        font-size: 18px;
-    }
-
-    .guest-phone {
-        font-size: 16px;
-    }
-
-    .stay-badge {
-        padding: 6px 12px;
-        font-size: 14px;
-    }
-
-    /* Календарь с горизонтальным скроллом */
-    .calendar-week-grid {
-        overflow-x: auto;
-        padding-bottom: 8px;
-    }
-
-    .calendar-weekdays {
-        min-width: 560px;
+@media (min-width: 769px) {
+    .calendar-grid-container {
+        overflow-x: visible;
     }
 
     .calendar-days-grid {
-        min-width: 560px;
+        grid-template-columns: repeat(7, 70px);
+        justify-content: center;
+        gap: 6px;
     }
 
     .calendar-cell {
-        min-width: 70px;
-        min-height: 70px;
-    }
-
-    /* Карточка опций */
-    .option-card {
-        padding: 10px 4px;
-    }
-}
-
-/* ========================================
-   7. ОЧЕНЬ МАЛЕНЬКИЕ ЭКРАНЫ (до 480px)
-   ======================================== */
-@media (max-width: 480px) {
-    .guest-item {
-        padding: 14px 16px;
-    }
-
-    .guest-avatar {
-        width: 44px;
-        height: 44px;
-        font-size: 18px;
-    }
-
-    .guest-name {
-        font-size: 16px;
-    }
-
-    .guest-phone {
-        font-size: 14px;
-    }
-
-    .calendar-cell {
-        min-width: 60px;
-        min-height: 60px;
+        width: 70px;
+        height: 70px;
     }
 
     .cell-day {
-        font-size: 16px;
+        font-size: 18px;
+    }
+
+    .cell-weekday {
+        display: block;
+        font-size: 10px;
     }
 
     .cell-month {
         font-size: 10px;
+    }
+}
+
+/* ========================================
+   7. МОБИЛЬНЫЕ (до 768px)
+   ======================================== */
+@media (max-width: 768px) {
+    .calendar-days-grid {
+        grid-template-columns: repeat(7, 1fr);
+        gap: 3px;
+    }
+
+    .calendar-cell {
+        min-width: 40px; /* Минимальный размер, но сетка 7 колонок */
+        max-width: 50px; /* Максимальный, чтобы не растягивались */
+        margin: 0 auto;
+    }
+
+    .cell-day {
+        font-size: 14px;
+    }
+
+    .cell-weekday {
+        display: block;
+        font-size: 9px;
+    }
+
+    .cell-month {
+        display: none; /* Прячем месяц на мобильных */
+    }
+
+    .unit-icon {
+        font-size: 9px;
+    }
+}
+
+/* ========================================
+   8. ОЧЕНЬ МАЛЕНЬКИЕ ЭКРАНЫ (до 480px)
+   ======================================== */
+@media (max-width: 480px) {
+    .calendar-cell {
+        min-width: 38px;
+        max-width: 42px;
+    }
+
+    .cell-day {
+        font-size: 13px;
+    }
+
+    .cell-weekday {
+        font-size: 8px;
     }
 }
