@@ -32,10 +32,11 @@ jobs:
           $publishPath = "${{ github.workspace }}\publish"
           $msDeployPath = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
           
-          # Прямой вызов движка WebDeploy с параметрами из твоего профиля (.publishsettings)
+          # Прописываем адрес сервера ЯВНО, чтобы GitHub не обрезал его
           & $msDeployPath `
             -verb:sync `
             -source:contentPath="$publishPath" `
-            -dest:contentPath='${{ secrets.WEBSITE_NAME }}',ComputerName='${{ secrets.SERVER_COMPUTER_NAME }}',UserName='${{ secrets.SERVER_USERNAME }}',Password='${{ secrets.SERVER_PASSWORD }}',AuthType='Basic' `
+            -dest:contentPath='site57408',ComputerName='https://site57408.siteasp.net{{ secrets.SERVER_PASSWORD }}',AuthType='Basic' `
             -allowUntrusted `
             -enableRule:DoNotDeleteRule
+
