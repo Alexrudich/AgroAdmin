@@ -1,7 +1,7 @@
 ﻿name: Build and Deploy to MonsterASP.NET (FTP)
 
 on:
-  workflow_dispatch: # Ручной запуск кнопкой для контроля процесса
+  workflow_dispatch:
 
 jobs:
   build_and_deploy:
@@ -15,25 +15,34 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore AgroAdmin.slnx
-
-      - name: Build
-        run: dotnet build AgroAdmin.slnx --configuration Release --no-restore
+      - name: Restore & Build
+        run: |
+          dotnet restore AgroAdmin.slnx
+          dotnet build AgroAdmin.slnx --configuration Release --no-restore
 
       - name: Publish
-        # Публикуем серверный проект. Все файлы для работы сайта попадут в ./publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
+      # Создаем файл-заглушку локально
+      - name: Create Offline File
+        run: echo "Site is updating..." > ./publish/app_offline.htm
+
+      # Деплоим ВСЁ (включая app_offline.htm первым делом)
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # Берем всё содержимое папки publish (DLL-ки, конфиги и папку wwwroot)
           local-dir: ./publish/
-          # Кладем в папку wwwroot на сервере (как ты делал в FileZilla)
           server-dir: ./wwwroot/
-          # true удалит старые файлы на сервере, которых нет в новом билде (чистка мусора)
-          dangerous-clean-slate: false 
+
+      # Удаляем заглушку, чтобы сайт запустился
+      # Используем простой скрипт для удаления одного файла через FTP
+      - name: Put Site Online (Remove app_offline.htm)
+        shell: pwsh
+        run: |
+          $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
+          $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
+          $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
+          try { $ftp.GetResponse().Close() } catch { Write-Host "File already gone or error: $_" }
