@@ -1,47 +1,39 @@
-﻿name: Build and Deploy to MonsterASP.NET
+﻿name: Build and Deploy to MonsterASP.NET (FTP)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Ручной запуск кнопкой для контроля процесса
 
 jobs:
   build_and_deploy:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore & Build
-        run: |
-          dotnet restore AgroAdmin.slnx
-          dotnet build AgroAdmin.slnx --configuration Release --no-restore
+      - name: Restore dependencies
+        run: dotnet restore AgroAdmin.slnx
+
+      - name: Build
+        run: dotnet build AgroAdmin.slnx --configuration Release --no-restore
 
       - name: Publish
+        # Публикуем серверный проект. Все файлы для работы сайта попадут в ./publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      - name: Deploy via MSDeploy
-        shell: pwsh
-        env:
-          MS_SERVER: ${{ secrets.SERVER_COMPUTER_NAME }}
-          MS_SITE: 'site57408'
-          MS_USER: 'site57408'
-          MS_PASS: ${{ secrets.SERVER_PASSWORD }}
-        run: |
-          $msDeployPath = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          $publishPath = "${{ github.workspace }}\publish"
-          
-          # Формируем аргументы массивом, чтобы PowerShell не накосячил с кавычками
-          $destArg = "contentPath=$env:MS_SITE,ComputerName=$env:MS_SERVER,UserName=$env:MS_USER,Password=$env:MS_PASS,AuthType=Basic"
-          
-          $params = @(
-            "-verb:sync",
-            "-source:contentPath=$publishPath",
-            "-dest:$destArg",
-            "-allowUntrusted",
-            "-enableRule:DoNotDeleteRule"
-          )
-          
-          & $msDeployPath $params
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Берем всё содержимое папки publish (DLL-ки, конфиги и папку wwwroot)
+          local-dir: ./publish/
+          # Кладем в папку wwwroot на сервере (как ты делал в FileZilla)
+          server-dir: ./wwwroot/
+          # true удалит старые файлы на сервере, которых нет в новом билде (чистка мусора)
+          dangerous-clean-slate: false 
