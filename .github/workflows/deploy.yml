@@ -1,12 +1,9 @@
 ﻿name: Build and Deploy to MonsterASP.NET
 
 on:
-  # push:
-  #   branches: [ develop ]
   workflow_dispatch:
 
 jobs:
-  # ПЕРВАЯ РАБОТА: Собираем проект
   build_and_publish:
     runs-on: windows-latest
     steps:
@@ -16,8 +13,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          include-prerelease: true
-          cache: true # Ускоряем за счет кэша нугетов
+          cache: true
+          # Указываем, по какому файлу кэшировать пакеты
+          cache-dependency-path: AgroAdmin.slnx
 
       - name: Restore
         run: dotnet restore AgroAdmin.slnx
@@ -28,7 +26,6 @@ jobs:
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      # Сохраняем результат в артефакт (живет 1 день)
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -36,12 +33,11 @@ jobs:
           path: ./publish
           retention-days: 1
 
-   # ВТОРАЯ РАБОТА: Только деплой
   deploy_to_monster:
     needs: build_and_publish
     runs-on: windows-latest
     env:
-      # Выносим всё сюда, чтобы не путаться в кавычках
+      # ВАЖНО: Вернул порт и путь, иначе будет 404
       MS_SERVER: 'https://site57408.siteasp.net'
       MS_SITE: 'site57408'
       MS_USER: 'site57408'
@@ -59,7 +55,6 @@ jobs:
           $publishPath = "${{ github.workspace }}\publish"
           $msDeployPath = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
           
-          # Используем переменные среды $env:...
           & $msDeployPath `
             -verb:sync `
             -source:contentPath="$publishPath" `
