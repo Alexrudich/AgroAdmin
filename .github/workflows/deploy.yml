@@ -25,12 +25,12 @@ jobs:
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm, чтобы вырубить сайт
+      # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm
       - name: Put Site Offline
         shell: pwsh
         run: |
           $offlineFile = "./publish/app_offline.htm"
-          "Site Updating..." | Out-File -FilePath $offlineFile
+          "Site Updating..." | Out-File -FilePath $offlineFile -Encoding utf8
           
           $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
           $ftp.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
@@ -41,9 +41,9 @@ jobs:
           $requestStream.Write($bytes, 0, $bytes.Length)
           $requestStream.Close()
           Write-Host "Site is now OFFLINE. Waiting for IIS to release files..."
-          Start-Sleep -Seconds 5 # Даем IIS время выгрузить DLL
+          Start-Sleep -Seconds 5
 
-      # ШАГ 2: Заливаем все остальные файлы (борьба с 550 ошибкой)
+      # ШАГ 2: Заливаем все остальные файлы в 10 потоков
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -53,8 +53,9 @@ jobs:
           local-dir: ./publish/
           server-dir: ./wwwroot/
           dangerous-clean-slate: false
+          parallel: 10 
 
-      # ШАГ 3: Удаляем заглушку, чтобы сайт поднялся
+      # ШАГ 3: Удаляем заглушку
       - name: Put Site Online
         shell: pwsh
         run: |
