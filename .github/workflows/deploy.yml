@@ -3,10 +3,11 @@
 on:
   # push:
   #   branches: [ develop ]
-  workflow_dispatch: # Оставляем ручной запуск кнопкой для отладки
+  workflow_dispatch:
 
 jobs:
-  build_and_deploy:
+  # ПЕРВАЯ РАБОТА: Собираем проект
+  build_and_publish:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,8 +17,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
           include-prerelease: true
+          cache: true # Ускоряем за счет кэша нугетов
 
-      - name: Restore dependencies
+      - name: Restore
         run: dotnet restore AgroAdmin.slnx
 
       - name: Build
@@ -26,17 +28,41 @@ jobs:
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      - name: Deploy to MonsterASP via MSDeploy
+      # Сохраняем результат в артефакт (живет 1 день)
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-app-package
+          path: ./publish
+          retention-days: 1
+
+   # ВТОРАЯ РАБОТА: Только деплой
+  deploy_to_monster:
+    needs: build_and_publish
+    runs-on: windows-latest
+    env:
+      # Выносим всё сюда, чтобы не путаться в кавычках
+      MS_SERVER: 'https://site57408.siteasp.net'
+      MS_SITE: 'site57408'
+      MS_USER: 'site57408'
+      MS_PASS: ${{ secrets.SERVER_PASSWORD }}
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-app-package
+          path: ./publish
+
+      - name: Deploy via MSDeploy
         shell: pwsh
         run: |
           $publishPath = "${{ github.workspace }}\publish"
           $msDeployPath = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
           
-          # Прописываем адрес сервера ЯВНО, чтобы GitHub не обрезал его
+          # Используем переменные среды $env:...
           & $msDeployPath `
             -verb:sync `
             -source:contentPath="$publishPath" `
-            -dest:contentPath='site57408',ComputerName='https://site57408.siteasp.net{{ secrets.SERVER_PASSWORD }}',AuthType='Basic' `
+            -dest:contentPath="$env:MS_SITE",ComputerName="$env:MS_SERVER",UserName="$env:MS_USER",Password="$env:MS_PASS",AuthType='Basic' `
             -allowUntrusted `
             -enableRule:DoNotDeleteRule
-
