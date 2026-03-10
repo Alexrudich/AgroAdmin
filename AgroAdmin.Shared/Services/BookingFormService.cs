@@ -218,18 +218,25 @@ public class BookingFormService : IDisposable
         ShowNameDropdown = false;
         ShowPhoneDropdown = false;
 
-        Booking.Guest.Id = guest.Id;
-        Booking.Guest.FullName = guest.FullName;
-        Booking.Guest.Phone = guest.Phone;
-        Booking.Guest.Comment = guest.Comment;
+        if (Booking.Guest != null)
+        {
+            Booking.Guest.Id = guest.Id;
+            Booking.Guest.FullName = guest.FullName;
+            Booking.Guest.Phone = guest.Phone;
+            Booking.Guest.Comment = guest.Comment;
+        }
 
         StateChanged?.Invoke();
     }
 
     public void CreateNewGuestFromName()
     {
-        Booking.Guest.FullName = GuestNameSearchTerm;
-        Booking.Guest.Phone = "";
+        if (Booking.Guest != null)
+        {
+            Booking.Guest.FullName = GuestNameSearchTerm;
+            Booking.Guest.Phone = "";
+        }
+
         SelectedGuest = null;
         ShowNameDropdown = false;
         StateChanged?.Invoke();
@@ -298,37 +305,36 @@ public class BookingFormService : IDisposable
         // Для выбора половинки
         bool selectedSideBusy = Booking.ReservedUnit == ReservedUnits.PondSide ? pondSideBusy : parkingSideBusy;
 
-        if (!selectedSideBusy)
+        if (selectedSideBusy)
         {
-            // Выбранная половинка свободна - зеленая ячейка
-            return "free";
+            // Выбранная половинка занята - красный
+            return "full-busy";
         }
         else
         {
-            // Выбранная половинка занята - проверяем вторую
+            // Выбранная половинка свободна - проверяем другую
             bool otherSideBusy = Booking.ReservedUnit == ReservedUnits.PondSide ? parkingSideBusy : pondSideBusy;
 
-            // Если вторая свободна - желтый (можно выбрать другую половинку)
-            // Если вторая тоже занята - красный
-            return otherSideBusy ? "full-busy" : "partial-busy";
+            // Если другая половинка занята - желтый, если нет - зеленый
+            return otherSideBusy ? "partial-busy" : "free";
         }
     }
 
     public ReservedUnits GetBusyUnitsOnDate(DateTime date)
     {
         var bookingsOnDate = AllBookings?.Where(b =>
-            b.Id != (_currentBookingId ?? 0) &&
-            date >= b.ArrivalDate.Date &&
-            date < b.DepartureDate.Date
+                b.Id != (_currentBookingId ?? 0) &&
+                date >= b.ArrivalDate.Date &&    // дата >= заезда
+                date < b.DepartureDate.Date      // И дата < выезда
         ).ToList() ?? new();
 
         if (!bookingsOnDate.Any()) return 0;
 
         ReservedUnits busy = 0;
 
-        // Если есть бронь на весь дом - обе половинки заняты
+        // Если есть бронь на весь дом - возвращаем WholeHouse
         if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.WholeHouse))
-            return ReservedUnits.PondSide | ReservedUnits.ParkingSide;
+            return ReservedUnits.WholeHouse;
 
         // Проверяем занятость половинок
         if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.PondSide))

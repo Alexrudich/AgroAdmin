@@ -1,0 +1,122 @@
+﻿@using System.Globalization
+@using AgroAdmin.Shared.Enums
+
+<div class="card mb-3 border-info">
+    <div class="card-header bg-info text-white py-2">
+        <h6 class="mb-0">📅 @(Service.Booking.ReservedUnit.ToFriendlyString())</h6>
+    </div>
+    <div class="card-body p-2">
+        <div class="calendar-grid-container">
+            <div class="calendar-days-grid">
+                @{
+                    var baseDate = Service.Booking.ArrivalDate != default
+                    ? Service.Booking.ArrivalDate
+                    : DateTime.Today;
+
+                    var startDate = baseDate.AddDays(-5);
+                    var endDate = baseDate.AddDays(20);
+                    var maxAvailableDate = GetMaxAvailableDate();
+                }
+
+                @for (int i = 0; i < (endDate - startDate).Days; i++)
+                {
+                    var date = startDate.AddDays(i);
+                    if (date < DateTime.Today.AddDays(-30)) continue;
+
+                    var status = Service.GetDateStatus(date);
+                    var isSelected = date >= Service.Booking.ArrivalDate && date < Service.Booking.DepartureDate;
+                    var busyUnits = Service.GetBusyUnitsOnDate(date);
+
+                    // ОТЛАДКА: посмотрим в консоль браузера
+                    Console.WriteLine($"Date: {date:dd.MM}, Status: {status}, BusyUnits: {busyUnits}");
+
+                    // Проверяем возможность тапа
+                    var canTap = date > Service.Booking.ArrivalDate && status != "full-busy";
+
+                    // Диапазон для подсветки
+                    var isInSelectedRange = date >= Service.Booking.ArrivalDate && date < Service.Booking.DepartureDate;
+                    var isInFutureRange = date >= Service.Booking.ArrivalDate && date < maxAvailableDate;
+
+                    // День недели
+                    var dayOfWeek = date.DayOfWeek switch
+                    {
+                        DayOfWeek.Monday => "Пн",
+                        DayOfWeek.Tuesday => "Вт",
+                        DayOfWeek.Wednesday => "Ср",
+                        DayOfWeek.Thursday => "Чт",
+                        DayOfWeek.Friday => "Пт",
+                        DayOfWeek.Saturday => "Сб",
+                        DayOfWeek.Sunday => "Вс",
+                        _ => ""
+                    };
+
+                    <div class="calendar-cell @status
+                             @(isInSelectedRange ? "selected" : "")
+                             @(isInFutureRange && !isInSelectedRange ? "available-range" : "")
+                             @(canTap ? "tapable" : "not-tapable")"
+                         @onclick="() => OnDateTap.InvokeAsync((date, status))"
+                         title="Статус: @status, Занято: @busyUnits">
+
+                        <div class="cell-day">@date.Day</div>
+                        <div class="cell-weekday">@dayOfWeek</div>
+                        <div class="cell-month">@date.ToString("MMM")</div>
+
+                        @if (busyUnits != 0)
+                        {
+                            <div class="cell-icons">
+                                @if ((busyUnits & ReservedUnits.WholeHouse) == ReservedUnits.WholeHouse)
+                                {
+                                    <span class="unit-icon" title="Весь дом занят">🏠</span>
+                                }
+                                @if ((busyUnits & ReservedUnits.PondSide) == ReservedUnits.PondSide)
+                                {
+                                    <span class="unit-icon" title="Пруд занят">🌊</span>
+                                }
+                                @if ((busyUnits & ReservedUnits.ParkingSide) == ReservedUnits.ParkingSide)
+                                {
+                                    <span class="unit-icon" title="Парковка занята">🚗</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="calendar-legend">
+            <span class="legend-item"><span class="color-box free"></span> Свободно</span>
+            <span class="legend-item">
+                <span class="color-box partial-busy"></span>
+                <span class="legend-icons">🌊 или 🚗</span> Частично
+            </span>
+            <span class="legend-item">
+                <span class="color-box full-busy"></span>
+                <span class="legend-icons">🌊/🚗/🏠</span> Занято
+            </span>
+            <span class="legend-item"><span class="color-box selected"></span> Выбрано</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public BookingFormService Service { get; set; } = default!;
+    [Parameter] public EventCallback<(DateTime date, string status)> OnDateTap { get; set; }
+
+    private DateTime GetMaxAvailableDate()
+    {
+        var maxDate = Service.Booking.ArrivalDate.AddDays(30);
+        var checkDate = Service.Booking.ArrivalDate.AddDays(1);
+
+        while (checkDate <= maxDate)
+        {
+            var status = Service.GetDateStatus(checkDate);
+            if (status == "full-busy")
+            {
+                return checkDate.AddDays(-1);
+            }
+            checkDate = checkDate.AddDays(1);
+        }
+
+        return maxDate;
+    }
+}

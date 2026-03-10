@@ -1,0 +1,25 @@
+﻿.option-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 8px 4px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+    .option-card.active {
+        background: #e7f1ff;
+        border-color: #0d6efd;
+        box-shadow: 0 2px 8px rgba(13,110,253,0.2);
+    }
+
+.option-label {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
+.option-card.active .option-label {
+    color: #0d6efd;
+    font-weight: 500;
+}

@@ -1,0 +1,147 @@
+﻿@using AgroAdmin.Shared.Services
+@inject IJSRuntime Js
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <label class="form-label fw-bold">👤 Имя гостя (поиск по имени)</label>
+        <div class="smart-search-container">
+            <input type="text"
+                   class="form-control @(Service.SelectedGuest != null ? "is-valid" : "")"
+                   placeholder="Например: Афанасий Фет"
+                   @bind="Service.GuestNameSearchTerm"
+                   @oninput="OnNameSearchInput"
+                   @onfocus="() => Service.ShowNameDropdown = true"
+                   @onblur="HideNameDropdown"
+                   autocomplete="off" />
+
+            @if (Service.IsSearching)
+            {
+                <span class="searching-indicator">🔍</span>
+            }
+
+            @if (Service.ShowNameDropdown && Service.NameSearchResults.Any())
+            {
+                <div class="guest-dropdown">
+                    @foreach (var guest in Service.NameSearchResults.Take(10))
+                    {
+                        <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
+                             @onmousedown="() => Service.SelectGuest(guest)">
+                            <div class="guest-avatar">
+                                @guest.FullName.Substring(0, 1).ToUpper()
+                            </div>
+                            <div class="guest-info">
+                                <div class="guest-name">@guest.FullName</div>
+                                <div class="guest-phone">@guest.Phone</div>
+                            </div>
+                            <div class="guest-stats">
+                                <span class="stay-badge">🏨 @guest.TotalStays</span>
+                            </div>
+                        </div>
+                    }
+
+                    @if (!Service.NameSearchResults.Any() && Service.GuestNameSearchTerm.Length >= 2)
+                    {
+                        <div class="guest-item new-guest"
+                             @onmousedown="() => Service.CreateNewGuestFromName()">
+                            <div class="guest-avatar">➕</div>
+                            <div class="guest-info">
+                                <div class="guest-name">Создать нового гостя</div>
+                                <div class="guest-phone">@Service.GuestNameSearchTerm</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- 2️ УМНОЕ ПОЛЕ ПОИСКА ПО ТЕЛЕФОНУ -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <label class="form-label fw-bold">📞 Телефон (поиск по телефону)</label>
+        <div class="smart-search-container">
+            <input type="text"
+                   class="form-control"
+                   placeholder="+375..."
+                   @bind="Service.GuestPhoneSearchTerm"
+                   @oninput="OnPhoneSearchInput"
+                   @onfocus="() => Service.ShowPhoneDropdown = true"
+                   @onblur="HidePhoneDropdown"
+                   autocomplete="off" />
+
+            @if (Service.IsSearching)
+            {
+                <span class="searching-indicator">🔍</span>
+            }
+
+            @if (Service.ShowPhoneDropdown && Service.PhoneSearchResults.Any())
+            {
+                <div class="guest-dropdown">
+                    @foreach (var guest in Service.PhoneSearchResults.Take(10))
+                    {
+                        <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
+                             @onmousedown="() => Service.SelectGuest(guest)">
+                            <div class="guest-avatar">
+                                @guest.FullName.Substring(0, 1).ToUpper()
+                            </div>
+                            <div class="guest-info">
+                                <div class="guest-name">@guest.FullName</div>
+                                <div class="guest-phone">@guest.Phone</div>
+                            </div>
+                            <div class="guest-stats">
+                                <span class="stay-badge">🏨 @guest.TotalStays</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- 3️ Карточка выбранного гостя (если есть) -->
+@if (Service.SelectedGuest != null)
+{
+    <div class="selected-guest-card mb-3">
+        <div class="selected-guest-avatar">
+            @(Service.SelectedGuest.FullName?.Length > 0 ? Service.SelectedGuest.FullName.Substring(0, 1).ToUpper() : "?")
+        </div>
+        <div class="selected-guest-info">
+            <div class="selected-guest-name">
+                @Service.SelectedGuest.FullName
+                <span class="selected-guest-badge">Был @Service.SelectedGuest.TotalStays раз(а)</span>
+            </div>
+            <div class="selected-guest-phone">📞 @Service.SelectedGuest.Phone</div>
+        </div>
+        <button type="button" class="selected-guest-clear" @onclick="Service.ClearGuest" title="Очистить">
+            ✕
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter] public BookingFormService Service { get; set; } = default!;
+
+    private void OnNameSearchInput(ChangeEventArgs e)
+    {
+        Service.OnNameSearchInput(e.Value?.ToString() ?? "");
+    }
+
+    private void OnPhoneSearchInput(ChangeEventArgs e)
+    {
+        Service.OnPhoneSearchInput(e.Value?.ToString() ?? "");
+    }
+
+    private async void HideNameDropdown()
+    {
+        await Task.Delay(200);
+        Service.HideNameDropdown();
+    }
+
+    private async void HidePhoneDropdown()
+    {
+        await Task.Delay(200);
+        Service.HidePhoneDropdown();
+    }
+}
