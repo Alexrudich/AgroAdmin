@@ -1,6 +1,8 @@
 ﻿name: Build and Deploy to MonsterASP.NET (FTP)
 
 on:
+  push:
+    branches: [ develop ]
   workflow_dispatch:
 
 jobs:
@@ -52,7 +54,7 @@ jobs:
           server-dir: ./wwwroot/
           dangerous-clean-slate: false
 
-      # ШАГ 3: Удаляем заглушку, чтобы сайт ожил
+      # ШАГ 3: Удаляем заглушку, чтобы сайт поднялся
       - name: Put Site Online
         shell: pwsh
         run: |
