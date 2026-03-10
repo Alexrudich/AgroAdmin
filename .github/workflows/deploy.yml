@@ -1,4 +1,4 @@
-﻿name: Build and Deploy to MonsterASP.NET
+name: Build and Deploy to MonsterASP.NET
 
 on:
   push:
@@ -33,5 +33,4 @@ jobs:
           server-username: ${{ secrets.SERVER_USERNAME }}
           server-password: ${{ secrets.SERVER_PASSWORD }}
           source-path: ./publish
-          # Это заставит WebDeploy удалять файлы на сервере, которых нет в пакете publish (чистка wwwroot)
-          extra-args: '-allowUntrackedFiles:False'
+          target-delete: true
