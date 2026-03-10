@@ -23,11 +23,25 @@ jobs:
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      # Создаем файл-заглушку локально
-      - name: Create Offline File
-        run: echo "Site is updating..." > ./publish/app_offline.htm
+      # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm, чтобы вырубить сайт
+      - name: Put Site Offline
+        shell: pwsh
+        run: |
+          $offlineFile = "./publish/app_offline.htm"
+          "Site Updating..." | Out-File -FilePath $offlineFile
+          
+          $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
+          $ftp.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
+          $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
+          $bytes = [System.IO.File]::ReadAllBytes($offlineFile)
+          $ftp.ContentLength = $bytes.Length
+          $requestStream = $ftp.GetRequestStream()
+          $requestStream.Write($bytes, 0, $bytes.Length)
+          $requestStream.Close()
+          Write-Host "Site is now OFFLINE. Waiting for IIS to release files..."
+          Start-Sleep -Seconds 5 # Даем IIS время выгрузить DLL
 
-      # Деплоим ВСЁ (включая app_offline.htm первым делом)
+      # ШАГ 2: Заливаем все остальные файлы (борьба с 550 ошибкой)
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -36,13 +50,13 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./publish/
           server-dir: ./wwwroot/
+          dangerous-clean-slate: false
 
-      # Удаляем заглушку, чтобы сайт запустился
-      # Используем простой скрипт для удаления одного файла через FTP
-      - name: Put Site Online (Remove app_offline.htm)
+      # ШАГ 3: Удаляем заглушку, чтобы сайт ожил
+      - name: Put Site Online
         shell: pwsh
         run: |
           $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
           $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
           $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
-          try { $ftp.GetResponse().Close() } catch { Write-Host "File already gone or error: $_" }
+          try { $ftp.GetResponse().Close(); Write-Host "Site is now ONLINE." } catch { }
