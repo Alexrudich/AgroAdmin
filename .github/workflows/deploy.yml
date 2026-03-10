@@ -1,37 +1,64 @@
-﻿name: Build and Deploy to MonsterASP.NET
+﻿name: Build and Deploy to MonsterASP.NET (FTP)
 
 on:
   push:
     branches: [ develop ]
+  workflow_dispatch:
 
 jobs:
   build_and_deploy:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          include-prerelease: true
 
-      - name: Restore dependencies
-        run: dotnet restore AgroAdmin.slnx
-
-      - name: Build
-        run: dotnet build AgroAdmin.slnx --configuration Release --no-restore
+      - name: Restore & Build
+        run: |
+          dotnet restore AgroAdmin.slnx
+          dotnet build AgroAdmin.slnx --configuration Release --no-restore
 
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      - name: Deploy via WebDeploy
-        uses: rasmusbuchholdt/simply-web-deploy@2.1.0
+      # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm, чтобы вырубить сайт
+      - name: Put Site Offline
+        shell: pwsh
+        run: |
+          $offlineFile = "./publish/app_offline.htm"
+          "Site Updating..." | Out-File -FilePath $offlineFile
+          
+          $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
+          $ftp.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
+          $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
+          $bytes = [System.IO.File]::ReadAllBytes($offlineFile)
+          $ftp.ContentLength = $bytes.Length
+          $requestStream = $ftp.GetRequestStream()
+          $requestStream.Write($bytes, 0, $bytes.Length)
+          $requestStream.Close()
+          Write-Host "Site is now OFFLINE. Waiting for IIS to release files..."
+          Start-Sleep -Seconds 5 # Даем IIS время выгрузить DLL
+
+      # ШАГ 2: Заливаем все остальные файлы (борьба с 550 ошибкой)
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          website-name: ${{ secrets.WEBSITE_NAME }}
-          server-computer-name: ${{ secrets.SERVER_COMPUTER_NAME }}
-          server-username: ${{ secrets.SERVER_USERNAME }}
-          server-password: ${{ secrets.SERVER_PASSWORD }}
-          source-path: ./publish
-          # Это заставит WebDeploy удалять файлы на сервере, которых нет в пакете publish (чистка wwwroot)
-          extra-args: '-allowUntrackedFiles:False'
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./publish/
+          server-dir: ./wwwroot/
+          dangerous-clean-slate: false
+
+      # ШАГ 3: Удаляем заглушку, чтобы сайт поднялся
+      - name: Put Site Online
+        shell: pwsh
+        run: |
+          $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
+          $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
+          $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
+          try { $ftp.GetResponse().Close(); Write-Host "Site is now ONLINE." } catch { }
