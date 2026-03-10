@@ -1,0 +1,7 @@
+﻿<div class="mb-3">
+    <InputTextArea @bind-Value="Service.Booking.AdminNotes" class="form-control" rows="2" placeholder="Заметки..." />
+</div>
+
+@code {
+    [Parameter] public BookingFormService Service { get; set; } = default!;
+}

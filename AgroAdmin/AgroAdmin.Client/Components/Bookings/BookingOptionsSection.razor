@@ -1,0 +1,33 @@
+﻿<div class="row mb-3 g-2">
+    <div class="col-4">
+        <div class="option-card @(Service.Booking.NeedsSauna ? "active" : "")">
+            <div class="form-check form-switch d-flex justify-content-center">
+                <InputCheckbox @bind-Value="Service.Booking.NeedsSauna" class="form-check-input" id="sauna" />
+                <label class="form-check-label ms-1" for="sauna">🌡️</label>
+            </div>
+            <div class="option-label">Баня</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="option-card @(Service.Booking.NeedsBanquetHall ? "active" : "")">
+            <div class="form-check form-switch d-flex justify-content-center">
+                <InputCheckbox @bind-Value="Service.Booking.NeedsBanquetHall" class="form-check-input" id="hall" />
+                <label class="form-check-label ms-1" for="hall">🥂</label>
+            </div>
+            <div class="option-label">Зал</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="option-card @(Service.Booking.HasDog ? "active" : "")">
+            <div class="form-check form-switch d-flex justify-content-center">
+                <InputCheckbox @bind-Value="Service.Booking.HasDog" class="form-check-input" id="dog" />
+                <label class="form-check-label ms-1" for="dog">🐕</label>
+            </div>
+            <div class="option-label">Собака</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public BookingFormService Service { get; set; } = default!;
+}

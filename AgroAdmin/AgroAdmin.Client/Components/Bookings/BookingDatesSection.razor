@@ -1,0 +1,28 @@
+﻿@using AgroAdmin.Shared.Enums
+@using AgroAdmin.Shared.Extensions
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label fw-bold">📅 Заезд</label>
+        <InputDate @bind-Value="Service.Booking.ArrivalDate" @onchange="OnDateChanged" class="form-control" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">📅 Выезд</label>
+        <InputDate @bind-Value="Service.Booking.DepartureDate" @onchange="OnDateChanged" class="form-control" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">🏠 Объект</label>
+        <InputSelect @bind-Value="Service.Booking.ReservedUnit" @onchange="OnUnitChanged" class="form-select">
+            @foreach (var unit in Enum.GetValues<ReservedUnits>())
+            {
+                <option value="@unit">@unit.ToFriendlyString()</option>
+            }
+        </InputSelect>
+    </div>
+</div>
+
+@code {
+    [Parameter] public BookingFormService Service { get; set; } = default!;
+    [Parameter] public EventCallback OnDateChanged { get; set; }
+    [Parameter] public EventCallback OnUnitChanged { get; set; }
+}

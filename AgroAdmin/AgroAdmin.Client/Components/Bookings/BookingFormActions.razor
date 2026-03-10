@@ -1,0 +1,7 @@
+﻿<button type="button" class="btn btn-outline-secondary flex-fill" @onclick="OnCancel">Отмена</button>
+<button type="submit" class="btn btn-success flex-fill">@(Id.HasValue ? "Обновить" : "Создать")</button>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}

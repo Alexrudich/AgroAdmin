@@ -1,0 +1,21 @@
+﻿<div class="row g-2 mb-3">
+    <div class="col-4">
+        <label class="form-label small mb-1">👨 Взрослые</label>
+        <InputNumber @bind-Value="Service.Booking.AdultsCount" @oninput="Service.UpdateTotal" class="form-control form-control-sm" />
+    </div>
+    <div class="col-4">
+        <label class="form-label small mb-1">👦 Дети</label>
+        <InputNumber @bind-Value="Service.Booking.ChildrenCount" @oninput="Service.UpdateTotal" class="form-control form-control-sm" />
+    </div>
+    <div class="col-4">
+        <label class="form-label small mb-1">👶 Младенцы</label>
+        <InputNumber @bind-Value="Service.Booking.InfantsCount" @oninput="Service.UpdateTotal" class="form-control form-control-sm" />
+    </div>
+    <div class="col-12 text-end mt-1">
+        <small class="text-primary fw-bold">Итого: @Service.Booking.TotalGuestsCount чел.</small>
+    </div>
+</div>
+
+@code {
+    [Parameter] public BookingFormService Service { get; set; } = default!;
+}
