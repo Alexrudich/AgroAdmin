@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_and_publish:
+  build_and_deploy:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,51 +13,35 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          cache: true
-          # Указываем, по какому файлу кэшировать пакеты
-          cache-dependency-path: AgroAdmin.slnx
 
-      - name: Restore
-        run: dotnet restore AgroAdmin.slnx
-
-      - name: Build
-        run: dotnet build AgroAdmin.slnx --configuration Release --no-restore
+      - name: Restore & Build
+        run: |
+          dotnet restore AgroAdmin.slnx
+          dotnet build AgroAdmin.slnx --configuration Release --no-restore
 
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-app-package
-          path: ./publish
-          retention-days: 1
-
-  deploy_to_monster:
-    needs: build_and_publish
-    runs-on: windows-latest
-    env:
-      # ВАЖНО: Вернул порт и путь, иначе будет 404
-      MS_SERVER: 'https://site57408.siteasp.net'
-      MS_SITE: 'site57408'
-      MS_USER: 'site57408'
-      MS_PASS: ${{ secrets.SERVER_PASSWORD }}
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: web-app-package
-          path: ./publish
-
       - name: Deploy via MSDeploy
         shell: pwsh
+        env:
+          MS_SERVER: ${{ secrets.SERVER_COMPUTER_NAME }}
+          MS_SITE: 'site57408'
+          MS_USER: 'site57408'
+          MS_PASS: ${{ secrets.SERVER_PASSWORD }}
         run: |
-          $publishPath = "${{ github.workspace }}\publish"
           $msDeployPath = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          $publishPath = "${{ github.workspace }}\publish"
           
-          & $msDeployPath `
-            -verb:sync `
-            -source:contentPath="$publishPath" `
-            -dest:contentPath="$env:MS_SITE",ComputerName="$env:MS_SERVER",UserName="$env:MS_USER",Password="$env:MS_PASS",AuthType='Basic' `
-            -allowUntrusted `
-            -enableRule:DoNotDeleteRule
+          # Формируем аргументы массивом, чтобы PowerShell не накосячил с кавычками
+          $destArg = "contentPath=$env:MS_SITE,ComputerName=$env:MS_SERVER,UserName=$env:MS_USER,Password=$env:MS_PASS,AuthType=Basic"
+          
+          $params = @(
+            "-verb:sync",
+            "-source:contentPath=$publishPath",
+            "-dest:$destArg",
+            "-allowUntrusted",
+            "-enableRule:DoNotDeleteRule"
+          )
+          
+          & $msDeployPath $params
