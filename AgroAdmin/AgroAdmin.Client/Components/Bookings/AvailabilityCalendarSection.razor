@@ -27,9 +27,6 @@
                     var isSelected = date >= Service.Booking.ArrivalDate && date < Service.Booking.DepartureDate;
                     var busyUnits = Service.GetBusyUnitsOnDate(date);
 
-                    // ОТЛАДКА: посмотрим в консоль браузера
-                    Console.WriteLine($"Date: {date:dd.MM}, Status: {status}, BusyUnits: {busyUnits}");
-
                     // Проверяем возможность тапа
                     var canTap = date > Service.Booking.ArrivalDate && status != "full-busy";
 
