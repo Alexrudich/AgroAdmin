@@ -3,6 +3,7 @@ using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
 using AgroAdmin.Shared.Services;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -86,6 +87,32 @@ else
         .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
         .SetApplicationName("AgroAdmin");
 }
+
+// Настройка MassTransit для отправки сообщений в RabbitMQ
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        // 1. Берем переменную (через двоеточие или подчеркивание)
+        var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
+                        ?? builder.Configuration["RabbitMQ__Url"];
+
+        if (!string.IsNullOrEmpty(rabbitUrl))
+        {
+            // 2. Тщательно чистим строку от пробелов и лишних слэшей в конце
+            var cleanUrl = rabbitUrl.Trim().TrimEnd('/');
+
+            try
+            {
+                cfg.Host(new Uri(cleanUrl));
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "RabbitMQ URI is still malformed: {Url}", cleanUrl);
+            }
+        }
+    });
+});
 
 var app = builder.Build();
 

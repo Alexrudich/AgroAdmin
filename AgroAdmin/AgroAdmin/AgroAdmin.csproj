@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\AgroAdmin.Infrastructure\AgroAdmin.Infrastructure.csproj" />
     <ProjectReference Include="..\..\AgroAdmin.Shared\AgroAdmin.Shared.csproj" />
     <ProjectReference Include="..\AgroAdmin.Client\AgroAdmin.Client.csproj" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.2.5" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.3">
       <PrivateAssets>all</PrivateAssets>
