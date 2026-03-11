@@ -1,0 +1,27 @@
+﻿@if (Errors.Any())
+{
+    <div class="validation-errors alert alert-danger">
+        <ul class="mb-0">
+            @foreach (var error in Errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (EarliestAvailableDate.HasValue)
+{
+    <div class="validation-hint alert alert-warning mt-2">
+        <small>
+            📅 <strong>Подсказка:</strong> Ближайшая доступная дата:
+            @EarliestAvailableDate.Value.ToString("dd.MM.yyyy")
+        </small>
+    </div>
+}
+
+@code {
+    [Parameter] public List<string> Errors { get; set; } = new();
+    [Parameter] public DateTime? EarliestAvailableDate { get; set; }
+    [Parameter] public bool IsValidating { get; set; }
+}

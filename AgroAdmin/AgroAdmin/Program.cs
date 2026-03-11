@@ -36,7 +36,6 @@ var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:8080
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(frontendUrl) });
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<IAuthService, AuthService>();
 
 var allowedOrigins = new[] { "https://agroadmin.runasp.net" };
 builder.Services.AddCors(options =>
@@ -62,6 +61,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<ITelegramService>(sp =>
 {
     var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();

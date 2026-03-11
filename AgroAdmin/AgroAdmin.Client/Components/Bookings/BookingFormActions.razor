@@ -1,7 +1,16 @@
-﻿<button type="button" class="btn btn-outline-secondary flex-fill" @onclick="OnCancel">Отмена</button>
-<button type="submit" class="btn btn-success flex-fill">@(Id.HasValue ? "Обновить" : "Создать")</button>
+﻿<div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary flex-fill" @onclick="OnCancel">Отмена</button>
+    <button type="submit" class="btn btn-success flex-fill" disabled="@IsValidating">
+        @if (IsValidating)
+        {
+            <span class="spinner-border spinner-border-sm me-1"></span>
+        }
+        @(Id.HasValue ? "Обновить" : "Создать")
+    </button>
+</div>
 
 @code {
     [Parameter] public int? Id { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public bool IsValidating { get; set; }
 }

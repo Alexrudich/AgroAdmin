@@ -427,5 +427,25 @@ public class BookingFormService : IDisposable
         }
     }
 
+    public async Task<BookingValidationResult?> ValidateAsync(CreateBookingDto booking)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync("api/bookings/validate", booking);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<BookingValidationResult>();
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Validation error");
+            return null;
+        }
+    }
+
     public void Dispose() => _debounceTimer?.Dispose();
 }

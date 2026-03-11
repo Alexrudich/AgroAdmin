@@ -37,8 +37,15 @@
                 <!-- 8️ Заметки -->
                 <BookingNotesSection Service="Service" />
 
-                <!-- 9️ Кнопки -->
-                <BookingFormActions Id="Id" OnCancel="Cancel" />
+                <!-- 9️ Валидация -->
+                <BookingValidation Errors="validationErrors"
+                                   EarliestAvailableDate="earliestAvailableDate"
+                                   IsValidating="isValidating" />
+
+                <!-- 10️ Кнопки -->
+                <BookingFormActions Id="Id"
+                                    OnCancel="Cancel"
+                                    IsValidating="isValidating" />
 
             </EditForm>
         </div>
@@ -47,6 +54,11 @@
 
 @code {
     [Parameter] public int? Id { get; set; }
+
+    private List<string> validationErrors = new();
+    private DateTime? earliestAvailableDate;
+    private bool isValidating = false;
+
     private void Cancel() => Nav.NavigateTo("/bookings");
 
     protected override async Task OnInitializedAsync()
@@ -61,18 +73,15 @@
         {
             Service.Booking.DepartureDate = Service.Booking.ArrivalDate.AddDays(1);
         }
-        // Принудительно обновляем календарь
         StateHasChanged();
     }
 
     private void OnUnitChanged()
     {
-        // При смене объекта корректируем выезд, если нужно
         if (Service.Booking.DepartureDate <= Service.Booking.ArrivalDate)
         {
             Service.Booking.DepartureDate = Service.Booking.ArrivalDate.AddDays(1);
         }
-        // Принудительно обновляем календарь
         StateHasChanged();
     }
 
@@ -126,8 +135,35 @@
 
     private async Task HandleSubmit()
     {
-        if (await Service.SubmitAsync(Id))
-            Nav.NavigateTo("/calendar");
+        validationErrors.Clear();
+        earliestAvailableDate = null;
+        isValidating = true;
+        StateHasChanged();
+
+        try
+        {
+            var validationResult = await Service.ValidateAsync(Service.Booking);
+
+            if (validationResult?.IsValid == true)
+            {
+                if (await Service.SubmitAsync(Id))
+                    Nav.NavigateTo("/calendar");
+            }
+            else if (validationResult != null)
+            {
+                validationErrors = validationResult.Errors ?? new();
+                earliestAvailableDate = validationResult.EarliestAvailableDate;
+            }
+            else
+            {
+                validationErrors = new() { "Ошибка при проверке данных" };
+            }
+        }
+        finally
+        {
+            isValidating = false;
+            StateHasChanged();
+        }
     }
 
     public void Dispose()

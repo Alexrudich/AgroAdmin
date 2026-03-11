@@ -11,7 +11,11 @@ namespace AgroAdmin.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BookingsController(AppDbContext context, ITelegramService telegramService, ILogger<BookingsController> logger) : ControllerBase
+public class BookingsController(
+    AppDbContext context,
+    ITelegramService telegramService,
+    IBookingValidationService validationService,
+    ILogger<BookingsController> logger) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IEnumerable<BookingDto>>> GetAll()
@@ -94,7 +98,48 @@ public class BookingsController(AppDbContext context, ITelegramService telegramS
     {
         try
         {
-            // 1. Ищем или создаем гостя
+            var errors = new List<string>();
+            DateTime? earliestAvailable = null;
+
+            // 1. Валидация количества гостей
+            var guestValidation = validationService.ValidateGuests(dto);
+            if (!guestValidation.IsValid)
+            {
+                errors.AddRange(guestValidation.Errors);
+            }
+
+            // 2. Валидация доступности дат
+            var dateValidation = await validationService.ValidateDatesAsync(dto);
+            if (!dateValidation.IsValid)
+            {
+                errors.AddRange(dateValidation.Errors);
+                earliestAvailable = dateValidation.EarliestAvailableDate;
+            }
+
+            // 3. Если есть ошибки - возвращаем все сразу
+            if (errors.Any())
+            {
+                var response = new
+                {
+                    errors = errors,
+                    type = "validation"
+                };
+
+                // Добавляем earliestAvailable только если он есть
+                if (earliestAvailable.HasValue)
+                {
+                    return Conflict(new
+                    {
+                        errors = errors,
+                        earliestAvailable = earliestAvailable,
+                        type = "validation"
+                    });
+                }
+
+                return BadRequest(response);
+            }
+
+            // 4. Ищем или создаем гостя
             Guest? guest = null;
             int guestId;
 
@@ -138,7 +183,7 @@ public class BookingsController(AppDbContext context, ITelegramService telegramS
                 guest = newGuest;
             }
 
-            // 2. Создаем бронь
+            // 5. Создаем бронь
             var booking = new Booking(
                 guestId: guestId,
                 arrival: dto.ArrivalDate,
@@ -159,24 +204,23 @@ public class BookingsController(AppDbContext context, ITelegramService telegramS
             context.Bookings.Add(booking);
             await context.SaveChangesAsync();
 
-            // 3. ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ В TELEGRAM (не блокируем ответ)
+            // 6. ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ В TELEGRAM
             _ = Task.Run(async () =>
             {
                 try
                 {
                     var unitName = dto.ReservedUnit.ToFriendlyString();
-
                     var message = $"""
-                        🔔 <b>Новая бронь!</b>
-                        
-                        👤 <b>Гость:</b> {guest.FullName}
-                        📞 <b>Тел:</b> {guest.Phone}
-                        📅 <b>Даты:</b> {dto.ArrivalDate:dd.MM} — {dto.DepartureDate:dd.MM}
-                        🏠 <b>Объект:</b> {unitName}
-                        👥 <b>Состав:</b> {dto.TotalGuestsCount} чел. (👨{dto.AdultsCount} 👦{dto.ChildrenCount} 👶{dto.InfantsCount})
-                        🛠 <b>Допы:</b> {(dto.NeedsSauna ? "🌡️" : "")} {(dto.NeedsBanquetHall ? "🥂" : "")} {(dto.HasDog ? "🐕" : "")}
-                        📝 <b>Заметка:</b> {dto.AdminNotes ?? "нет"}
-                        """;
+                    🔔 <b>Новая бронь!</b>
+                    
+                    👤 <b>Гость:</b> {guest.FullName}
+                    📞 <b>Тел:</b> {guest.Phone}
+                    📅 <b>Даты:</b> {dto.ArrivalDate:dd.MM} — {dto.DepartureDate:dd.MM}
+                    🏠 <b>Объект:</b> {unitName}
+                    👥 <b>Состав:</b> {dto.TotalGuestsCount} чел. (👨{dto.AdultsCount} 👦{dto.ChildrenCount} 👶{dto.InfantsCount})
+                    🛠 <b>Допы:</b> {(dto.NeedsSauna ? "🌡️" : "")} {(dto.NeedsBanquetHall ? "🥂" : "")} {(dto.HasDog ? "🐕" : "")}
+                    📝 <b>Заметка:</b> {dto.AdminNotes ?? "нет"}
+                    """;
 
                     await telegramService.SendMessageAsync(message);
                 }
@@ -190,50 +234,164 @@ public class BookingsController(AppDbContext context, ITelegramService telegramS
         }
         catch (Exception ex)
         {
-            return BadRequest(ex.Message);
+            logger.LogError(ex, "Error creating booking");
+            return BadRequest(new
+            {
+                errors = new[] { "Ошибка при создании брони" },
+                type = "error"
+            });
         }
     }
 
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateBookingDto dto)
     {
-        var booking = await context.Bookings
-            .Include(b => b.Guest)
-            .FirstOrDefaultAsync(b => b.Id == id);
-
-        if (booking == null) return NotFound();
-
-        // Обновляем гостя если нужно
-        if (dto.Guest != null)
+        try
         {
-            var guest = booking.Guest;
-            if (guest.FullName != dto.Guest.FullName || guest.Phone != dto.Guest.Phone)
+            var booking = await context.Bookings
+                .Include(b => b.Guest)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null) return NotFound();
+
+            var errors = new List<string>();
+            DateTime? earliestAvailable = null;
+
+            // 1. Валидация количества гостей
+            var guestValidation = validationService.ValidateGuests(new CreateBookingDto
             {
-                guest.UpdateInfo(
-                    dto.Guest.FullName ?? guest.FullName,
-                    dto.Guest.Phone ?? guest.Phone,
-                    guest.Comment
-                );
+                AdultsCount = dto.AdultsCount,
+                ChildrenCount = dto.ChildrenCount,
+                InfantsCount = dto.InfantsCount,
+                ReservedUnit = dto.ReservedUnit
+            });
+
+            if (!guestValidation.IsValid)
+            {
+                errors.AddRange(guestValidation.Errors);
             }
+
+            // 2. Валидация доступности дат (исключая текущую бронь)
+            var dateValidation = await validationService.ValidateDatesAsync(new CreateBookingDto
+            {
+                ArrivalDate = dto.ArrivalDate,
+                DepartureDate = dto.DepartureDate,
+                ReservedUnit = dto.ReservedUnit
+            }, id);
+
+            if (!dateValidation.IsValid)
+            {
+                errors.AddRange(dateValidation.Errors);
+                earliestAvailable = dateValidation.EarliestAvailableDate;
+            }
+
+            // 3. Если есть ошибки - возвращаем все сразу
+            if (errors.Any())
+            {
+                var response = new
+                {
+                    errors = errors,
+                    type = "validation"
+                };
+
+                if (earliestAvailable.HasValue)
+                {
+                    return Conflict(new
+                    {
+                        errors = errors,
+                        earliestAvailable = earliestAvailable,
+                        type = "validation"
+                    });
+                }
+
+                return BadRequest(response);
+            }
+
+            // 4. Обновляем гостя если нужно
+            if (dto.Guest != null)
+            {
+                var guest = booking.Guest;
+                if (guest.FullName != dto.Guest.FullName || guest.Phone != dto.Guest.Phone)
+                {
+                    guest.UpdateInfo(
+                        dto.Guest.FullName ?? guest.FullName,
+                        dto.Guest.Phone ?? guest.Phone,
+                        guest.Comment
+                    );
+                }
+            }
+
+            // 5. Обновляем поля брони
+            booking.GetType().GetProperty("ArrivalDate")?.SetValue(booking, DateTime.SpecifyKind(dto.ArrivalDate, DateTimeKind.Utc));
+            booking.GetType().GetProperty("DepartureDate")?.SetValue(booking, DateTime.SpecifyKind(dto.DepartureDate, DateTimeKind.Utc));
+            booking.GetType().GetProperty("ReservedUnit")?.SetValue(booking, dto.ReservedUnit);
+            booking.GetType().GetProperty("TotalGuestsCount")?.SetValue(booking, dto.TotalGuestsCount);
+            booking.GetType().GetProperty("AdultsCount")?.SetValue(booking, dto.AdultsCount);
+            booking.GetType().GetProperty("ChildrenCount")?.SetValue(booking, dto.ChildrenCount);
+            booking.GetType().GetProperty("InfantsCount")?.SetValue(booking, dto.InfantsCount);
+            booking.GetType().GetProperty("HasDog")?.SetValue(booking, dto.HasDog);
+            booking.GetType().GetProperty("NeedsSauna")?.SetValue(booking, dto.NeedsSauna);
+            booking.GetType().GetProperty("NeedsBanquetHall")?.SetValue(booking, dto.NeedsBanquetHall);
+            booking.GetType().GetProperty("IsFirstTimeGuest")?.SetValue(booking, dto.IsFirstTimeGuest);
+            booking.GetType().GetProperty("AdminNotes")?.SetValue(booking, dto.AdminNotes);
+            booking.GetType().GetProperty("FeedbackComment")?.SetValue(booking, dto.FeedbackComment);
+
+            await context.SaveChangesAsync();
+
+            logger.LogInformation("Booking {Id} updated successfully", id);
+            return NoContent();
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating booking {Id}", id);
+            return BadRequest(new
+            {
+                errors = new[] { "Ошибка при обновлении брони" },
+                type = "error"
+            });
+        }
+    }
 
-        // Обновляем поля брони
-        booking.GetType().GetProperty("ArrivalDate")?.SetValue(booking, DateTime.SpecifyKind(dto.ArrivalDate, DateTimeKind.Utc));
-        booking.GetType().GetProperty("DepartureDate")?.SetValue(booking, DateTime.SpecifyKind(dto.DepartureDate, DateTimeKind.Utc));
-        booking.GetType().GetProperty("ReservedUnit")?.SetValue(booking, dto.ReservedUnit);
-        booking.GetType().GetProperty("TotalGuestsCount")?.SetValue(booking, dto.TotalGuestsCount);
-        booking.GetType().GetProperty("AdultsCount")?.SetValue(booking, dto.AdultsCount);
-        booking.GetType().GetProperty("ChildrenCount")?.SetValue(booking, dto.ChildrenCount);
-        booking.GetType().GetProperty("InfantsCount")?.SetValue(booking, dto.InfantsCount);
-        booking.GetType().GetProperty("HasDog")?.SetValue(booking, dto.HasDog);
-        booking.GetType().GetProperty("NeedsSauna")?.SetValue(booking, dto.NeedsSauna);
-        booking.GetType().GetProperty("NeedsBanquetHall")?.SetValue(booking, dto.NeedsBanquetHall);
-        booking.GetType().GetProperty("IsFirstTimeGuest")?.SetValue(booking, dto.IsFirstTimeGuest);
-        booking.GetType().GetProperty("AdminNotes")?.SetValue(booking, dto.AdminNotes);
-        booking.GetType().GetProperty("FeedbackComment")?.SetValue(booking, dto.FeedbackComment);
+    [HttpPost("validate")]
+    public async Task<ActionResult<BookingValidationResult>> Validate([FromBody] CreateBookingDto dto)
+    {
+        try
+        {
+            var errors = new List<string>();
+            DateTime? earliestAvailable = null;
 
-        await context.SaveChangesAsync();
-        return NoContent();
+            // 1. Валидация количества гостей
+            var guestValidation = validationService.ValidateGuests(dto);
+            if (!guestValidation.IsValid)
+            {
+                errors.AddRange(guestValidation.Errors);
+            }
+
+            // 2. Валидация доступности дат
+            var dateValidation = await validationService.ValidateDatesAsync(dto);
+            if (!dateValidation.IsValid)
+            {
+                errors.AddRange(dateValidation.Errors);
+                earliestAvailable = dateValidation.EarliestAvailableDate;
+            }
+
+            // 3. Возвращаем все ошибки сразу
+            return Ok(new BookingValidationResult
+            {
+                IsValid = !errors.Any(),
+                Errors = errors,
+                EarliestAvailableDate = earliestAvailable
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error validating booking");
+            return BadRequest(new BookingValidationResult
+            {
+                IsValid = false,
+                Errors = new List<string> { "Ошибка валидации" }
+            });
+        }
     }
 
     [HttpDelete("{id}")]
