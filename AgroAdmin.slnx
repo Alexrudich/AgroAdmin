@@ -3,10 +3,10 @@
     <File Path=".github/workflows/deploy.yml" />
     <File Path="README.md" />
   </Folder>
-  <Project Path="../AgroAdmin.NotificationWorker/AgroAdmin.NotificationWorker.csproj" Id="a6d0d880-0e21-4d06-819b-63b5e044c293" />
   <Project Path="AgroAdmin.API/AgroAdmin.API.csproj" />
   <Project Path="AgroAdmin.Domain/AgroAdmin.Domain.csproj" />
   <Project Path="AgroAdmin.Infrastructure/AgroAdmin.Infrastructure.csproj" />
+  <Project Path="AgroAdmin.NotificationWorker/AgroAdmin.NotificationWorker.csproj" />
   <Project Path="AgroAdmin.Shared/AgroAdmin.Shared.csproj" />
   <Project Path="AgroAdmin/AgroAdmin.Client/AgroAdmin.Client.csproj" />
   <Project Path="AgroAdmin/AgroAdmin/AgroAdmin.csproj" />

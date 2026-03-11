@@ -2,11 +2,14 @@
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
+using AgroAdmin.NotificationWorker.Consumers;
+using AgroAdmin.NotificationWorker.Jobs;
 using AgroAdmin.Shared.Services;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Quartz;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -72,6 +75,15 @@ builder.Services.AddSingleton<ITelegramService>(sp =>
     return new TelegramService(httpClientFactory, configuration, logger);
 });
 
+builder.Services.AddQuartz(q =>
+{
+    // Добавляем StoreDurably(), чтобы Quartz не падал при старте без триггера
+    q.AddJob<ReminderJob>(opts => opts
+        .WithIdentity("ReminderJob")
+        .StoreDurably());
+});
+builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+
 builder.Services.AddScoped<BookingFormService>();
 
 if (OperatingSystem.IsWindows())
@@ -91,24 +103,27 @@ else
 // Настройка MassTransit для отправки сообщений в RabbitMQ
 builder.Services.AddMassTransit(x =>
 {
+    // Регистрируем консьюмера из проекта NotificationWorker
+    x.AddConsumer<BookingCreatedConsumer>();
+
     x.UsingRabbitMq((context, cfg) =>
     {
-        // 1. Берем переменную (через двоеточие или подчеркивание)
         var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
                         ?? builder.Configuration["RabbitMQ__Url"];
 
         if (!string.IsNullOrEmpty(rabbitUrl))
         {
-            // 2. Тщательно чистим строку от пробелов и лишних слэшей в конце
             var cleanUrl = rabbitUrl.Trim().TrimEnd('/');
-
             try
             {
                 cfg.Host(new Uri(cleanUrl));
+
+                // команда создает очереди и связывает их с консьюмерами
+                cfg.ConfigureEndpoints(context);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "RabbitMQ URI is still malformed: {Url}", cleanUrl);
+                Log.Error(ex, "RabbitMQ URI error: {Url}", cleanUrl);
             }
         }
     });
