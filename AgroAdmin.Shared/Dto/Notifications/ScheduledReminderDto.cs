@@ -9,4 +9,5 @@ public class ScheduledReminderDto
     public DateTime ScheduledFor { get; set; }
     public bool IsSent { get; set; }
     public ReminderPriority Priority { get; set; }
+    public string? TargetChatId { get; set; }
 }

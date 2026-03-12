@@ -23,4 +23,21 @@ public class NotificationsController(INotificationService notificationService) :
         var reminders = await notificationService.GetActiveRemindersAsync();
         return Ok(reminders);
     }
+
+    [HttpPut("reminders/{id}")]
+    public async Task<IActionResult> UpdateReminder(int id, [FromBody] CreateReminderDto dto)
+    {
+        await notificationService.UpdateReminderAsync(id, dto);
+        return NoContent();
+    }
+
+    [HttpDelete("reminders/{id}")]
+    public async Task<IActionResult> DeleteReminder(int id)
+    {
+        var reminder = await notificationService.GetByIdAsync(id);
+        if (reminder == null) return NotFound();
+
+        await notificationService.DeleteReminderAsync(id);
+        return NoContent();
+    }
 }

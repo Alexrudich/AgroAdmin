@@ -31,7 +31,7 @@ builder.Services.AddQuartz(q => {
     q.AddTrigger(opts => opts
         .ForJob(scannerKey)
         .WithIdentity("DatabaseScannerTrigger")
-        .WithSimpleSchedule(x => x.WithIntervalInSeconds(10).RepeatForever()));
+        .WithSimpleSchedule(x => x.WithIntervalInSeconds(60).RepeatForever()));
 });
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 

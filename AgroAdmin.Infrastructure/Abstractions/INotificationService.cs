@@ -1,10 +1,12 @@
-﻿using AgroAdmin.Domain.Models;
-using AgroAdmin.Shared.Dto.Notifications;
+﻿using AgroAdmin.Shared.Dto.Notifications;
 
 namespace AgroAdmin.Infrastructure.Abstractions;
 
 public interface INotificationService
 {
-    Task CreateReminderAsync(CreateReminderDto dto);
     Task<List<ScheduledReminderDto>> GetActiveRemindersAsync();
+    Task<ScheduledReminderDto?> GetByIdAsync(int id);
+    Task CreateReminderAsync(CreateReminderDto dto);
+    Task UpdateReminderAsync(int id, CreateReminderDto dto);
+    Task DeleteReminderAsync(int id);
 }

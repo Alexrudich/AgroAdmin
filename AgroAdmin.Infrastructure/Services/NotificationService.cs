@@ -1,26 +1,26 @@
 ﻿using AgroAdmin.Domain.Models;
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Shared.Dto.Notifications; // Новый namespace
+using AgroAdmin.Shared.Dto.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgroAdmin.Infrastructure.Services;
 
 public class NotificationService(AppDbContext context) : INotificationService
 {
-    public async Task CreateReminderAsync(CreateReminderDto dto)
+    public async Task<ScheduledReminderDto?> GetByIdAsync(int id)
     {
-        var reminder = new ScheduledReminder
-        {
-            Message = dto.Message,
-            ScheduledFor = DateTime.SpecifyKind(dto.ScheduledFor, DateTimeKind.Utc),
-            Priority = dto.Priority,
-            TargetChatId = dto.TargetChatId,
-            IsSent = false
-        };
+        var reminder = await context.ScheduledReminders.FindAsync(id);
+        if (reminder == null) return null;
 
-        context.ScheduledReminders.Add(reminder);
-        await context.SaveChangesAsync();
+        return new ScheduledReminderDto
+        {
+            Id = reminder.Id,
+            Message = reminder.Message,
+            ScheduledFor = reminder.ScheduledFor,
+            IsSent = reminder.IsSent,
+            Priority = reminder.Priority
+        };
     }
 
     public async Task<List<ScheduledReminderDto>> GetActiveRemindersAsync()
@@ -38,5 +38,42 @@ public class NotificationService(AppDbContext context) : INotificationService
             IsSent = r.IsSent,
             Priority = r.Priority
         }).ToList();
+    }
+
+    public async Task CreateReminderAsync(CreateReminderDto dto)
+    {
+        var reminder = new ScheduledReminder
+        {
+            Message = dto.Message,
+            ScheduledFor = DateTime.SpecifyKind(dto.ScheduledFor, DateTimeKind.Utc),
+            Priority = dto.Priority,
+            TargetChatId = dto.TargetChatId,
+            IsSent = false
+        };
+
+        context.ScheduledReminders.Add(reminder);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task UpdateReminderAsync(int id, CreateReminderDto dto)
+    {
+        var reminder = await context.ScheduledReminders.FindAsync(id);
+        if (reminder != null)
+        {
+            reminder.Message = dto.Message;
+            reminder.ScheduledFor = DateTime.SpecifyKind(dto.ScheduledFor, DateTimeKind.Utc);
+            reminder.Priority = dto.Priority;
+            await context.SaveChangesAsync();
+        }
+    }
+
+    public async Task DeleteReminderAsync(int id)
+    {
+        var reminder = await context.ScheduledReminders.FindAsync(id);
+        if (reminder != null)
+        {
+            context.ScheduledReminders.Remove(reminder);
+            await context.SaveChangesAsync();
+        }
     }
 }

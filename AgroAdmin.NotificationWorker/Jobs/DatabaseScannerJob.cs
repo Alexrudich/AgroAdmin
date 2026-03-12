@@ -1,11 +1,12 @@
 ﻿using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
+using AgroAdmin.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
 
 namespace AgroAdmin.NotificationWorker.Jobs;
 
-[DisallowConcurrentExecution] // Чтобы два сканера не слали одно и то же одновременно
+[DisallowConcurrentExecution]
 public class DatabaseScannerJob(
     AppDbContext dbContext,
     ITelegramService telegram,
@@ -15,11 +16,10 @@ public class DatabaseScannerJob(
     {
         var now = DateTime.UtcNow;
 
-        // 1. Ищем задачи, время которых пришло, но они не отправлены
         var pendingReminders = await dbContext.ScheduledReminders
             .Where(r => !r.IsSent && r.ScheduledFor <= now)
-            .OrderBy(r => r.Priority) // Сначала срочные
-            .Take(10) // Берем пачкой, чтобы не забить лимиты Телеграма
+            .OrderByDescending(r => r.Priority)
+            .Take(10)
             .ToListAsync();
 
         if (pendingReminders.Count == 0) return;
@@ -30,8 +30,17 @@ public class DatabaseScannerJob(
         {
             try
             {
-                // Если TargetChatId пустой — TelegramService сам возьмет дефолтные из конфига
-                await telegram.SendMessageAsync(reminder.Message);
+                var prefix = reminder.Priority switch
+                {
+                    ReminderPriority.Urgent => "🚨 <b>СРОЧНО:</b> ",
+                    ReminderPriority.High => "⚠️ <b>Внимание:</b> ",
+                    ReminderPriority.Low => "ℹ️ ",
+                    _ => "🔔 "
+                };
+
+                // Отправляем сообщение. Если TargetChatId в базе null, 
+                // TelegramService использует список из конфига.
+                await telegram.SendMessageAsync(prefix + reminder.Message, reminder.TargetChatId);
 
                 reminder.IsSent = true;
                 logger.LogInformation("✅ Отправлено: {Msg}", reminder.Message);
