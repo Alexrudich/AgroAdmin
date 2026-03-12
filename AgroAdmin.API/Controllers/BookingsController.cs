@@ -3,6 +3,7 @@ using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Shared.Dto;
 using AgroAdmin.Shared.Extensions;
+using MassTransit;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -15,6 +16,7 @@ public class BookingsController(
     AppDbContext context,
     ITelegramService telegramService,
     IBookingValidationService validationService,
+    IPublishEndpoint publishEndpoint,
     ILogger<BookingsController> logger) : ControllerBase
 {
     [HttpGet]
@@ -203,6 +205,27 @@ public class BookingsController(
 
             context.Bookings.Add(booking);
             await context.SaveChangesAsync();
+
+            // ОТПРАВКА В RABBITMQ
+            try
+            {
+                await publishEndpoint.Publish(new BookingCreatedEvent
+                {
+                    BookingId = booking.Id,
+                    GuestName = guest.FullName,
+                    Phone = guest.Phone,
+                    ArrivalDate = booking.ArrivalDate,
+                    DepartureDate = booking.DepartureDate,
+                    Unit = booking.ReservedUnit,
+                    NeedsSauna = booking.NeedsSauna,
+                    AdminNotes = booking.AdminNotes
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Could not publish BookingCreatedEvent to RabbitMQ");
+                // Не прерываем выполнение, так как бронь уже в базе
+            }
 
             // 6. ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ В TELEGRAM
             _ = Task.Run(async () =>

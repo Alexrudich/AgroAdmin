@@ -7,22 +7,51 @@ services:
       context: .
       dockerfile: AgroAdmin/AgroAdmin/Dockerfile
     container_name: agro_admin_api
+    env_file: .env
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=db;Database=AgroAdminDb;User Id=sa;Password=YourStrong!Password;TrustServerCertificate=True;MultipleActiveResultSets=true
-      - Telegram__BotToken=
-      - Telegram__ChatId=
+      - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
+      - Telegram__ChatId=${TELEGRAM_CHAT_ID}
+      - RabbitMQ__Url=${RABBITMQ_URL}
     ports:
       - "8080:80"
     depends_on:
       db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - agro_network
     volumes:
       - agro_keys:/root/.aspnet/DataProtection-Keys
     user: root
+
+  notification_worker:
+    image: ${DOCKER_REGISTRY-}agroadmin-worker
+    build:
+      context: .
+      dockerfile: AgroAdmin.NotificationWorker/Dockerfile
+    container_name: agro_notification_worker
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
+      - Telegram__ChatId=${TELEGRAM_CHAT_ID}
+      - RabbitMQ__Url=${RABBITMQ_URL}
+    depends_on:
+      - rabbitmq
+    networks:
+      - agro_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: agro_rabbit_local
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - agro_network
 
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest

@@ -2,10 +2,14 @@
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
+using AgroAdmin.NotificationWorker.Consumers;
+using AgroAdmin.NotificationWorker.Jobs;
 using AgroAdmin.Shared.Services;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Quartz;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -71,6 +75,15 @@ builder.Services.AddSingleton<ITelegramService>(sp =>
     return new TelegramService(httpClientFactory, configuration, logger);
 });
 
+builder.Services.AddQuartz(q =>
+{
+    // Добавляем StoreDurably(), чтобы Quartz не падал при старте без триггера
+    q.AddJob<ReminderJob>(opts => opts
+        .WithIdentity("ReminderJob")
+        .StoreDurably());
+});
+builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+
 builder.Services.AddScoped<BookingFormService>();
 
 if (OperatingSystem.IsWindows())
@@ -86,6 +99,34 @@ else
         .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
         .SetApplicationName("AgroAdmin");
 }
+
+// Настройка MassTransit (Отправитель + Получатель на проде)
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumer<BookingCreatedConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        // Проверка URL для Docker и IIS
+        var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
+                        ?? builder.Configuration["RabbitMQ__Url"]
+                        ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
+
+        if (!string.IsNullOrEmpty(rabbitUrl))
+        {
+            var cleanUrl = rabbitUrl.Trim().TrimEnd('/');
+            try
+            {
+                cfg.Host(new Uri(cleanUrl));
+                cfg.ConfigureEndpoints(context);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "RabbitMQ URI error: {Url}", cleanUrl);
+            }
+        }
+    });
+});
 
 var app = builder.Build();
 

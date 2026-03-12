@@ -1,65 +1,72 @@
-﻿# Миграции Entity Framework Core
+﻿# 🌿 AgroAdmin — Система управления усадьбой
 
-## Добавление новой миграции
+Проект на .NET 10 (Blazor WebApp) с Event-Driven архитектурой уведомлений через RabbitMQ и Quartz.NET.
 
-```powershell
-# В Package Manager Console (Visual Studio)
-# Default project: AgroAdmin.Infrastructure
+## 🛠️ Быстрый старт (Локальный Docker)
 
-Add-Migration InitialMigration -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin -OutputDir Persistence/Migrations
+Вы можете запустить весь стек (БД, Кролик, Сайт, Воркер) одной командой.
+
+### 1. Прекондишены
+
+В корне проекта (рядом с docker-compose.yml) создайте файл .env (добавьте его в .gitignore) и заполните:
+TELEGRAM_BOT_TOKEN=ваш_токен_бота
+TELEGRAM_CHAT_ID=ваш_id_чата
+
+### 2. Запуск стека
+```bash
+bash
+docker-compose up --build
+```
+Сайт: http://localhost:8080
+RabbitMQ Admin: http://localhost:15672 (guest/guest)
+MSSQL: localhost:1433
+
+### 💻 Разработка в Visual Studio (F5)
+
+Если запускаете проекты из IDE без Docker, используйте User Secrets, чтобы не светить ключи в репозитории.
+Настройка User Secrets
+Правой кнопкой на проект AgroAdmin.NotificationWorker -> Manage User Secrets:
+```json
+{
+  "Telegram": {
+    "BotToken": "ваш_токен",
+    "ChatId": "ID1,ID2"
+  },
+  "RabbitMQ": {
+    "Url": "amqp://guest:guest@localhost:5672" 
 ```
 
-## Применение миграции к БД
+## 🏗️ Миграции базы данных (EF Core)
+
+**Проект с DbContext:** `AgroAdmin.Infrastructure`  
+**Startup проект:** `AgroAdmin`
+
+### Локальное применение (Docker/Local DB)
+
+| Действие | Команда (Package Manager Console) |
+|----------|-----------------------------------|
+| **Новая миграция** | `Add-Migration Name -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin -OutputDir Persistence/Migrations` |
+| **Применить к БД** | `Update-Database -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin` |
+
+### Применение на Продакшн (MonsterASP.net)
+Так как хостинг не всегда позволяет выполнять миграции автоматически при старте, используйте прямое подключение из Visual Studio:
 
 ```powershell
-Update-Database -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin
+Update-Database -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin -Connection "ВАША_СТРОКА_ПОДКЛЮЧЕНИЯ_ИЗ_ПАНЕЛИ_MONSTERASP"
 ```
+### 🚀 Деплой на MonsterASP.net
 
-## Пример
+Сайт деплоится автоматически через GitHub Actions при пуше в ветку develop.
+Переменные окружения (Environment Variables):
+Ключ	Описание
+ConnectionStrings__DefaultConnection	Строка к внешней MSSQL
+Telegram__BotToken	Токен бота
+Telegram__ChatId	ID чатов через запятую
+RabbitMQ__Url	URL от CloudAMQP (amqps://...)
 
-```powershell
-# Добавление гостей и отзывов
-Add-Migration AddGuestsAndFeedback -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin -OutputDir Persistence/Migrations
+### 🐰 Архитектура уведомлений
 
-# Применение
-Update-Database -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin
-```
-
-## Важно
-
-- `-Project AgroAdmin.Infrastructure` - проект с DbContext
-- `-StartupProject AgroAdmin` - проект, который запускается (содержит строку подключения в appsettings.json)
-- `-OutputDir Persistence/Migrations` - папка для хранения миграций
-
----
-
-# 🚀 Деплой на MonsterASP.net
-
-## Настройка переменных окружения (Environment Variables)
-
-В панели управления MonsterASP.net необходимо добавить следующие переменные:
-
-| Name | Value | Описание |
-|------|-------|----------|
-| `ConnectionStrings__DefaultConnection` | `Server=dbXXXX.public.databaseasp.net;Database=dbXXXX;User Id=dbXXXX;Password=XXXX;TrustServerCertificate=True;MultipleActiveResultSets=true` | Строка подключения к БД |
-| `Telegram__BotToken` | `ваш_токен` | Токен Telegram бота |
-| `Telegram__ChatId` | `ID1,ID2` | ID чатов через запятую |
-
-**Важно:** Используйте двойное подчеркивание `__` для вложенных настроек (например, `Telegram__BotToken` вместо `Telegram:BotToken`).
-
-## Частые проблемы и решения
-
-### 1. Ошибка 500 при запросе к API
-- Проверьте логи в панели управления
-- Убедитесь, что все переменные окружения заданы правильно
-- Проверьте что `Telegram__BotToken` существует и корректен
-
-### 2. Telegram уведомления не приходят
-- Убедитесь, что бот добавлен в чат и имеет права
-- ChatId можно получить через `@getidsbot` в Telegram
-- Для нескольких чатов используйте запятую без пробелов: `ID1,ID2`
-
-### 3. База данных не создается
-- Проверьте права пользователя БД
-- Убедитесь что строка подключения корректна
-- В коде используется `context.Database.Migrate()` при старте
+AgroAdmin (API) отправляет событие BookingCreatedEvent в RabbitMQ.
+NotificationWorker (интегрирован в процесс сайта на проде) ловит событие.
+Quartz.NET планирует задачу ReminderJob.
+TelegramService отправляет уведомление админам.
