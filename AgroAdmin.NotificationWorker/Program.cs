@@ -8,25 +8,37 @@ using System.Text;
 Console.OutputEncoding = Encoding.UTF8;
 var builder = Host.CreateApplicationBuilder(args);
 
-// 1. Настройка Quartz
+// --- ОТЛАДКА ПЕРЕМЕННЫХ ---
+var url = builder.Configuration["RabbitMQ:Url"]
+          ?? builder.Configuration["RabbitMQ__Url"]
+          ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
+
+// --- НАСТРОЙКА QUARTZ ---
 builder.Services.AddQuartz(q => {
-    q.AddJob<AgroAdmin.NotificationWorker.Jobs.ReminderJob>(opts => opts.WithIdentity("ReminderJob"));
+    q.AddJob<AgroAdmin.NotificationWorker.Jobs.ReminderJob>(opts => opts
+        .WithIdentity("ReminderJob")
+        .StoreDurably());
 });
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
-// 2. Настройка MassTransit
+// --- НАСТРОЙКА MASSTRANSIT ---
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<BookingCreatedConsumer>();
     x.UsingRabbitMq((context, cfg) =>
     {
-        var rabbitUrl = builder.Configuration["RabbitMQ:Url"];
-        cfg.Host(new Uri(rabbitUrl!));
+        if (string.IsNullOrEmpty(url))
+        {
+            // Не падаем сразу, а пробуем дефолт для Docker, если мы внутри сети
+            url = "amqp://guest:guest@rabbitmq:5672";
+            Console.WriteLine("⚠️ WARNING: Config URL is empty. Using fallback: " + url);
+        }
+
+        cfg.Host(new Uri(url.Trim().TrimEnd('/')));
         cfg.ConfigureEndpoints(context);
     });
 });
 
-// 3. Регистрация ОРИГИНАЛЬНОГО сервиса из Infrastructure
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ITelegramService, TelegramService>();
 

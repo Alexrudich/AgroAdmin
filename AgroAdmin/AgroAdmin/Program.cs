@@ -100,16 +100,17 @@ else
         .SetApplicationName("AgroAdmin");
 }
 
-// Настройка MassTransit для отправки сообщений в RabbitMQ
+// Настройка MassTransit (Отправитель + Получатель на проде)
 builder.Services.AddMassTransit(x =>
 {
-    // Регистрируем консьюмера из проекта NotificationWorker
     x.AddConsumer<BookingCreatedConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {
+        // Проверка URL для Docker и IIS
         var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
-                        ?? builder.Configuration["RabbitMQ__Url"];
+                        ?? builder.Configuration["RabbitMQ__Url"]
+                        ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
 
         if (!string.IsNullOrEmpty(rabbitUrl))
         {
@@ -117,8 +118,6 @@ builder.Services.AddMassTransit(x =>
             try
             {
                 cfg.Host(new Uri(cleanUrl));
-
-                // команда создает очереди и связывает их с консьюмерами
                 cfg.ConfigureEndpoints(context);
             }
             catch (Exception ex)
