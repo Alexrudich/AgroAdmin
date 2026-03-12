@@ -1,6 +1,6 @@
 ﻿using AgroAdmin.Domain.Models;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Shared.Dto;
+using AgroAdmin.Shared.Dto.Guests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;

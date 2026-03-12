@@ -14,6 +14,7 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// --- 1. ЛОГИРОВАНИЕ (Serilog) ---
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .WriteTo.File("logs/agroadmin-.txt",
@@ -24,6 +25,7 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
+// --- 2. БАЗА ДАННЫХ И СТАНДАРТНЫЕ СЕРВИСЫ ASP.NET ---
 builder.Services.AddControllers()
     .AddApplicationPart(typeof(AgroAdmin.API.Controllers.AuthController).Assembly);
 
@@ -35,12 +37,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:8080";
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(frontendUrl) });
-
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
 
+// --- 3. БЕЗОПАСНОСТЬ (CORS, Auth, DataProtection) ---
 var allowedOrigins = new[] { "https://agroadmin.runasp.net" };
 builder.Services.AddCors(options =>
 {
@@ -64,50 +64,47 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddHttpClient();
-builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddSingleton<ITelegramService>(sp =>
+if (OperatingSystem.IsWindows())
 {
-    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-    var configuration = sp.GetRequiredService<IConfiguration>();
-    var logger = sp.GetRequiredService<ILogger<TelegramService>>();
-    return new TelegramService(httpClientFactory, configuration, logger);
-});
+    builder.Services.AddDataProtection().SetApplicationName("AgroAdmin");
+}
+else
+{
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
+        .SetApplicationName("AgroAdmin");
+}
 
+// --- 4. СЕРВИСЫ ПРИЛОЖЕНИЯ (Infrastructure & Shared) ---
+// Scoped сервисы
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<BookingFormService>();
+
+// Singleton сервисы 
+builder.Services.AddSingleton<ITelegramService, TelegramService>();
+
+// Настройка HttpClient для фронтенда
+var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:8080";
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(frontendUrl) });
+
+// --- 5. ФОНОВЫЕ ЗАДАЧИ (Quartz.NET) ---
 builder.Services.AddQuartz(q =>
 {
-    // Добавляем StoreDurably(), чтобы Quartz не падал при старте без триггера
     q.AddJob<ReminderJob>(opts => opts
         .WithIdentity("ReminderJob")
         .StoreDurably());
 });
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
-builder.Services.AddScoped<BookingFormService>();
-
-if (OperatingSystem.IsWindows())
-{
-    // На Windows Server/IIS ключи хранятся в реестре или профиле пользователя
-    builder.Services.AddDataProtection()
-        .SetApplicationName("AgroAdmin");
-}
-else
-{
-    // Для Linux/Docker
-    builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
-        .SetApplicationName("AgroAdmin");
-}
-
-// Настройка MassTransit (Отправитель + Получатель на проде)
+// --- 6. ШИНА ДАННЫХ (MassTransit & RabbitMQ) ---
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<BookingCreatedConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
     {
-        // Проверка URL для Docker и IIS
         var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
                         ?? builder.Configuration["RabbitMQ__Url"]
                         ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
@@ -128,8 +125,10 @@ builder.Services.AddMassTransit(x =>
     });
 });
 
+// --- 7. КОНФИГУРАЦИЯ PIPELINE (Middleware) ---
 var app = builder.Build();
 
+// Автоматические миграции БД при старте
 using (var scope = app.Services.CreateScope())
 {
     try
@@ -166,6 +165,7 @@ app.UseAntiforgery();
 
 app.MapControllers();
 
+// Редирект с корня на календарь
 app.Use(async (context, next) =>
 {
     if (context.Request.Path == "/")

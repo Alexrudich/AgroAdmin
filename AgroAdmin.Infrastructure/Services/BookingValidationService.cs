@@ -1,6 +1,6 @@
 ﻿using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Shared.Dto;
+using AgroAdmin.Shared.Dto.Bookings;
 using AgroAdmin.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

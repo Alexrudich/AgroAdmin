@@ -1,6 +1,6 @@
 ﻿using AgroAdmin.Shared.Enums;
 
-namespace AgroAdmin.Shared.Dto;
+namespace AgroAdmin.Shared.Dto.Notifications;
 
 public class CreateReminderDto
 {

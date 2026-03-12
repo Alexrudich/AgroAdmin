@@ -1,5 +1,5 @@
 ﻿using AgroAdmin.NotificationWorker.Jobs;
-using AgroAdmin.Shared.Dto;
+using AgroAdmin.Shared.Dto.Bookings;
 using MassTransit;
 using Quartz;
 

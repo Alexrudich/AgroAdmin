@@ -1,4 +1,5 @@
-﻿using AgroAdmin.Shared.Dto;
+﻿using AgroAdmin.Shared.Dto.Bookings;
+using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Enums;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.WebUtilities;

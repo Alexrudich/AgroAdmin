@@ -1,4 +1,4 @@
-﻿namespace AgroAdmin.Shared.Dto
+﻿namespace AgroAdmin.Shared.Dto.Bookings
 {
     public class BookingCapacityDto
     {

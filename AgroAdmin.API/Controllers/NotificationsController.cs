@@ -1,41 +1,26 @@
-﻿using AgroAdmin.Domain.Models;
-using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Shared.Dto;
+﻿using AgroAdmin.Infrastructure.Abstractions;
+using AgroAdmin.Shared.Dto.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace AgroAdmin.API.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class NotificationsController(AppDbContext context) : ControllerBase
+public class NotificationsController(INotificationService notificationService) : ControllerBase
 {
     [HttpPost("reminders")]
     public async Task<IActionResult> CreateReminder([FromBody] CreateReminderDto dto)
     {
-        var reminder = new ScheduledReminder
-        {
-            Message = dto.Message,
-            ScheduledFor = DateTime.SpecifyKind(dto.ScheduledFor, DateTimeKind.Utc),
-            Priority = dto.Priority,
-            TargetChatId = dto.TargetChatId,
-            IsSent = false
-        };
-
-        context.ScheduledReminders.Add(reminder);
-        await context.SaveChangesAsync();
-
-        return Ok(new { id = reminder.Id });
+        await notificationService.CreateReminderAsync(dto);
+        return Ok();
     }
 
     [HttpGet("reminders")]
-    public async Task<ActionResult<List<ScheduledReminder>>> GetActiveReminders()
+    public async Task<IActionResult> GetActiveReminders()
     {
-        return await context.ScheduledReminders
-            .Where(r => !r.IsSent)
-            .OrderBy(r => r.ScheduledFor)
-            .ToListAsync();
+        var reminders = await notificationService.GetActiveRemindersAsync();
+        return Ok(reminders);
     }
 }

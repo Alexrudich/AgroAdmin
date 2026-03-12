@@ -1,5 +1,6 @@
-using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using AgroAdmin.Client.Services;
 using AgroAdmin.Shared.Services;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 namespace AgroAdmin.Client
 {
@@ -16,7 +17,7 @@ namespace AgroAdmin.Client
 
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<BookingFormService>();
-
+            builder.Services.AddScoped<NotificationApiClient>();
             await builder.Build().RunAsync();
         }
     }

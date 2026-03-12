@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AgroAdmin.Shared.Dto;
+namespace AgroAdmin.Shared.Dto.Guests;
 
 public class GuestDto
 {

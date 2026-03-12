@@ -1,7 +1,8 @@
 ﻿using AgroAdmin.Domain.Models;
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Shared.Dto;
+using AgroAdmin.Shared.Dto.Bookings;
+using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Extensions;
 using MassTransit;
 using Microsoft.AspNetCore.Mvc;
