@@ -9,6 +9,7 @@ namespace AgroAdmin.Infrastructure.Persistence
         public DbSet<SaunaOrder> SaunaOrders => Set<SaunaOrder>();
         public DbSet<Guest> Guests => Set<Guest>();
         public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+        public DbSet<ScheduledReminder> ScheduledReminders => Set<ScheduledReminder>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -19,7 +20,6 @@ namespace AgroAdmin.Infrastructure.Persistence
             {
                 builder.HasKey(b => b.Id);
 
-                // Говорим EF работать с приватным полем _saunaOrders напрямую
                 builder.Metadata.FindNavigation(nameof(Booking.SaunaOrders))
                     ?.SetPropertyAccessMode(PropertyAccessMode.Field);
 
@@ -29,7 +29,6 @@ namespace AgroAdmin.Infrastructure.Persistence
                     .HasForeignKey(s => s.BookingId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                // Настройка нового поля FeedbackComment (если нужно)
                 builder.Property(b => b.FeedbackComment)
                     .HasMaxLength(1000);
             });
@@ -71,6 +70,22 @@ namespace AgroAdmin.Infrastructure.Persistence
                     .IsRequired();
                 builder.HasIndex(a => a.Username)
                     .IsUnique();
+            });
+
+            // Конфигурация для ScheduledReminder
+            modelBuilder.Entity<ScheduledReminder>(builder =>
+            {
+                builder.HasKey(r => r.Id);
+
+                builder.Property(r => r.Message)
+                    .IsRequired()
+                    .HasMaxLength(2000);
+
+                builder.Property(r => r.TargetChatId)
+                    .HasMaxLength(500);
+
+                // Индекс на время и статус отправки (воркер будет постоянно делать такие выборки)
+                builder.HasIndex(r => new { r.ScheduledFor, r.IsSent });
             });
         }
     }

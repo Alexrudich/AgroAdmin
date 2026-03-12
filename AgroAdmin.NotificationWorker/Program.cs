@@ -1,46 +1,54 @@
-﻿using AgroAdmin.NotificationWorker.Consumers;
-using AgroAdmin.Infrastructure.Abstractions;
+﻿using AgroAdmin.Infrastructure.Abstractions;
+using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
+using AgroAdmin.NotificationWorker.Consumers;
+using AgroAdmin.NotificationWorker.Jobs;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using Quartz;
 using System.Text;
 
 Console.OutputEncoding = Encoding.UTF8;
 var builder = Host.CreateApplicationBuilder(args);
 
-// --- ОТЛАДКА ПЕРЕМЕННЫХ ---
-var url = builder.Configuration["RabbitMQ:Url"]
-          ?? builder.Configuration["RabbitMQ__Url"]
-          ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
+// 1. База данных
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// --- НАСТРОЙКА QUARTZ ---
+// 2. Инфраструктура
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ITelegramService, TelegramService>();
+
+// 3. Планировщик Quartz
 builder.Services.AddQuartz(q => {
-    q.AddJob<AgroAdmin.NotificationWorker.Jobs.ReminderJob>(opts => opts
-        .WithIdentity("ReminderJob")
-        .StoreDurably());
+    // Задача напоминания (создается динамически из RabbitMQ)
+    q.AddJob<ReminderJob>(opts => opts.WithIdentity("ReminderJob").StoreDurably());
+
+    // Задача сканирования базы (запускается по расписанию)
+    var scannerKey = new JobKey("DatabaseScannerJob");
+    q.AddJob<DatabaseScannerJob>(opts => opts.WithIdentity(scannerKey));
+
+    q.AddTrigger(opts => opts
+        .ForJob(scannerKey)
+        .WithIdentity("DatabaseScannerTrigger")
+        .WithSimpleSchedule(x => x.WithIntervalInSeconds(10).RepeatForever()));
 });
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
-// --- НАСТРОЙКА MASSTRANSIT ---
+// 4. Очереди MassTransit
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<BookingCreatedConsumer>();
     x.UsingRabbitMq((context, cfg) =>
     {
-        if (string.IsNullOrEmpty(url))
-        {
-            // Не падаем сразу, а пробуем дефолт для Docker, если мы внутри сети
-            url = "amqp://guest:guest@rabbitmq:5672";
-            Console.WriteLine("⚠️ WARNING: Config URL is empty. Using fallback: " + url);
-        }
+        var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
+                        ?? builder.Configuration["RabbitMQ__Url"]
+                        ?? "amqp://guest:guest@rabbitmq:5672"; // Fallback для Docker
 
-        cfg.Host(new Uri(url.Trim().TrimEnd('/')));
+        cfg.Host(new Uri(rabbitUrl.Trim().TrimEnd('/')));
         cfg.ConfigureEndpoints(context);
     });
 });
-
-builder.Services.AddHttpClient();
-builder.Services.AddSingleton<ITelegramService, TelegramService>();
 
 var host = builder.Build();
 host.Run();
