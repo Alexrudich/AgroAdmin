@@ -1,0 +1,85 @@
+﻿@using AgroAdmin.Shared.Dto.Notifications
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+
+<div class="card border-info shadow-sm">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">Управление получателями</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <input @bind="newName" class="form-control" placeholder="Имя получателя" />
+            </div>
+            <div class="col-md-4">
+                <input @bind="newChatId" class="form-control" placeholder="Chat ID" />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-success w-100" @onclick="AddRecipient">➕ Добавить</button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Имя</th>
+                        <th>Chat ID</th>
+                        <th>По умолчанию</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in recipients)
+                    {
+                        <tr>
+                            <td>@r.Name</td>
+                            <td>@r.ChatId</td>
+                            <td>@(r.IsDefault ? "✅" : "")</td>
+                            <td class="text-end">
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteRecipient(r.Id)">🗑️</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnChanged { get; set; }
+    
+    private HttpClient Http => HttpClientFactory.CreateClient("AgroAdmin");
+    private List<TelegramRecipientDto> recipients = new();
+    private string newName = "";
+    private string newChatId = "";
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        recipients = await Http.GetFromJsonAsync<List<TelegramRecipientDto>>("api/notifications/recipients") ?? new();
+    }
+
+    private async Task AddRecipient()
+    {
+        if (string.IsNullOrWhiteSpace(newName) || string.IsNullOrWhiteSpace(newChatId))
+            return;
+
+        await Http.PostAsJsonAsync("api/notifications/recipients", 
+            new TelegramRecipientDto { Name = newName, ChatId = newChatId });
+
+        newName = "";
+        newChatId = "";
+        await Load();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task DeleteRecipient(int id)
+    {
+        await Http.DeleteAsync($"api/notifications/recipients/{id}");
+        await Load();
+        await OnChanged.InvokeAsync();
+    }
+}

@@ -1,5 +1,5 @@
 ﻿using AgroAdmin.Infrastructure.Abstractions;
-using AgroAdmin.Shared.Dto;
+using AgroAdmin.Shared.Dto.Bookings;
 using AgroAdmin.Shared.Enums;
 using AgroAdmin.Shared.Extensions;
 using Microsoft.Extensions.Configuration;
@@ -16,13 +16,16 @@ public class TelegramService(
     private readonly string _botToken = configuration["Telegram:BotToken"] ?? throw new InvalidOperationException("Telegram:BotToken not configured");
     private readonly string _chatId = configuration["Telegram:ChatId"] ?? throw new InvalidOperationException("Telegram:ChatId not configured");
 
-    public async Task SendMessageAsync(string message)
+    public async Task SendMessageAsync(string message, string? targetChatId = null)
     {
         try
         {
-            logger.LogInformation("Sending Telegram message to chats: {ChatIds}", _chatId);
+            // Если передан конкретный ID, используем его. Если нет — берем из конфига.
+            var idsToProcess = targetChatId ?? _chatId;
 
-            var chatIds = _chatId.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            logger.LogInformation("Sending Telegram message to chats: {ChatIds}", idsToProcess);
+
+            var chatIds = idsToProcess.Split(',', StringSplitOptions.RemoveEmptyEntries);
             var successCount = 0;
 
             foreach (var chatId in chatIds)
@@ -36,13 +39,11 @@ public class TelegramService(
                     if (response.IsSuccessStatusCode)
                     {
                         successCount++;
-                        logger.LogDebug("Message sent successfully to chat {ChatId}", trimmedChatId);
                     }
                     else
                     {
                         var error = await response.Content.ReadAsStringAsync();
-                        logger.LogWarning("Telegram send failed for chat {ChatId}. Status: {StatusCode}, Error: {Error}",
-                            trimmedChatId, response.StatusCode, error);
+                        logger.LogWarning("Telegram send failed for {ChatId}: {Error}", trimmedChatId, error);
                     }
                 }
                 catch (Exception ex)
@@ -51,14 +52,14 @@ public class TelegramService(
                 }
             }
 
-            logger.LogInformation("Telegram messages sent. Success: {SuccessCount}/{TotalCount}",
-                successCount, chatIds.Length);
+            logger.LogInformation("Telegram sent. Success: {SuccessCount}/{TotalCount}", successCount, chatIds.Length);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Critical error in SendMessageAsync");
         }
     }
+
 
     public async Task SendBookingNotificationAsync(BookingDto booking)
     {

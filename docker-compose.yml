@@ -11,7 +11,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__DefaultConnection=Server=db;Database=AgroAdminDb;User Id=sa;Password=YourStrong!Password;TrustServerCertificate=True;MultipleActiveResultSets=true
+      - ConnectionStrings__DefaultConnection=${CONNECTIONSTRINGS__DEFAULTCONNECTION}
       - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
       - Telegram__ChatId=${TELEGRAM_CHAT_ID}
       - RabbitMQ__Url=${RABBITMQ_URL}
@@ -34,13 +34,16 @@ services:
       context: .
       dockerfile: AgroAdmin.NotificationWorker/Dockerfile
     container_name: agro_notification_worker
+    env_file: .env
     environment:
       - DOTNET_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=${CONNECTIONSTRINGS__DEFAULTCONNECTION}
       - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
       - Telegram__ChatId=${TELEGRAM_CHAT_ID}
       - RabbitMQ__Url=${RABBITMQ_URL}
     depends_on:
       - rabbitmq
+      - db
     networks:
       - agro_network
 

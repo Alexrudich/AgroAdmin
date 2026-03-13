@@ -1,0 +1,99 @@
+﻿@using AgroAdmin.Shared.Dto.Notifications
+@using AgroAdmin.Shared.Enums
+@using System.Net.Http
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+
+<div class="card mb-4 border-primary shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title">@(editingId.HasValue ? "✏️ Редактирование" : "🆕 Новое напоминание")</h5>
+        <div class="row g-3">
+            <div class="col-12"><textarea @bind="model.Message" class="form-control" rows="2" placeholder="Текст..."></textarea></div>
+            <div class="col-md-4"><input type="datetime-local" @bind="model.ScheduledFor" class="form-control" /></div>
+            <div class="col-md-4">
+                <select @bind="model.Priority" class="form-select">
+                    @foreach (var p in Enum.GetValues<ReminderPriority>()) { <option value="@p">@p</option> }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <select @bind="model.TargetChatId" class="form-select">
+                    <option value="">-- Всем --</option>
+                    @foreach (var r in Recipients) { <option value="@r.ChatId">@r.Name</option> }
+                </select>
+            </div>
+            <div class="col-12 text-end">
+                @if (editingId.HasValue) { <button class="btn btn-secondary me-2" @onclick="Cancel">Отмена</button> }
+                <button class="btn btn-primary px-4" @onclick="Save">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <tbody>
+                @foreach (var r in reminders) {
+                    <tr>
+                        <td>@r.ScheduledFor.ToLocalTime().ToString("dd.MM HH:mm")</td>
+                        <td style="white-space: pre-wrap;">@((MarkupString)r.Message)</td>
+                        <td class="text-end">
+                            <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => StartEdit(r)">✏️</button>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Delete(r.Id)">🗑️</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<TelegramRecipientDto> Recipients { get; set; } = new();
+    
+    private HttpClient Http => HttpClientFactory.CreateClient("AgroAdmin");
+    private List<ScheduledReminderDto> reminders = new();
+    private CreateReminderDto model = new() { ScheduledFor = DateTime.Now.AddHours(1) };
+    private int? editingId = null;
+
+    protected override async Task OnInitializedAsync() => await Load();
+    
+    private async Task Load() => reminders = await Http.GetFromJsonAsync<List<ScheduledReminderDto>>("api/notifications/reminders") ?? new();
+
+    private async Task Save() {
+        var dto = new CreateReminderDto { 
+            Message = model.Message, 
+            Priority = model.Priority, 
+            TargetChatId = model.TargetChatId, 
+            ScheduledFor = model.ScheduledFor.ToUniversalTime() 
+        };
+        
+        if (editingId.HasValue) 
+            await Http.PutAsJsonAsync($"api/notifications/reminders/{editingId}", dto);
+        else 
+            await Http.PostAsJsonAsync("api/notifications/reminders", dto);
+            
+        Cancel(); 
+        await Load();
+    }
+    
+    private async Task Delete(int id) { 
+        await Http.DeleteAsync($"api/notifications/reminders/{id}"); 
+        await Load(); 
+    }
+    
+    private void StartEdit(ScheduledReminderDto r) { 
+        editingId = r.Id; 
+        model = new CreateReminderDto { 
+            Message = r.Message, 
+            ScheduledFor = r.ScheduledFor.ToLocalTime(), 
+            Priority = r.Priority, 
+            TargetChatId = r.TargetChatId 
+        }; 
+    }
+    
+    private void Cancel() { 
+        editingId = null; 
+        model = new() { ScheduledFor = DateTime.Now.AddHours(1) }; 
+    }
+}

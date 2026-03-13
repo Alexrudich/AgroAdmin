@@ -1,46 +1,37 @@
-﻿using AgroAdmin.NotificationWorker.Consumers;
-using AgroAdmin.Infrastructure.Abstractions;
+﻿using AgroAdmin.Infrastructure.Abstractions;
+using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
+using AgroAdmin.NotificationWorker.Consumers;
 using MassTransit;
-using Quartz;
+using Microsoft.EntityFrameworkCore;
 using System.Text;
 
 Console.OutputEncoding = Encoding.UTF8;
 var builder = Host.CreateApplicationBuilder(args);
 
-// --- ОТЛАДКА ПЕРЕМЕННЫХ ---
-var url = builder.Configuration["RabbitMQ:Url"]
-          ?? builder.Configuration["RabbitMQ__Url"]
-          ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
+// 1. База данных
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// --- НАСТРОЙКА QUARTZ ---
-builder.Services.AddQuartz(q => {
-    q.AddJob<AgroAdmin.NotificationWorker.Jobs.ReminderJob>(opts => opts
-        .WithIdentity("ReminderJob")
-        .StoreDurably());
-});
-builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+// 2. Инфраструктура
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ITelegramService, TelegramService>();
 
-// --- НАСТРОЙКА MASSTRANSIT ---
+// 4. Очереди MassTransit
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<BookingCreatedConsumer>();
     x.UsingRabbitMq((context, cfg) =>
     {
-        if (string.IsNullOrEmpty(url))
-        {
-            // Не падаем сразу, а пробуем дефолт для Docker, если мы внутри сети
-            url = "amqp://guest:guest@rabbitmq:5672";
-            Console.WriteLine("⚠️ WARNING: Config URL is empty. Using fallback: " + url);
-        }
+        var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
+                        ?? builder.Configuration["RabbitMQ__Url"]
+                        ?? "amqp://guest:guest@rabbitmq:5672";
 
-        cfg.Host(new Uri(url.Trim().TrimEnd('/')));
+        cfg.Host(new Uri(rabbitUrl.Trim().TrimEnd('/')));
         cfg.ConfigureEndpoints(context);
     });
 });
 
-builder.Services.AddHttpClient();
-builder.Services.AddSingleton<ITelegramService, TelegramService>();
-
 var host = builder.Build();
+
 host.Run();

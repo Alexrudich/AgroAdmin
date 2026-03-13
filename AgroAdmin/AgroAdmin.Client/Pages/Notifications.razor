@@ -1,0 +1,47 @@
+﻿@page "/notifications"
+@using AgroAdmin.Client.Components.Notifications
+@using AgroAdmin.Shared.Dto.Notifications
+@using AgroAdmin.Shared.Dto.Auth
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
+
+<div class="container-fluid mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3><i class="bi bi-alarm"></i> Диспетчер напоминаний</h3>
+        <button class="btn btn-outline-secondary" @onclick="() => showSettings = !showSettings">
+            <i class="bi @(showSettings ? "bi-bell" : "bi-gear")"></i> 
+            @(showSettings ? "К напоминаниям" : "Настроить получателей")
+        </button>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-content-center p-5"><div class="spinner-border text-primary"></div></div>
+    }
+    else
+    {
+        @if (showSettings) { <RecipientManager OnChanged="LoadRecipients" /> }
+        else { <ReminderManager Recipients="recipients" /> }
+    }
+</div>
+
+@code {
+    private HttpClient Http => HttpClientFactory.CreateClient("AgroAdmin");
+    private List<TelegramRecipientDto> recipients = new();
+    private bool showSettings = false;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try {
+            var status = await Http.GetFromJsonAsync<AuthStatusDto>("api/auth/status");
+            if (status?.IsAuthenticated != true) { Nav.NavigateTo("/login", true); return; }
+            await LoadRecipients();
+            _loading = false;
+        }
+        catch { Nav.NavigateTo("/login", true); }
+    }
+
+    private async Task LoadRecipients() => 
+        recipients = await Http.GetFromJsonAsync<List<TelegramRecipientDto>>("api/notifications/recipients") ?? new();
+}

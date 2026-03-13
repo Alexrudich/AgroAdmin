@@ -1,55 +1,40 @@
 ﻿using AgroAdmin.Components;
 using AgroAdmin.Infrastructure.Abstractions;
+using AgroAdmin.Infrastructure.BackgroundServices;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
 using AgroAdmin.NotificationWorker.Consumers;
-using AgroAdmin.NotificationWorker.Jobs;
 using AgroAdmin.Shared.Services;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using Quartz;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// --- 1. ЛОГИРОВАНИЕ ---
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
-    .WriteTo.File("logs/agroadmin-.txt",
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 7,
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
-
 builder.Host.UseSerilog();
 
+// --- 2. БАЗА И КОНТРОЛЛЕРЫ ---
 builder.Services.AddControllers()
     .AddApplicationPart(typeof(AgroAdmin.API.Controllers.AuthController).Assembly);
-
-builder.Services.AddRazorComponents()
-    .AddInteractiveWebAssemblyComponents();
-
+builder.Services.AddRazorComponents().AddInteractiveWebAssemblyComponents();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:8080";
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(frontendUrl) });
-
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
 
-var allowedOrigins = new[] { "https://agroadmin.runasp.net" };
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowSpecificOrigin", policy =>
-    {
-        policy.WithOrigins(allowedOrigins)
-            .AllowAnyMethod()
-            .AllowAnyHeader()
-            .AllowCredentials();
+// --- 3. БЕЗОПАСНОСТЬ ---
+builder.Services.AddCors(options => {
+    options.AddPolicy("AllowSpecificOrigin", policy => {
+        policy.WithOrigins("https://agroadmin.runasp.net", "http://localhost:8080")
+            .AllowAnyMethod().AllowAnyHeader().AllowCredentials();
     });
 });
 
@@ -61,87 +46,61 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     });
-
 builder.Services.AddAuthorization();
 
-builder.Services.AddHttpClient();
-builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
+// --- 3.1 DATA PROTECTION ---
+try
+{
+    var keysPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "keys");
+    Directory.CreateDirectory(keysPath);
+
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
+        .SetApplicationName("AgroAdmin");
+
+    Log.Information("API Data Protection keys directory: {KeysPath}", keysPath);
+}
+catch (Exception ex)
+{
+    Log.Warning(ex, "API failed to setup Data Protection keys directory, using ephemeral keys");
+    builder.Services.AddDataProtection()
+        .SetApplicationName("AgroAdmin");
+}
+
+// --- 4. СЕРВИСЫ ---
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddSingleton<ITelegramService>(sp =>
-{
-    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-    var configuration = sp.GetRequiredService<IConfiguration>();
-    var logger = sp.GetRequiredService<ILogger<TelegramService>>();
-    return new TelegramService(httpClientFactory, configuration, logger);
-});
-
-builder.Services.AddQuartz(q =>
-{
-    // Добавляем StoreDurably(), чтобы Quartz не падал при старте без триггера
-    q.AddJob<ReminderJob>(opts => opts
-        .WithIdentity("ReminderJob")
-        .StoreDurably());
-});
-builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
-
+builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddScoped<BookingFormService>();
+builder.Services.AddHostedService<DatabaseScannerService>(); // Фоновый сканер
 
-if (OperatingSystem.IsWindows())
-{
-    // На Windows Server/IIS ключи хранятся в реестре или профиле пользователя
-    builder.Services.AddDataProtection()
-        .SetApplicationName("AgroAdmin");
-}
-else
-{
-    // Для Linux/Docker
-    builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
-        .SetApplicationName("AgroAdmin");
-}
-
-// Настройка MassTransit (Отправитель + Получатель на проде)
-builder.Services.AddMassTransit(x =>
-{
+// --- 5. MASSTRANSIT (RabbitMQ) ---
+builder.Services.AddMassTransit(x => {
     x.AddConsumer<BookingCreatedConsumer>();
-
-    x.UsingRabbitMq((context, cfg) =>
-    {
-        // Проверка URL для Docker и IIS
+    x.UsingRabbitMq((context, cfg) => {
         var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
                         ?? builder.Configuration["RabbitMQ__Url"]
                         ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
 
         if (!string.IsNullOrEmpty(rabbitUrl))
         {
-            var cleanUrl = rabbitUrl.Trim().TrimEnd('/');
-            try
-            {
-                cfg.Host(new Uri(cleanUrl));
-                cfg.ConfigureEndpoints(context);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "RabbitMQ URI error: {Url}", cleanUrl);
-            }
+            cfg.Host(new Uri(rabbitUrl.Trim().TrimEnd('/')));
+            cfg.ConfigureEndpoints(context);
         }
     });
 });
 
 var app = builder.Build();
 
+// --- МИГРАЦИИ ---
 using (var scope = app.Services.CreateScope())
 {
-    try
-    {
-        scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Migration applying error");
-    }
+    try { scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate(); }
+    catch (Exception ex) { Log.Error(ex, "Migration error"); }
 }
 
+// --- ПАЙПЛАЙН ---
 if (app.Environment.IsDevelopment())
 {
     app.UseWebAssemblyDebugging();
@@ -159,22 +118,32 @@ app.UseCors("AllowSpecificOrigin");
 app.UseStaticFiles();
 app.MapStaticAssets();
 
-app.UseRouting();
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseAntiforgery();
-
-app.MapControllers();
-
+// --- ОТЛАДКА АВТОРИЗАЦИИ ---
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path == "/")
+    var path = context.Request.Path.Value;
+
+    if (path == "/")
     {
         context.Response.Redirect("/calendar");
         return;
     }
+
+    if (!string.IsNullOrEmpty(path) && path.Contains("api/"))
+    {
+        var hasAuthCookie = context.Request.Cookies.ContainsKey("AgroAdmin.Auth");
+        Log.Information("[DEBUG AUTH] Path: {Path}, HasAuthCookie: {HasCookie}",
+            path, hasAuthCookie);
+    }
+
     await next();
 });
+
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
+app.MapControllers();
 
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()

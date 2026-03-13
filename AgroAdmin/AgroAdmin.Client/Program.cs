@@ -1,5 +1,6 @@
-using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+﻿using AgroAdmin.Client.Handlers;
 using AgroAdmin.Shared.Services;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 namespace AgroAdmin.Client
 {
@@ -9,10 +10,17 @@ namespace AgroAdmin.Client
         {
             var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-            builder.Services.AddScoped(sp => new HttpClient
+            // Регистрируем CookieHandler
+            builder.Services.AddTransient<CookieHandler>();
+
+            // Настраиваем HttpClient с поддержкой кук
+            builder.Services.AddHttpClient("AgroAdmin", client =>
             {
-                BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
-            });
+                client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
+            }).AddHttpMessageHandler<CookieHandler>();
+
+            // Оставляем старый HttpClient для обратной совместимости
+            builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("AgroAdmin"));
 
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<BookingFormService>();

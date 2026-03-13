@@ -1,8 +1,9 @@
 ﻿// AgroAdmin.Shared/Dto/CreateBookingDto.cs
+using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Enums;
 using System.ComponentModel.DataAnnotations;
 
-namespace AgroAdmin.Shared.Dto;
+namespace AgroAdmin.Shared.Dto.Bookings;
 
 public class CreateBookingDto
 {
