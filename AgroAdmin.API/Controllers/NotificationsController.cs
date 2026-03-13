@@ -2,7 +2,6 @@
 using AgroAdmin.Shared.Dto.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Serilog;
 
 namespace AgroAdmin.API.Controllers;
 
@@ -11,30 +10,23 @@ namespace AgroAdmin.API.Controllers;
 [Route("api/[controller]")]
 public class NotificationsController(INotificationService notificationService) : ControllerBase
 {
-    [HttpGet("reminders")]
-    public async Task<IActionResult> GetActiveReminders()
-    {
-        Log.Information("[NotificationsAPI] GET reminders. User: {User}, IsAuth: {IsAuth}",
-            User.Identity?.Name ?? "None", User.Identity?.IsAuthenticated);
-
-        var reminders = await notificationService.GetActiveRemindersAsync();
-        return Ok(reminders);
-    }
-
     [HttpPost("reminders")]
     public async Task<IActionResult> CreateReminder([FromBody] CreateReminderDto dto)
     {
-        Log.Information("[NotificationsAPI] POST reminder. User: {User}, Msg: {Msg}",
-            User.Identity?.Name, dto.Message);
-
         await notificationService.CreateReminderAsync(dto);
         return Ok();
+    }
+
+    [HttpGet("reminders")]
+    public async Task<IActionResult> GetActiveReminders()
+    {
+        var reminders = await notificationService.GetActiveRemindersAsync();
+        return Ok(reminders);
     }
 
     [HttpPut("reminders/{id}")]
     public async Task<IActionResult> UpdateReminder(int id, [FromBody] CreateReminderDto dto)
     {
-        Log.Information("[NotificationsAPI] PUT reminder {Id}. User: {User}", id, User.Identity?.Name);
         await notificationService.UpdateReminderAsync(id, dto);
         return NoContent();
     }
@@ -42,7 +34,6 @@ public class NotificationsController(INotificationService notificationService) :
     [HttpDelete("reminders/{id}")]
     public async Task<IActionResult> DeleteReminder(int id)
     {
-        Log.Information("[NotificationsAPI] DELETE reminder {Id}. User: {User}", id, User.Identity?.Name);
         var reminder = await notificationService.GetByIdAsync(id);
         if (reminder == null) return NotFound();
 
@@ -51,16 +42,11 @@ public class NotificationsController(INotificationService notificationService) :
     }
 
     [HttpGet("recipients")]
-    public async Task<IActionResult> GetRecipients()
-    {
-        Log.Information("[NotificationsAPI] GET recipients. User: {User}", User.Identity?.Name);
-        return Ok(await notificationService.GetRecipientsAsync());
-    }
+    public async Task<IActionResult> GetRecipients() => Ok(await notificationService.GetRecipientsAsync());
 
     [HttpPost("recipients")]
     public async Task<IActionResult> AddRecipient([FromBody] TelegramRecipientDto dto)
     {
-        Log.Information("[NotificationsAPI] POST recipient {Name}. User: {User}", dto.Name, User.Identity?.Name);
         await notificationService.AddRecipientAsync(dto);
         return Ok();
     }
@@ -68,7 +54,6 @@ public class NotificationsController(INotificationService notificationService) :
     [HttpDelete("recipients/{id}")]
     public async Task<IActionResult> DeleteRecipient(int id)
     {
-        Log.Information("[NotificationsAPI] DELETE recipient {Id}. User: {User}", id, User.Identity?.Name);
         await notificationService.DeleteRecipientAsync(id);
         return NoContent();
     }

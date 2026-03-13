@@ -100,4 +100,14 @@ public class NotificationService(AppDbContext context) : INotificationService
             await context.SaveChangesAsync();
         }
     }
+
+    public async Task MarkAsSentAsync(int id)
+    {
+        var reminder = await context.ScheduledReminders.FindAsync(id);
+        if (reminder != null)
+        {
+            reminder.IsSent = true;
+            await context.SaveChangesAsync();
+        }
+    }
 }

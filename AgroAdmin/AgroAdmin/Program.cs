@@ -1,5 +1,6 @@
 ﻿using AgroAdmin.Components;
 using AgroAdmin.Infrastructure.Abstractions;
+using AgroAdmin.Infrastructure.BackgroundServices;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
 using AgroAdmin.NotificationWorker.Consumers;
@@ -12,7 +13,7 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- 1. ЛОГИРОВАНИЕ (настройки в appsettings.json) ---
+// --- 1. ЛОГИРОВАНИЕ ---
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
@@ -47,10 +48,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.Services.AddAuthorization();
 
-// --- 3.1 DATA PROTECTION (общая папка для ключей) ---
+// --- 3.1 DATA PROTECTION ---
 try
 {
-    // Для API ключи хранятся в папке keys внутри wwwroot
     var keysPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "keys");
     Directory.CreateDirectory(keysPath);
 
@@ -73,12 +73,16 @@ builder.Services.AddScoped<IBookingValidationService, BookingValidationService>(
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddScoped<BookingFormService>();
+builder.Services.AddHostedService<DatabaseScannerService>(); // Фоновый сканер
 
-// --- 5. MASSTRANSIT ---
+// --- 5. MASSTRANSIT (RabbitMQ) ---
 builder.Services.AddMassTransit(x => {
     x.AddConsumer<BookingCreatedConsumer>();
     x.UsingRabbitMq((context, cfg) => {
-        var rabbitUrl = builder.Configuration["RabbitMQ:Url"] ?? builder.Configuration["RabbitMQ__Url"] ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
+        var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
+                        ?? builder.Configuration["RabbitMQ__Url"]
+                        ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
+
         if (!string.IsNullOrEmpty(rabbitUrl))
         {
             cfg.Host(new Uri(rabbitUrl.Trim().TrimEnd('/')));
@@ -89,37 +93,44 @@ builder.Services.AddMassTransit(x => {
 
 var app = builder.Build();
 
-// Миграции
+// --- МИГРАЦИИ ---
 using (var scope = app.Services.CreateScope())
 {
     try { scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate(); }
     catch (Exception ex) { Log.Error(ex, "Migration error"); }
 }
 
-if (app.Environment.IsDevelopment()) { app.UseWebAssemblyDebugging(); app.UseSwagger(); app.UseSwaggerUI(); }
-else { app.UseExceptionHandler("/Error"); app.UseHsts(); }
+// --- ПАЙПЛАЙН ---
+if (app.Environment.IsDevelopment())
+{
+    app.UseWebAssemblyDebugging();
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 app.UseCors("AllowSpecificOrigin");
 app.UseStaticFiles();
 app.MapStaticAssets();
 
-// --- 6. ОБЪЕДИНЕННЫЙ БЛОК ОТЛАДКИ И РЕДИРЕКТА ---
+// --- ОТЛАДКА АВТОРИЗАЦИИ ---
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value;
 
-    // Редирект с корня
     if (path == "/")
     {
         context.Response.Redirect("/calendar");
         return;
     }
 
-    // Логирование наличия куки для API запросов
     if (!string.IsNullOrEmpty(path) && path.Contains("api/"))
     {
-        // Проверяем наличие именно куки авторизации
         var hasAuthCookie = context.Request.Cookies.ContainsKey("AgroAdmin.Auth");
         Log.Information("[DEBUG AUTH] Path: {Path}, HasAuthCookie: {HasCookie}",
             path, hasAuthCookie);

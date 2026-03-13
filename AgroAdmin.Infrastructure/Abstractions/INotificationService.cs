@@ -13,4 +13,5 @@ public interface INotificationService
     Task<List<TelegramRecipientDto>> GetRecipientsAsync();
     Task AddRecipientAsync(TelegramRecipientDto dto);
     Task DeleteRecipientAsync(int id);
+    Task MarkAsSentAsync(int id);
 }
