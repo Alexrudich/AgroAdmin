@@ -14,7 +14,10 @@ public class DatabaseScannerJob(
 {
     public async Task Execute(IJobExecutionContext context)
     {
+        logger.LogInformation("🔍 DatabaseScannerJob started at {Time}", DateTime.UtcNow);
+
         var now = DateTime.UtcNow;
+        logger.LogInformation("Current UTC time: {Now}", now);
 
         var pendingReminders = await dbContext.ScheduledReminders
             .Where(r => !r.IsSent && r.ScheduledFor <= now)
@@ -22,12 +25,21 @@ public class DatabaseScannerJob(
             .Take(10)
             .ToListAsync();
 
-        if (pendingReminders.Count == 0) return;
+        logger.LogInformation("Found {Count} pending reminders in DB", pendingReminders.Count);
+
+        if (pendingReminders.Count == 0)
+        {
+            logger.LogInformation("No pending reminders found");
+            return;
+        }
 
         logger.LogInformation("🔍 Найдено {Count} напоминаний для отправки", pendingReminders.Count);
 
         foreach (var reminder in pendingReminders)
         {
+            logger.LogInformation("Processing reminder {Id}: {Msg}, ScheduledFor: {Time}, TargetChatId: {ChatId}",
+                reminder.Id, reminder.Message, reminder.ScheduledFor, reminder.TargetChatId);
+
             try
             {
                 var prefix = reminder.Priority switch
@@ -38,9 +50,12 @@ public class DatabaseScannerJob(
                     _ => "🔔 "
                 };
 
+                var fullMessage = prefix + reminder.Message;
+                logger.LogInformation("Sending to Telegram: {Message}", fullMessage);
+
                 // Отправляем сообщение. Если TargetChatId в базе null, 
                 // TelegramService использует список из конфига.
-                await telegram.SendMessageAsync(prefix + reminder.Message, reminder.TargetChatId);
+                await telegram.SendMessageAsync(fullMessage, reminder.TargetChatId);
 
                 reminder.IsSent = true;
                 logger.LogInformation("✅ Отправлено: {Msg}", reminder.Message);
@@ -52,5 +67,6 @@ public class DatabaseScannerJob(
         }
 
         await dbContext.SaveChangesAsync();
+        logger.LogInformation("DatabaseScannerJob completed at {Time}", DateTime.UtcNow);
     }
 }

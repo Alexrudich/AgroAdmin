@@ -10,6 +10,7 @@ namespace AgroAdmin.Infrastructure.Persistence
         public DbSet<Guest> Guests => Set<Guest>();
         public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
         public DbSet<ScheduledReminder> ScheduledReminders => Set<ScheduledReminder>();
+        public DbSet<TelegramRecipient> TelegramRecipients => Set<TelegramRecipient>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -86,6 +87,14 @@ namespace AgroAdmin.Infrastructure.Persistence
 
                 // Индекс на время и статус отправки (воркер будет постоянно делать такие выборки)
                 builder.HasIndex(r => new { r.ScheduledFor, r.IsSent });
+            });
+
+            // Конфигурация для TelegramRecipient
+            modelBuilder.Entity<TelegramRecipient>(builder =>
+            {
+                builder.HasKey(t => t.Id);
+                builder.Property(t => t.Name).IsRequired().HasMaxLength(100);
+                builder.Property(t => t.ChatId).IsRequired().HasMaxLength(50);
             });
         }
     }

@@ -3,53 +3,37 @@ using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
 using AgroAdmin.NotificationWorker.Consumers;
-using AgroAdmin.NotificationWorker.Jobs;
 using AgroAdmin.Shared.Services;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using Quartz;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- 1. ЛОГИРОВАНИЕ (Serilog) ---
+// --- 1. ЛОГИРОВАНИЕ (настройки в appsettings.json) ---
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
-    .WriteTo.File("logs/agroadmin-.txt",
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 7,
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
-
 builder.Host.UseSerilog();
 
-// --- 2. БАЗА ДАННЫХ И СТАНДАРТНЫЕ СЕРВИСЫ ASP.NET ---
+// --- 2. БАЗА И КОНТРОЛЛЕРЫ ---
 builder.Services.AddControllers()
     .AddApplicationPart(typeof(AgroAdmin.API.Controllers.AuthController).Assembly);
-
-builder.Services.AddRazorComponents()
-    .AddInteractiveWebAssemblyComponents();
-
+builder.Services.AddRazorComponents().AddInteractiveWebAssemblyComponents();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 
-// --- 3. БЕЗОПАСНОСТЬ (CORS, Auth, DataProtection) ---
-var allowedOrigins = new[] { "https://agroadmin.runasp.net" };
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowSpecificOrigin", policy =>
-    {
-        policy.WithOrigins(allowedOrigins)
-            .AllowAnyMethod()
-            .AllowAnyHeader()
-            .AllowCredentials();
+// --- 3. БЕЗОПАСНОСТЬ ---
+builder.Services.AddCors(options => {
+    options.AddPolicy("AllowSpecificOrigin", policy => {
+        policy.WithOrigins("https://agroadmin.runasp.net", "http://localhost:8080")
+            .AllowAnyMethod().AllowAnyHeader().AllowCredentials();
     });
 });
 
@@ -61,120 +45,94 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     });
-
 builder.Services.AddAuthorization();
 
-if (OperatingSystem.IsWindows())
+// --- 3.1 DATA PROTECTION (общая папка для ключей) ---
+try
 {
-    builder.Services.AddDataProtection().SetApplicationName("AgroAdmin");
-}
-else
-{
+    // Для API ключи хранятся в папке keys внутри wwwroot
+    var keysPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "keys");
+    Directory.CreateDirectory(keysPath);
+
     builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
+        .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
+        .SetApplicationName("AgroAdmin");
+
+    Log.Information("API Data Protection keys directory: {KeysPath}", keysPath);
+}
+catch (Exception ex)
+{
+    Log.Warning(ex, "API failed to setup Data Protection keys directory, using ephemeral keys");
+    builder.Services.AddDataProtection()
         .SetApplicationName("AgroAdmin");
 }
 
-// --- 4. СЕРВИСЫ ПРИЛОЖЕНИЯ (Infrastructure & Shared) ---
-// Scoped сервисы
+// --- 4. СЕРВИСЫ ---
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddScoped<BookingFormService>();
 
-// Singleton сервисы 
-builder.Services.AddSingleton<ITelegramService, TelegramService>();
-
-// Настройка HttpClient для фронтенда
-var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:8080";
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(frontendUrl) });
-
-// --- 5. ФОНОВЫЕ ЗАДАЧИ (Quartz.NET) ---
-builder.Services.AddQuartz(q =>
-{
-    q.AddJob<ReminderJob>(opts => opts
-        .WithIdentity("ReminderJob")
-        .StoreDurably());
-});
-builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
-
-// --- 6. ШИНА ДАННЫХ (MassTransit & RabbitMQ) ---
-builder.Services.AddMassTransit(x =>
-{
+// --- 5. MASSTRANSIT ---
+builder.Services.AddMassTransit(x => {
     x.AddConsumer<BookingCreatedConsumer>();
-
-    x.UsingRabbitMq((context, cfg) =>
-    {
-        var rabbitUrl = builder.Configuration["RabbitMQ:Url"]
-                        ?? builder.Configuration["RabbitMQ__Url"]
-                        ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
-
+    x.UsingRabbitMq((context, cfg) => {
+        var rabbitUrl = builder.Configuration["RabbitMQ:Url"] ?? builder.Configuration["RabbitMQ__Url"] ?? Environment.GetEnvironmentVariable("RabbitMQ__Url");
         if (!string.IsNullOrEmpty(rabbitUrl))
         {
-            var cleanUrl = rabbitUrl.Trim().TrimEnd('/');
-            try
-            {
-                cfg.Host(new Uri(cleanUrl));
-                cfg.ConfigureEndpoints(context);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "RabbitMQ URI error: {Url}", cleanUrl);
-            }
+            cfg.Host(new Uri(rabbitUrl.Trim().TrimEnd('/')));
+            cfg.ConfigureEndpoints(context);
         }
     });
 });
 
-// --- 7. КОНФИГУРАЦИЯ PIPELINE (Middleware) ---
 var app = builder.Build();
 
-// Автоматические миграции БД при старте
+// Миграции
 using (var scope = app.Services.CreateScope())
 {
-    try
-    {
-        scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Migration applying error");
-    }
+    try { scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate(); }
+    catch (Exception ex) { Log.Error(ex, "Migration error"); }
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseWebAssemblyDebugging();
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-else
-{
-    app.UseExceptionHandler("/Error");
-    app.UseHsts();
-}
+if (app.Environment.IsDevelopment()) { app.UseWebAssemblyDebugging(); app.UseSwagger(); app.UseSwaggerUI(); }
+else { app.UseExceptionHandler("/Error"); app.UseHsts(); }
 
 app.UseHttpsRedirection();
 app.UseCors("AllowSpecificOrigin");
 app.UseStaticFiles();
 app.MapStaticAssets();
 
-app.UseRouting();
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseAntiforgery();
-
-app.MapControllers();
-
-// Редирект с корня на календарь
+// --- 6. ОБЪЕДИНЕННЫЙ БЛОК ОТЛАДКИ И РЕДИРЕКТА ---
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path == "/")
+    var path = context.Request.Path.Value;
+
+    // Редирект с корня
+    if (path == "/")
     {
         context.Response.Redirect("/calendar");
         return;
     }
+
+    // Логирование наличия куки для API запросов
+    if (!string.IsNullOrEmpty(path) && path.Contains("api/"))
+    {
+        // Проверяем наличие именно куки авторизации
+        var hasAuthCookie = context.Request.Cookies.ContainsKey("AgroAdmin.Auth");
+        Log.Information("[DEBUG AUTH] Path: {Path}, HasAuthCookie: {HasCookie}",
+            path, hasAuthCookie);
+    }
+
     await next();
 });
+
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
+app.MapControllers();
 
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()

@@ -1,177 +1,47 @@
 ﻿@page "/notifications"
+@using AgroAdmin.Client.Components.Notifications
 @using AgroAdmin.Shared.Dto.Notifications
-@using AgroAdmin.Shared.Enums
-@using AgroAdmin.Client.Services
-@inject NotificationApiClient ApiClient
+@using AgroAdmin.Shared.Dto.Auth
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
 
 <div class="container-fluid mt-3">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3><i class="bi bi-alarm"></i> Диспетчер напоминаний</h3>
-        <button class="btn @(showForm ? "btn-secondary" : "btn-success")" @onclick="ToggleForm">
-            <i class="bi @(showForm ? "bi-x-circle" : "bi-plus-circle")"></i>
-            @(showForm ? "Отмена" : "Создать вручную")
+        <button class="btn btn-outline-secondary" @onclick="() => showSettings = !showSettings">
+            <i class="bi @(showSettings ? "bi-bell" : "bi-gear")"></i> 
+            @(showSettings ? "К напоминаниям" : "Настроить получателей")
         </button>
     </div>
 
-    @if (showForm)
+    @if (_loading)
     {
-        <div class="card mb-4 border-primary shadow-sm" style="max-width: 800px;">
-            <div class="card-body">
-                <h5 class="card-title">@(editingId.HasValue ? "✏️ Редактирование" : "🆕 Новое напоминание")</h5>
-                <div class="row g-3">
-                    <div class="col-12">
-                        <label class="form-label">Текст сообщения (HTML поддерживается)</label>
-                        <textarea @bind="model.Message" class="form-control" rows="3" placeholder="Например: Вывезти траву..."></textarea>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Когда отправить? (Минск)</label>
-                        <input type="datetime-local" @bind="model.ScheduledFor" class="form-control" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Приоритет</label>
-                        <select @bind="model.Priority" class="form-select">
-                            @foreach (var p in Enum.GetValues<ReminderPriority>())
-                            {
-                                <option value="@p">@p</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Target Chat ID (необязательно)</label>
-                        <input type="text" @bind="model.TargetChatId" class="form-control" placeholder="ID через запятую" />
-                    </div>
-                    <div class="col-12 text-end">
-                        <button class="btn btn-primary px-4" @onclick="Save">
-                            @(editingId.HasValue ? "Сохранить изменения" : "Запланировать")
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div class="d-flex justify-content-center p-5"><div class="spinner-border text-primary"></div></div>
     }
-
-    <div class="card shadow-sm">
-        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-list-ul"></i> Очередь на отправку</span>
-            <span class="badge bg-secondary">Всего: @reminders.Count</span>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 180px;">Время (Локально)</th>
-                        <th>Сообщение</th>
-                        <th style="width: 120px;">Приоритет</th>
-                        <th style="width: 120px;" class="text-end">Действия</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (!reminders.Any())
-                    {
-                        <tr><td colspan="4" class="text-center py-5 text-muted">🎉 Нет активных напоминаний</td></tr>
-                    }
-                    @foreach (var r in reminders)
-                    {
-                        <tr class="@(r.Priority == ReminderPriority.Urgent ? "table-danger-light" : "")">
-                            <td class="fw-bold">@r.ScheduledFor.ToLocalTime().ToString("dd.MM HH:mm")</td>
-                            <td style="white-space: pre-wrap;">@((MarkupString)r.Message)</td>
-                            <td>
-                                <span class="badge @GetPriorityClass(r.Priority)">
-                                    @GetPriorityIcon(r.Priority) @r.Priority
-                                </span>
-                            </td>
-                            <td class="text-end">
-                                <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => Edit(r)" title="Редактировать">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-outline-danger btn-sm" @onclick="() => Delete(r.Id)" title="Удалить">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </div>
+    else
+    {
+        @if (showSettings) { <RecipientManager OnChanged="LoadRecipients" /> }
+        else { <ReminderManager Recipients="recipients" /> }
+    }
 </div>
 
 @code {
-    private List<ScheduledReminderDto> reminders = new();
-    private CreateReminderDto model = new() { ScheduledFor = DateTime.Now.AddHours(1) };
-    private int? editingId = null;
-    private bool showForm = false;
+    private HttpClient Http => HttpClientFactory.CreateClient("AgroAdmin");
+    private List<TelegramRecipientDto> recipients = new();
+    private bool showSettings = false;
+    private bool _loading = true;
 
-    protected override async Task OnInitializedAsync() => await Load();
-
-    private async Task Load() => reminders = await ApiClient.GetActiveRemindersAsync();
-
-    private void ToggleForm()
+    protected override async Task OnInitializedAsync()
     {
-        if (showForm) Cancel();
-        else showForm = true;
+        try {
+            var status = await Http.GetFromJsonAsync<AuthStatusDto>("api/auth/status");
+            if (status?.IsAuthenticated != true) { Nav.NavigateTo("/login", true); return; }
+            await LoadRecipients();
+            _loading = false;
+        }
+        catch { Nav.NavigateTo("/login", true); }
     }
 
-    private void Edit(ScheduledReminderDto r)
-    {
-        editingId = r.Id;
-        model = new CreateReminderDto
-        {
-            Message = r.Message,
-            ScheduledFor = r.ScheduledFor.ToLocalTime(),
-            Priority = r.Priority,
-            TargetChatId = r.TargetChatId
-        };
-        showForm = true;
-        StateHasChanged();
-    }
-
-    private async Task Save()
-    {
-        if (string.IsNullOrWhiteSpace(model.Message)) return;
-
-        var dto = new CreateReminderDto
-        {
-            Message = model.Message,
-            Priority = model.Priority,
-            TargetChatId = model.TargetChatId,
-            ScheduledFor = model.ScheduledFor.ToUniversalTime()
-        };
-
-        if (editingId.HasValue)
-            await ApiClient.UpdateReminderAsync(editingId.Value, dto);
-        else
-            await ApiClient.CreateReminderAsync(dto);
-
-        Cancel();
-        await Load();
-    }
-
-    private async Task Delete(int id)
-    {
-        await ApiClient.DeleteReminderAsync(id);
-        await Load();
-    }
-
-    private void Cancel()
-    {
-        editingId = null;
-        model = new() { ScheduledFor = DateTime.Now.AddHours(1) };
-        showForm = false;
-    }
-
-    private string GetPriorityClass(ReminderPriority p) => p switch
-    {
-        ReminderPriority.Urgent => "bg-danger",
-        ReminderPriority.High => "bg-warning text-dark",
-        ReminderPriority.Normal => "bg-info text-dark",
-        _ => "bg-light text-dark border"
-    };
-
-    private string GetPriorityIcon(ReminderPriority p) => p switch
-    {
-        ReminderPriority.Urgent => "🚨",
-        ReminderPriority.High => "⚠️",
-        _ => "ℹ️"
-    };
+    private async Task LoadRecipients() => 
+        recipients = await Http.GetFromJsonAsync<List<TelegramRecipientDto>>("api/notifications/recipients") ?? new();
 }

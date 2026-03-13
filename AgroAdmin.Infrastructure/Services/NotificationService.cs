@@ -76,4 +76,28 @@ public class NotificationService(AppDbContext context) : INotificationService
             await context.SaveChangesAsync();
         }
     }
+
+    public async Task<List<TelegramRecipientDto>> GetRecipientsAsync()
+    {
+        return await context.TelegramRecipients
+            .Select(t => new TelegramRecipientDto { Id = t.Id, Name = t.Name, ChatId = t.ChatId, IsDefault = t.IsDefault })
+            .ToListAsync();
+    }
+
+    public async Task AddRecipientAsync(TelegramRecipientDto dto)
+    {
+        var recipient = new TelegramRecipient { Name = dto.Name, ChatId = dto.ChatId, IsDefault = dto.IsDefault };
+        context.TelegramRecipients.Add(recipient);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task DeleteRecipientAsync(int id)
+    {
+        var recipient = await context.TelegramRecipients.FindAsync(id);
+        if (recipient != null)
+        {
+            context.TelegramRecipients.Remove(recipient);
+            await context.SaveChangesAsync();
+        }
+    }
 }
