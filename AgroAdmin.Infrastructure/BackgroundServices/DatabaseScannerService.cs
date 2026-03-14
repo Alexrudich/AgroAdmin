@@ -28,7 +28,8 @@ public class DatabaseScannerService(
 
                 foreach (var reminder in pendingReminders.Where(r => r.ScheduledFor <= now))
                 {
-                    logger.LogInformation("Sending reminder {Id}", reminder.Id);
+                    logger.LogInformation("Sending reminder {Id} with TargetChatId: '{TargetChatId}'",
+                        reminder.Id, reminder.TargetChatId ?? "null");
 
                     var prefix = reminder.Priority switch
                     {
@@ -38,9 +39,11 @@ public class DatabaseScannerService(
                         _ => "🔔 "
                     };
 
+                    logger.LogInformation("Calling telegram.SendMessageAsync with chatId: {ChatId}",
+                        reminder.TargetChatId ?? "default");
+
                     await telegram.SendMessageAsync(prefix + reminder.Message, reminder.TargetChatId);
 
-                    // Отметить как отправленное (нужно добавить метод в INotificationService)
                     await notificationService.MarkAsSentAsync(reminder.Id);
                 }
             }

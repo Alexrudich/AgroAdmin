@@ -1,6 +1,4 @@
 ﻿@using AgroAdmin.Shared.Dto.Notifications
-@using AgroAdmin.Shared.Enums
-@using System.Net.Http
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Nav
 
@@ -61,18 +59,23 @@
     private async Task Load() => reminders = await Http.GetFromJsonAsync<List<ScheduledReminderDto>>("api/notifications/reminders") ?? new();
 
     private async Task Save() {
+        foreach (var r in Recipients)
+        {
+            Console.WriteLine($"- {r.Name}: ChatId='{r.ChatId}', IsDefault={r.IsDefault}");
+        }
+    
         var dto = new CreateReminderDto { 
             Message = model.Message, 
             Priority = model.Priority, 
             TargetChatId = model.TargetChatId, 
             ScheduledFor = model.ScheduledFor.ToUniversalTime() 
         };
-        
+
         if (editingId.HasValue) 
             await Http.PutAsJsonAsync($"api/notifications/reminders/{editingId}", dto);
         else 
             await Http.PostAsJsonAsync("api/notifications/reminders", dto);
-            
+        
         Cancel(); 
         await Load();
     }
@@ -94,6 +97,6 @@
     
     private void Cancel() { 
         editingId = null; 
-        model = new() { ScheduledFor = DateTime.Now.AddHours(1) }; 
+        model = new CreateReminderDto { ScheduledFor = DateTime.Now.AddHours(1) }; 
     }
 }

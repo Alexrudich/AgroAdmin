@@ -19,7 +19,8 @@ public class NotificationService(AppDbContext context) : INotificationService
             Message = reminder.Message,
             ScheduledFor = reminder.ScheduledFor,
             IsSent = reminder.IsSent,
-            Priority = reminder.Priority
+            Priority = reminder.Priority,
+            TargetChatId = reminder.TargetChatId
         };
     }
 
@@ -36,7 +37,8 @@ public class NotificationService(AppDbContext context) : INotificationService
             Message = r.Message,
             ScheduledFor = r.ScheduledFor,
             IsSent = r.IsSent,
-            Priority = r.Priority
+            Priority = r.Priority,
+            TargetChatId = r.TargetChatId
         }).ToList();
     }
 
@@ -107,6 +109,18 @@ public class NotificationService(AppDbContext context) : INotificationService
         if (reminder != null)
         {
             reminder.IsSent = true;
+            await context.SaveChangesAsync();
+        }
+    }
+
+    public async Task UpdateRecipientAsync(int id, TelegramRecipientDto dto)
+    {
+        var recipient = await context.TelegramRecipients.FindAsync(id);
+        if (recipient != null)
+        {
+            recipient.Name = dto.Name;
+            recipient.ChatId = dto.ChatId;
+            recipient.IsDefault = dto.IsDefault;
             await context.SaveChangesAsync();
         }
     }
