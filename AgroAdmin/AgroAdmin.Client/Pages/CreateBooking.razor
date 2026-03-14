@@ -22,27 +22,21 @@
                                      OnDateChanged="OnDateChanged"
                                      OnUnitChanged="OnUnitChanged" />
 
-                <!-- 5️ Календарь занятости -->
-                @if (Service.Booking.ArrivalDate != default)
-                {
-                    <AvailabilityCalendarSection Service="Service" OnDateTap="OnDateTap" />
-                }
-
-                <!-- 6️ Состав гостей -->
+                <!-- 5️ Состав гостей -->
                 <GuestCompositionSection Service="Service" />
 
-                <!-- 7️ Опции -->
+                <!-- 6️ Опции -->
                 <BookingOptionsSection Service="Service" />
 
-                <!-- 8️ Заметки -->
+                <!-- 7️ Заметки -->
                 <BookingNotesSection Service="Service" />
 
-                <!-- 9️ Валидация -->
+                <!-- 8️ Валидация -->
                 <BookingValidation Errors="_validationErrors"
                                    EarliestAvailableDate="_earliestAvailableDate"
                                    IsValidating="_isValidating" />
 
-                <!-- 10️ Кнопки -->
+                <!-- 9️ Кнопки -->
                 <BookingFormActions Id="Id"
                                     OnCancel="Cancel"
                                     IsValidating="_isValidating" />
@@ -82,54 +76,6 @@
         {
             Service.Booking.DepartureDate = Service.Booking.ArrivalDate.AddDays(1);
         }
-        StateHasChanged();
-    }
-
-    private void OnDateTap((DateTime date, string status) data)
-    {
-        var (date, status) = data;
-
-        if (status == "full-busy" || date < Service.Booking.ArrivalDate || date.Date == Service.Booking.ArrivalDate.Date)
-            return;
-
-        var isPeriodFree = true;
-        var checkDate = Service.Booking.ArrivalDate;
-
-        while (checkDate <= date)
-        {
-            var dayStatus = Service.GetDateStatus(checkDate);
-            if (dayStatus == "full-busy" ||
-                (dayStatus == "partial-busy" && Service.Booking.ReservedUnit != ReservedUnits.WholeHouse))
-            {
-                isPeriodFree = false;
-                break;
-            }
-            checkDate = checkDate.AddDays(1);
-        }
-
-        if (!isPeriodFree)
-        {
-            var lastFreeDate = Service.Booking.ArrivalDate;
-            checkDate = Service.Booking.ArrivalDate.AddDays(1);
-
-            while (checkDate <= date)
-            {
-                var dayStatus = Service.GetDateStatus(checkDate);
-                if (dayStatus == "full-busy" ||
-                    (dayStatus == "partial-busy" && Service.Booking.ReservedUnit != ReservedUnits.WholeHouse))
-                {
-                    break;
-                }
-                lastFreeDate = checkDate;
-                checkDate = checkDate.AddDays(1);
-            }
-
-            Service.Booking.DepartureDate = lastFreeDate.AddDays(1);
-            StateHasChanged();
-            return;
-        }
-
-        Service.Booking.DepartureDate = date.AddDays(1);
         StateHasChanged();
     }
 

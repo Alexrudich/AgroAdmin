@@ -46,11 +46,6 @@ public class BookingFormService(
 
         try
         {
-            // ВРЕМЕННО: смотрим что реально приходит с сервера
-            var response = await http.GetAsync("api/bookings");
-            var json = await response.Content.ReadAsStringAsync();
-            logger.LogInformation($"RAW JSON: {json}");
-
             var result = await http.GetFromJsonAsync<PagedResultDto<BookingDto>>("api/bookings");
             AllBookings = result?.Items ?? new();
         }
@@ -269,81 +264,6 @@ public class BookingFormService(
     {
         Booking.TotalGuestsCount = Booking.AdultsCount + Booking.ChildrenCount + Booking.InfantsCount;
         StateChanged?.Invoke();
-    }
-
-    public string GetDateStatus(DateTime date)
-    {
-        if (AllBookings == null || !AllBookings.Any()) return "free";
-
-        var bookingsOnDate = AllBookings.Where(b =>
-            b.Id != (_currentBookingId ?? 0) &&
-            date >= b.ArrivalDate.Date &&
-            date < b.DepartureDate.Date
-        ).ToList();
-
-        if (!bookingsOnDate.Any()) return "free";
-
-        // Проверяем, есть ли бронь на весь дом
-        bool hasWholeHouse = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.WholeHouse);
-
-        // Если есть бронь на весь дом - всё красное для любого выбора
-        if (hasWholeHouse) return "full-busy";
-
-        // Проверяем, какие половинки заняты
-        bool pondSideBusy = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.PondSide);
-        bool parkingSideBusy = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.ParkingSide);
-
-        // Если заняты обе половинки - красный для любого выбора
-        if (pondSideBusy && parkingSideBusy) return "full-busy";
-
-        // Для выбора всего дома - красный если занята хотя бы одна половинка
-        if (Booking.ReservedUnit == ReservedUnits.WholeHouse)
-        {
-            return (pondSideBusy || parkingSideBusy) ? "full-busy" : "free";
-        }
-
-        // Для выбора половинки
-        bool selectedSideBusy = Booking.ReservedUnit == ReservedUnits.PondSide ? pondSideBusy : parkingSideBusy;
-
-        if (selectedSideBusy)
-        {
-            // Выбранная половинка занята - красный
-            return "full-busy";
-        }
-        else
-        {
-            // Выбранная половинка свободна - проверяем другую
-            bool otherSideBusy = Booking.ReservedUnit == ReservedUnits.PondSide ? parkingSideBusy : pondSideBusy;
-
-            // Если другая половинка занята - желтый, если нет - зеленый
-            return otherSideBusy ? "partial-busy" : "free";
-        }
-    }
-
-    public ReservedUnits GetBusyUnitsOnDate(DateTime date)
-    {
-        var bookingsOnDate = AllBookings?.Where(b =>
-                b.Id != (_currentBookingId ?? 0) &&
-                date >= b.ArrivalDate.Date &&    // дата >= заезда
-                date < b.DepartureDate.Date      // И дата < выезда
-        ).ToList() ?? new();
-
-        if (!bookingsOnDate.Any()) return 0;
-
-        ReservedUnits busy = 0;
-
-        // Если есть бронь на весь дом - возвращаем WholeHouse
-        if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.WholeHouse))
-            return ReservedUnits.WholeHouse;
-
-        // Проверяем занятость половинок
-        if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.PondSide))
-            busy |= ReservedUnits.PondSide;
-
-        if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.ParkingSide))
-            busy |= ReservedUnits.ParkingSide;
-
-        return busy;
     }
 
     public async Task<GuestDto?> GetGuestAsync(int id)
