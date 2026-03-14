@@ -1,4 +1,4 @@
-﻿namespace AgroAdmin.Shared.Dto.Bookings
+﻿namespace AgroAdmin.Shared.Dto.Bookings.Responses
 {
     public class BookingValidationResult
     {

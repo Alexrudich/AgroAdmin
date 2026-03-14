@@ -1,0 +1,104 @@
+﻿@using AgroAdmin.Shared.Dto.Bookings.Responses
+
+<tr class="@GetRowClass()">
+    <td>
+        <strong>@Booking.Guest?.FullName</strong>
+        <br />
+        <small class="text-muted">@Booking.Guest?.Phone</small>
+    </td>
+    <td>
+        @Booking.ArrivalDate.ToShortDateString() — @Booking.DepartureDate.ToShortDateString()
+        @if (Booking.ArrivalDate.Date == DateTime.Today)
+        {
+            <span class="badge bg-success ms-2">Сегодня</span>
+        }
+        else if (Booking.ArrivalDate.Date == DateTime.Today.AddDays(1))
+        {
+            <span class="badge bg-info ms-2">Завтра</span>
+        }
+    </td>
+    <td>
+        <span class="badge @GetUnitBadgeClass(Booking.ReservedUnit)">
+            @Booking.ReservedUnit.ToFriendlyString()
+        </span>
+    </td>
+    <td>
+        <div class="d-flex flex-column">
+            <span class="fw-bold" style="font-size: 1.1rem;">
+                Всего: @Booking.TotalGuestsCount
+            </span>
+            <div class="d-flex gap-2 align-items-center" style="font-size: 0.9rem;">
+                <span title="Взрослые">👨 @Booking.AdultsCount</span>
+                @if (Booking.ChildrenCount > 0)
+                {
+                    <span title="Дети">👦 @Booking.ChildrenCount</span>
+                }
+                @if (Booking.InfantsCount > 0)
+                {
+                    <span title="Младенцы">👶 @Booking.InfantsCount</span>
+                }
+                @if (Booking.HasDog)
+                {
+                    <span title="С собакой" class="ms-1">🐕</span>
+                }
+            </div>
+        </div>
+    </td>
+    <td>
+        <div class="d-flex flex-column gap-1">
+            <div>
+                @if (Booking.IsFirstTimeGuest)
+                {
+                    <span class="badge bg-warning text-dark">Новый</span>
+                }
+                else
+                {
+                    <span class="badge bg-success">Постоянный</span>
+                }
+            </div>
+            <div class="d-flex gap-2" style="font-size: 1.1rem;">
+                @if (Booking.NeedsSauna)
+                {
+                    <span title="Нужна сауна">♨️</span>
+                }
+                @if (Booking.NeedsBanquetHall)
+                {
+                    <span title="Нужен банкетный зал">🥂</span>
+                }
+            </div>
+        </div>
+    </td>
+    <td class="text-end">
+        <div class="btn-group">
+            <button class="btn btn-outline-primary btn-sm"
+                    @onclick='() => OnEdit.InvokeAsync(Booking.Id)'
+                    title="Редактировать">
+                ✏️
+            </button>
+            <button class="btn btn-outline-danger btn-sm"
+                    @onclick='() => OnDelete.InvokeAsync((Booking.Id, Booking.Guest?.FullName ?? Booking.Id.ToString()))'
+                    title="Удалить">
+                🗑️
+            </button>
+        </div>
+    </td>
+</tr>
+
+@code {
+    [Parameter] public BookingDto Booking { get; set; } = default!;
+    [Parameter] public EventCallback<int> OnEdit { get; set; }
+    [Parameter] public EventCallback<(int Id, string Name)> OnDelete { get; set; }
+
+    private string GetRowClass()
+    {
+        return Booking.ArrivalDate.Date <= DateTime.Today && Booking.DepartureDate.Date >= DateTime.Today ? "table-warning" : "";
+    }
+
+    private string GetUnitBadgeClass(ReservedUnits unit) => unit switch
+    {
+        ReservedUnits.PondSide => "bg-info",
+        ReservedUnits.ParkingSide => "bg-secondary",
+        ReservedUnits.WholeHouse => "bg-primary",
+        _ => "bg-secondary"
+    };
+}

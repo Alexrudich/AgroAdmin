@@ -1,6 +1,6 @@
 ﻿using AgroAdmin.Shared.Enums;
 
-namespace AgroAdmin.Shared.Dto.Bookings;
+namespace AgroAdmin.Shared.Dto.Bookings.Events;
 public record BookingCreatedEvent
 {
     public int BookingId { get; init; }

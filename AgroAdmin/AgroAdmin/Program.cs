@@ -148,5 +148,5 @@ app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(AgroAdmin.Client._Imports).Assembly);
-
+app.MapGet("/health", () => Results.Ok("Healthy"));
 app.Run();

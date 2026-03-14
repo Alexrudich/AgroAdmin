@@ -1,5 +1,5 @@
 ﻿using AgroAdmin.Infrastructure.Abstractions;
-using AgroAdmin.Shared.Dto.Bookings;
+using AgroAdmin.Shared.Dto.Bookings.Responses;
 using AgroAdmin.Shared.Enums;
 using AgroAdmin.Shared.Extensions;
 using Microsoft.Extensions.Configuration;

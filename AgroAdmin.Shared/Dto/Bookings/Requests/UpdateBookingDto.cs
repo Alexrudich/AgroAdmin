@@ -1,9 +1,9 @@
 ﻿using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Enums;
 
-namespace AgroAdmin.Shared.Dto.Bookings;
+namespace AgroAdmin.Shared.Dto.Bookings.Requests;
 
-public class BookingDto
+public class UpdateBookingDto
 {
     public int Id { get; set; }
     public GuestDto? Guest { get; set; }

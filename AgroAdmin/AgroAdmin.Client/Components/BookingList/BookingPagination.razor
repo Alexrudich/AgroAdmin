@@ -1,0 +1,46 @@
+﻿<div class="d-flex justify-content-between align-items-center mt-3">
+    <div>
+        <select class="form-select form-select-sm" style="width: auto" @onchange="OnPageSizeChangeHandler">
+            <option value="20">20 на странице</option>
+            <option value="50">50 на странице</option>
+            <option value="100">100 на странице</option>
+        </select>
+    </div>
+
+    <div>
+        <span>Страница @Page из @TotalPages</span>
+        <button class="btn btn-sm btn-outline-primary ms-2" @onclick="OnPrevious"
+                disabled="@IsPreviousDisabled">
+            ←
+        </button>
+        <button class="btn btn-sm btn-outline-primary ms-1" @onclick="OnNext"
+                disabled="@IsNextDisabled">
+            →
+        </button>
+    </div>
+
+    <div>
+        <span class="text-muted">Всего записей: @TotalCount</span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Page { get; set; }
+    [Parameter] public int PageSize { get; set; }
+    [Parameter] public int TotalCount { get; set; }
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChange { get; set; }
+    [Parameter] public EventCallback OnPrevious { get; set; }
+    [Parameter] public EventCallback OnNext { get; set; }
+
+    private bool IsPreviousDisabled => Page <= 1;
+    private bool IsNextDisabled => Page >= TotalPages;
+
+    private async Task OnPageSizeChangeHandler(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var newSize))
+        {
+            await OnPageSizeChange.InvokeAsync(newSize);
+        }
+    }
+}

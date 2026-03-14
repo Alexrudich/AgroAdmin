@@ -1,4 +1,5 @@
-﻿using AgroAdmin.Shared.Dto.Bookings;
+﻿using AgroAdmin.Shared.Dto.Bookings.Requests;
+using AgroAdmin.Shared.Dto.Bookings.Responses;
 using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Enums;
 using Microsoft.AspNetCore.Components;
@@ -9,23 +10,15 @@ using Timer = System.Timers.Timer;
 
 namespace AgroAdmin.Shared.Services;
 
-public class BookingFormService : IDisposable
+public class BookingFormService(
+    HttpClient http,
+    NavigationManager nav,
+    ILogger<BookingFormService> logger)
+    : IDisposable
 {
-    private readonly HttpClient _http;
-    private readonly NavigationManager _nav;
-    private readonly ILogger<BookingFormService> _logger;
+    private readonly NavigationManager _nav = nav;
     private Timer? _debounceTimer;
     private int? _currentBookingId;
-
-    public BookingFormService(
-        HttpClient http,
-        NavigationManager nav,
-        ILogger<BookingFormService> logger)
-    {
-        _http = http;
-        _nav = nav;
-        _logger = logger;
-    }
 
     // Состояние
     public CreateBookingDto Booking { get; set; } = new() { Guest = new GuestDto() };
@@ -53,11 +46,12 @@ public class BookingFormService : IDisposable
 
         try
         {
-            AllBookings = await _http.GetFromJsonAsync<List<BookingDto>>("api/bookings") ?? new();
+            var result = await http.GetFromJsonAsync<PagedResultDto<BookingDto>>("api/bookings");
+            AllBookings = result?.Items ?? new();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка загрузки броней");
+            logger.LogError(ex, "Ошибка загрузки броней");
             AllBookings = new();
         }
 
@@ -86,7 +80,7 @@ public class BookingFormService : IDisposable
     {
         try
         {
-            var result = await _http.GetFromJsonAsync<BookingDto>($"api/bookings/{id}");
+            var result = await http.GetFromJsonAsync<BookingDto>($"api/bookings/{id}");
             if (result == null) return;
 
             Booking.ArrivalDate = result.ArrivalDate;
@@ -113,7 +107,7 @@ public class BookingFormService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка загрузки брони для редактирования {Id}", id);
+            logger.LogError(ex, "Ошибка загрузки брони для редактирования {Id}", id);
         }
     }
 
@@ -171,13 +165,13 @@ public class BookingFormService : IDisposable
 
         try
         {
-            NameSearchResults = await _http.GetFromJsonAsync<List<GuestDto>>(
+            NameSearchResults = await http.GetFromJsonAsync<List<GuestDto>>(
                 $"api/guests/search?term={Uri.EscapeDataString(GuestNameSearchTerm)}") ?? new();
             ShowNameDropdown = true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка поиска гостей по имени");
+            logger.LogError(ex, "Ошибка поиска гостей по имени");
         }
         finally
         {
@@ -196,13 +190,13 @@ public class BookingFormService : IDisposable
 
         try
         {
-            PhoneSearchResults = await _http.GetFromJsonAsync<List<GuestDto>>(
+            PhoneSearchResults = await http.GetFromJsonAsync<List<GuestDto>>(
                 $"api/guests/search?term={Uri.EscapeDataString(GuestPhoneSearchTerm)}") ?? new();
-            ShowPhoneDropdown = true;
+            ShowNameDropdown = true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка поиска гостей по телефону");
+            logger.LogError(ex, "Ошибка поиска гостей по телефону");
         }
         finally
         {
@@ -272,90 +266,15 @@ public class BookingFormService : IDisposable
         StateChanged?.Invoke();
     }
 
-    public string GetDateStatus(DateTime date)
-    {
-        if (AllBookings == null || !AllBookings.Any()) return "free";
-
-        var bookingsOnDate = AllBookings.Where(b =>
-            b.Id != (_currentBookingId ?? 0) &&
-            date >= b.ArrivalDate.Date &&
-            date < b.DepartureDate.Date
-        ).ToList();
-
-        if (!bookingsOnDate.Any()) return "free";
-
-        // Проверяем, есть ли бронь на весь дом
-        bool hasWholeHouse = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.WholeHouse);
-
-        // Если есть бронь на весь дом - всё красное для любого выбора
-        if (hasWholeHouse) return "full-busy";
-
-        // Проверяем, какие половинки заняты
-        bool pondSideBusy = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.PondSide);
-        bool parkingSideBusy = bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.ParkingSide);
-
-        // Если заняты обе половинки - красный для любого выбора
-        if (pondSideBusy && parkingSideBusy) return "full-busy";
-
-        // Для выбора всего дома - красный если занята хотя бы одна половинка
-        if (Booking.ReservedUnit == ReservedUnits.WholeHouse)
-        {
-            return (pondSideBusy || parkingSideBusy) ? "full-busy" : "free";
-        }
-
-        // Для выбора половинки
-        bool selectedSideBusy = Booking.ReservedUnit == ReservedUnits.PondSide ? pondSideBusy : parkingSideBusy;
-
-        if (selectedSideBusy)
-        {
-            // Выбранная половинка занята - красный
-            return "full-busy";
-        }
-        else
-        {
-            // Выбранная половинка свободна - проверяем другую
-            bool otherSideBusy = Booking.ReservedUnit == ReservedUnits.PondSide ? parkingSideBusy : pondSideBusy;
-
-            // Если другая половинка занята - желтый, если нет - зеленый
-            return otherSideBusy ? "partial-busy" : "free";
-        }
-    }
-
-    public ReservedUnits GetBusyUnitsOnDate(DateTime date)
-    {
-        var bookingsOnDate = AllBookings?.Where(b =>
-                b.Id != (_currentBookingId ?? 0) &&
-                date >= b.ArrivalDate.Date &&    // дата >= заезда
-                date < b.DepartureDate.Date      // И дата < выезда
-        ).ToList() ?? new();
-
-        if (!bookingsOnDate.Any()) return 0;
-
-        ReservedUnits busy = 0;
-
-        // Если есть бронь на весь дом - возвращаем WholeHouse
-        if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.WholeHouse))
-            return ReservedUnits.WholeHouse;
-
-        // Проверяем занятость половинок
-        if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.PondSide))
-            busy |= ReservedUnits.PondSide;
-
-        if (bookingsOnDate.Any(b => b.ReservedUnit == ReservedUnits.ParkingSide))
-            busy |= ReservedUnits.ParkingSide;
-
-        return busy;
-    }
-
     public async Task<GuestDto?> GetGuestAsync(int id)
     {
         try
         {
-            return await _http.GetFromJsonAsync<GuestDto>($"api/guests/{id}");
+            return await http.GetFromJsonAsync<GuestDto>($"api/guests/{id}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка загрузки гостя {Id}", id);
+            logger.LogError(ex, "Ошибка загрузки гостя {Id}", id);
             return null;
         }
     }
@@ -368,18 +287,18 @@ public class BookingFormService : IDisposable
 
             if (id.HasValue)
             {
-                response = await _http.PutAsJsonAsync($"api/guests/{id}", guest);
+                response = await http.PutAsJsonAsync($"api/guests/{id}", guest);
             }
             else
             {
-                response = await _http.PostAsJsonAsync("api/guests", guest);
+                response = await http.PostAsJsonAsync("api/guests", guest);
             }
 
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка сохранения гостя");
+            logger.LogError(ex, "Ошибка сохранения гостя");
             return false;
         }
     }
@@ -412,18 +331,18 @@ public class BookingFormService : IDisposable
                     AdminNotes = Booking.AdminNotes,
                     FeedbackComment = Booking.FeedbackComment
                 };
-                response = await _http.PutAsJsonAsync($"api/bookings/{id}", updateDto);
+                response = await http.PutAsJsonAsync($"api/bookings/{id}", updateDto);
             }
             else
             {
-                response = await _http.PostAsJsonAsync("api/bookings", Booking);
+                response = await http.PostAsJsonAsync("api/bookings", Booking);
             }
 
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при сохранении брони");
+            logger.LogError(ex, "Ошибка при сохранении брони");
             return false;
         }
     }
@@ -432,7 +351,7 @@ public class BookingFormService : IDisposable
     {
         try
         {
-            var response = await _http.PostAsJsonAsync("api/bookings/validate", booking);
+            var response = await http.PostAsJsonAsync("api/bookings/validate", booking);
 
             if (response.IsSuccessStatusCode)
             {
@@ -443,7 +362,7 @@ public class BookingFormService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Validation error");
+            logger.LogError(ex, "Validation error");
             return null;
         }
     }

@@ -1,4 +1,4 @@
-﻿using AgroAdmin.Shared.Dto.Bookings;
+﻿using AgroAdmin.Shared.Dto.Bookings.Responses;
 
 namespace AgroAdmin.Infrastructure.Abstractions;
 

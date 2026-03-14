@@ -1,9 +1,9 @@
 ﻿using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Domain.Models;
-using AgroAdmin.Shared.Dto.Bookings;
 using AgroAdmin.Shared.Enums;
 using AgroAdmin.Shared.Extensions;
 using MassTransit;
+using AgroAdmin.Shared.Dto.Bookings.Events;
 
 namespace AgroAdmin.NotificationWorker.Consumers;
 
@@ -32,18 +32,20 @@ public class BookingCreatedConsumer(
                     ⏰ Время заезда: {msg.ArrivalDate:HH:mm}
                     """;
 
-        // 4. Сохраняем в таблицу ScheduledReminders
+        // 4. Сохраняем в таблицу ScheduledReminders (TargetChatId = null - значит всем по умолчанию)
         var reminder = new ScheduledReminder
         {
             Message = text,
             ScheduledFor = reminderTime,
             Priority = ReminderPriority.High,
-            IsSent = false
+            IsSent = false,
+            TargetChatId = null // null = отправить получателям по умолчанию
         };
 
         dbContext.ScheduledReminders.Add(reminder);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("📅 Авто-напоминание для #{Id} создано на {Time}", msg.BookingId, reminderTime);
+        logger.LogInformation("📅 Авто-напоминание для #{Id} создано на {Time} (будет отправлено получателям по умолчанию)",
+            msg.BookingId, reminderTime);
     }
 }
