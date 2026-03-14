@@ -1,4 +1,5 @@
-﻿using AgroAdmin.Shared.Dto.Bookings;
+﻿using AgroAdmin.Shared.Dto.Bookings.Requests;
+using AgroAdmin.Shared.Dto.Bookings.Responses;
 using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Enums;
 using Microsoft.AspNetCore.Components;
@@ -9,23 +10,15 @@ using Timer = System.Timers.Timer;
 
 namespace AgroAdmin.Shared.Services;
 
-public class BookingFormService : IDisposable
+public class BookingFormService(
+    HttpClient http,
+    NavigationManager nav,
+    ILogger<BookingFormService> logger)
+    : IDisposable
 {
-    private readonly HttpClient _http;
-    private readonly NavigationManager _nav;
-    private readonly ILogger<BookingFormService> _logger;
+    private readonly NavigationManager _nav = nav;
     private Timer? _debounceTimer;
     private int? _currentBookingId;
-
-    public BookingFormService(
-        HttpClient http,
-        NavigationManager nav,
-        ILogger<BookingFormService> logger)
-    {
-        _http = http;
-        _nav = nav;
-        _logger = logger;
-    }
 
     // Состояние
     public CreateBookingDto Booking { get; set; } = new() { Guest = new GuestDto() };
@@ -53,11 +46,17 @@ public class BookingFormService : IDisposable
 
         try
         {
-            AllBookings = await _http.GetFromJsonAsync<List<BookingDto>>("api/bookings") ?? new();
+            // ВРЕМЕННО: смотрим что реально приходит с сервера
+            var response = await http.GetAsync("api/bookings");
+            var json = await response.Content.ReadAsStringAsync();
+            logger.LogInformation($"RAW JSON: {json}");
+
+            var result = await http.GetFromJsonAsync<PagedResultDto<BookingDto>>("api/bookings");
+            AllBookings = result?.Items ?? new();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка загрузки броней");
+            logger.LogError(ex, "Ошибка загрузки броней");
             AllBookings = new();
         }
 
@@ -86,7 +85,7 @@ public class BookingFormService : IDisposable
     {
         try
         {
-            var result = await _http.GetFromJsonAsync<BookingDto>($"api/bookings/{id}");
+            var result = await http.GetFromJsonAsync<BookingDto>($"api/bookings/{id}");
             if (result == null) return;
 
             Booking.ArrivalDate = result.ArrivalDate;
@@ -113,7 +112,7 @@ public class BookingFormService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка загрузки брони для редактирования {Id}", id);
+            logger.LogError(ex, "Ошибка загрузки брони для редактирования {Id}", id);
         }
     }
 
@@ -171,13 +170,13 @@ public class BookingFormService : IDisposable
 
         try
         {
-            NameSearchResults = await _http.GetFromJsonAsync<List<GuestDto>>(
+            NameSearchResults = await http.GetFromJsonAsync<List<GuestDto>>(
                 $"api/guests/search?term={Uri.EscapeDataString(GuestNameSearchTerm)}") ?? new();
             ShowNameDropdown = true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка поиска гостей по имени");
+            logger.LogError(ex, "Ошибка поиска гостей по имени");
         }
         finally
         {
@@ -196,13 +195,13 @@ public class BookingFormService : IDisposable
 
         try
         {
-            PhoneSearchResults = await _http.GetFromJsonAsync<List<GuestDto>>(
+            PhoneSearchResults = await http.GetFromJsonAsync<List<GuestDto>>(
                 $"api/guests/search?term={Uri.EscapeDataString(GuestPhoneSearchTerm)}") ?? new();
-            ShowPhoneDropdown = true;
+            ShowNameDropdown = true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка поиска гостей по телефону");
+            logger.LogError(ex, "Ошибка поиска гостей по телефону");
         }
         finally
         {
@@ -351,11 +350,11 @@ public class BookingFormService : IDisposable
     {
         try
         {
-            return await _http.GetFromJsonAsync<GuestDto>($"api/guests/{id}");
+            return await http.GetFromJsonAsync<GuestDto>($"api/guests/{id}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка загрузки гостя {Id}", id);
+            logger.LogError(ex, "Ошибка загрузки гостя {Id}", id);
             return null;
         }
     }
@@ -368,18 +367,18 @@ public class BookingFormService : IDisposable
 
             if (id.HasValue)
             {
-                response = await _http.PutAsJsonAsync($"api/guests/{id}", guest);
+                response = await http.PutAsJsonAsync($"api/guests/{id}", guest);
             }
             else
             {
-                response = await _http.PostAsJsonAsync("api/guests", guest);
+                response = await http.PostAsJsonAsync("api/guests", guest);
             }
 
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка сохранения гостя");
+            logger.LogError(ex, "Ошибка сохранения гостя");
             return false;
         }
     }
@@ -412,18 +411,18 @@ public class BookingFormService : IDisposable
                     AdminNotes = Booking.AdminNotes,
                     FeedbackComment = Booking.FeedbackComment
                 };
-                response = await _http.PutAsJsonAsync($"api/bookings/{id}", updateDto);
+                response = await http.PutAsJsonAsync($"api/bookings/{id}", updateDto);
             }
             else
             {
-                response = await _http.PostAsJsonAsync("api/bookings", Booking);
+                response = await http.PostAsJsonAsync("api/bookings", Booking);
             }
 
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при сохранении брони");
+            logger.LogError(ex, "Ошибка при сохранении брони");
             return false;
         }
     }
@@ -432,7 +431,7 @@ public class BookingFormService : IDisposable
     {
         try
         {
-            var response = await _http.PostAsJsonAsync("api/bookings/validate", booking);
+            var response = await http.PostAsJsonAsync("api/bookings/validate", booking);
 
             if (response.IsSuccessStatusCode)
             {
@@ -443,7 +442,7 @@ public class BookingFormService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Validation error");
+            logger.LogError(ex, "Validation error");
             return null;
         }
     }

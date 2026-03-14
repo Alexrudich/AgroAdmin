@@ -3,7 +3,7 @@ using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Enums;
 using System.ComponentModel.DataAnnotations;
 
-namespace AgroAdmin.Shared.Dto.Bookings;
+namespace AgroAdmin.Shared.Dto.Bookings.Requests;
 
 public class CreateBookingDto
 {

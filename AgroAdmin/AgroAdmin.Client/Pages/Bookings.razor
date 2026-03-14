@@ -1,7 +1,6 @@
 ﻿@page "/bookings"
-@using AgroAdmin.Shared.Dto
-@using AgroAdmin.Shared.Dto.Bookings
-@using AgroAdmin.Shared.Extensions
+@using AgroAdmin.Shared.Dto.Bookings.Requests
+@using AgroAdmin.Shared.Dto.Bookings.Responses
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime Js
@@ -16,31 +15,126 @@
         </button>
     </div>
 
-    @if (allBookings == null)
+    <!-- ФИЛЬТРЫ -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">🔍 Поиск</label>
+                    <input type="text" class="form-control" @bind="filter.SearchTerm"
+                           placeholder="Имя или телефон" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">🏠 Объект</label>
+                    <select class="form-select" @bind="filter.ReservedUnit">
+                        <option value="">Все</option>
+                        @foreach (var unit in Enum.GetValues<ReservedUnits>())
+                        {
+                            <option value="@unit">@unit.ToFriendlyString()</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">👤 Гость</label>
+                    <select class="form-select" @bind="filter.IsFirstTimeGuest">
+                        <option value="">Все</option>
+                        <option value="true">Новые</option>
+                        <option value="false">Постоянные</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">📅 Дата с</label>
+                    <input type="date" class="form-control" @bind="filter.DateFrom" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">📅 Дата по</label>
+                    <input type="date" class="form-control" @bind="filter.DateTo" />
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small mb-1">&nbsp;</label>
+                    <button class="btn btn-primary w-100" @onclick="ApplyFilters">OK</button>
+                </div>
+            </div>
+
+            <!-- Дополнительные фильтры (свернуты) -->
+            <div class="mt-2">
+                <button class="btn btn-sm btn-link" @onclick="ToggleAdvancedFilters">
+                    @(showAdvancedFilters ? "▲ Скрыть" : "▼ Дополнительные фильтры")
+                </button>
+            </div>
+
+            @if (showAdvancedFilters)
+            {
+                <div class="row g-3 mt-2">
+                    <div class="col-md-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="filter.NeedsSauna" id="filterSauna" />
+                            <label class="form-check-label" for="filterSauna">🌡️ Сауна</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="filter.NeedsBanquetHall" id="filterBanquet" />
+                            <label class="form-check-label" for="filterBanquet">🥂 Банкет</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="filter.HasDog" id="filterDog" />
+                            <label class="form-check-label" for="filterDog">🐕 Собака</label>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (result == null)
     {
-        <div class="spinner-border" role="status"></div>
+        <div class="d-flex justify-content-center p-5">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
     }
-    else if (!allBookings.Any())
+    else if (!result.Items.Any())
     {
         <div class="alert alert-info">Пока нет ни одного бронирования.</div>
     }
     else
     {
         <div class="table-responsive">
-            <table class="table table-striped">
+            <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>Гость</th>
-                        <th>Даты</th>
-                        <th>Объект</th>
+                        <th @onclick="@(() => SortBy("GuestName"))" style="cursor: pointer">
+                            Гость
+                            @if (filter.SortBy == "GuestName")
+                            {
+                                <span>@(filter.SortDesc ? "▼" : "▲")</span>
+                            }
+                        </th>
+                        <th @onclick="@(() => SortBy("ArrivalDate"))" style="cursor: pointer">
+                            Даты
+                            @if (filter.SortBy == "ArrivalDate")
+                            {
+                                <span>@(filter.SortDesc ? "▼" : "▲")</span>
+                            }
+                        </th>
+                        <th @onclick="@(() => SortBy("ReservedUnit"))" style="cursor: pointer">
+                            Объект
+                            @if (filter.SortBy == "ReservedUnit")
+                            {
+                                <span>@(filter.SortDesc ? "▼" : "▲")</span>
+                            }
+                        </th>
                         <th>Люди</th>
                         <th>Статус</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var booking in allBookings)
+                    @foreach (var booking in result.Items)
                     {
-                        <tr>
+                        <tr class="@(booking.ArrivalDate.Date <= DateTime.Today && booking.DepartureDate.Date >= DateTime.Today ? "table-warning" : "")">
                             <td>
                                 <strong>@booking.Guest?.FullName</strong>
                                 <br />
@@ -48,16 +142,25 @@
                             </td>
                             <td>
                                 @booking.ArrivalDate.ToShortDateString() — @booking.DepartureDate.ToShortDateString()
+                                @if (booking.ArrivalDate.Date == DateTime.Today)
+                                {
+                                    <span class="badge bg-success ms-2">Сегодня</span>
+                                }
+                                else if (booking.ArrivalDate.Date == DateTime.Today.AddDays(1))
+                                {
+                                    <span class="badge bg-info ms-2">Завтра</span>
+                                }
                             </td>
                             <td>
-                                <span class="badge bg-secondary">@booking.ReservedUnit.ToFriendlyString()</span>
+                                <span class="badge @GetUnitBadgeClass(booking.ReservedUnit)">
+                                    @booking.ReservedUnit.ToFriendlyString()
+                                </span>
                             </td>
                             <td>
                                 <div class="d-flex flex-column">
                                     <span class="fw-bold" style="font-size: 1.1rem;">
                                         Всего: @booking.TotalGuestsCount
                                     </span>
-
                                     <div class="d-flex gap-2 align-items-center" style="font-size: 0.9rem;">
                                         <span title="Взрослые">👨 @booking.AdultsCount</span>
                                         @if (booking.ChildrenCount > 0)
@@ -75,10 +178,8 @@
                                     </div>
                                 </div>
                             </td>
-
                             <td>
                                 <div class="d-flex flex-column gap-1">
-                                    @* Тип гостя *@
                                     <div>
                                         @if (booking.IsFirstTimeGuest)
                                         {
@@ -89,8 +190,6 @@
                                             <span class="badge bg-success">Постоянный</span>
                                         }
                                     </div>
-
-                                    @* Доп. услуги иконками *@
                                     <div class="d-flex gap-2" style="font-size: 1.1rem;">
                                         @if (booking.NeedsSauna)
                                         {
@@ -121,36 +220,150 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- ПАГИНАЦИЯ -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div>
+                <select class="form-select form-select-sm" style="width: auto" @onchange="OnPageSizeChange">
+                    <option value="20">20 на странице</option>
+                    <option value="50">50 на странице</option>
+                    <option value="100">100 на странице</option>
+                </select>
+            </div>
+
+            <div>
+                <span>Страница @result.Page из @result.TotalPages</span>
+                <button class="btn btn-sm btn-outline-primary ms-2" @onclick="PreviousPage"
+                        disabled="@IsPreviousDisabled()">
+                    ←
+                </button>
+                <button class="btn btn-sm btn-outline-primary ms-1" @onclick="NextPage"
+                        disabled="@IsNextDisabled()">
+                    →
+                </button>
+            </div>
+
+            <div>
+                <span class="text-muted">Всего записей: @result.TotalCount</span>
+            </div>
+        </div>
     }
 </div>
+
 @code {
-    private List<BookingDto>? allBookings;
+    private PagedResultDto<BookingDto>? result;
+    private BookingFilterDto filter = new();
+    private bool showAdvancedFilters = false;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
         try
         {
-            allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings");
+            var query = BuildQueryString();
+            result = await Http.GetFromJsonAsync<PagedResultDto<BookingDto>>($"api/bookings{query}");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Ошибка загрузки: {ex.Message}");
-            allBookings = new();
+            result = new PagedResultDto<BookingDto> { Items = new() };
         }
+    }
+
+    private string BuildQueryString()
+    {
+        var parameters = new List<string>();
+
+        if (filter.Page > 1) parameters.Add($"page={filter.Page}");
+        if (filter.PageSize != 20) parameters.Add($"pageSize={filter.PageSize}");
+        if (!string.IsNullOrEmpty(filter.SortBy)) parameters.Add($"sortBy={filter.SortBy}");
+        if (!filter.SortDesc) parameters.Add($"sortDesc=false");
+        if (!string.IsNullOrEmpty(filter.SearchTerm)) parameters.Add($"searchTerm={Uri.EscapeDataString(filter.SearchTerm)}");
+        if (filter.ReservedUnit.HasValue) parameters.Add($"reservedUnit={(int)filter.ReservedUnit}");
+        if (filter.IsFirstTimeGuest.HasValue) parameters.Add($"isFirstTimeGuest={filter.IsFirstTimeGuest.Value}");
+        if (filter.DateFrom.HasValue) parameters.Add($"dateFrom={filter.DateFrom:yyyy-MM-dd}");
+        if (filter.DateTo.HasValue) parameters.Add($"dateTo={filter.DateTo:yyyy-MM-dd}");
+        if (filter.NeedsSauna == true) parameters.Add($"needsSauna=true");
+        if (filter.NeedsBanquetHall == true) parameters.Add($"needsBanquetHall=true");
+        if (filter.HasDog == true) parameters.Add($"hasDog=true");
+
+        return parameters.Any() ? "?" + string.Join("&", parameters) : "";
+    }
+
+    private async Task ApplyFilters()
+    {
+        filter.Page = 1;
+        await LoadData();
+    }
+
+    private async Task SortBy(string field)
+    {
+        if (filter.SortBy == field)
+        {
+            filter.SortDesc = !filter.SortDesc;
+        }
+        else
+        {
+            filter.SortBy = field;
+            filter.SortDesc = true;
+        }
+        await ApplyFilters();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (result?.Page > 1)
+        {
+            filter.Page = result.Page - 1;
+            await LoadData();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (result != null && filter.Page < result.TotalPages)
+        {
+            filter.Page = result.Page + 1;
+            await LoadData();
+        }
+    }
+
+    private async Task OnPageSizeChange(ChangeEventArgs e)
+    {
+        filter.PageSize = int.Parse(e.Value?.ToString() ?? "20");
+        filter.Page = 1;
+        await LoadData();
+    }
+
+    private string GetUnitBadgeClass(ReservedUnits unit) => unit switch
+    {
+        ReservedUnits.PondSide => "bg-info",
+        ReservedUnits.ParkingSide => "bg-secondary",
+        ReservedUnits.WholeHouse => "bg-primary",
+        _ => "bg-secondary"
+    };
+
+    private bool IsPreviousDisabled() => result?.Page <= 1;
+    private bool IsNextDisabled() => result != null && result.Page >= result.TotalPages;
+
+    private void ToggleAdvancedFilters()
+    {
+        showAdvancedFilters = !showAdvancedFilters;
     }
 
     private async Task HandleDelete(int id, string name)
     {
         bool confirmed = await Js.InvokeAsync<bool>("confirm", $"Вы уверены, что хотите удалить бронь гостя {name}?");
-
         if (confirmed)
         {
             var response = await Http.DeleteAsync($"api/bookings/{id}");
-
             if (response.IsSuccessStatusCode)
             {
-                allBookings?.RemoveAll(b => b.Id == id);
-                StateHasChanged();
+                await LoadData();
             }
             else
             {

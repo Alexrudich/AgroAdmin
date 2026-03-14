@@ -1,7 +1,7 @@
 ﻿@page "/calendar"
 @using System.Globalization
 @using AgroAdmin.Shared.Dto.Auth
-@using AgroAdmin.Shared.Dto.Bookings
+@using AgroAdmin.Shared.Dto.Bookings.Responses
 @inject HttpClient Http
 @inject NavigationManager Nav
 
@@ -37,7 +37,7 @@
                     <button class="month-picker-nav" @onclick="IncrementYear">→</button>
                 </div>
                 <div class="month-picker-grid">
-                    @for (int i = 0; i < 12; i++)
+                    @for (var i = 0; i < 12; i++)
                     {
                         var monthNum = i + 1;
                         var monthDate = new DateTime(_pickerYear, monthNum, 1);
@@ -158,7 +158,8 @@
     {
         try
         {
-            _allBookings = await Http.GetFromJsonAsync<List<BookingDto>>("api/bookings");
+            var result = await Http.GetFromJsonAsync<PagedResultDto<BookingDto>>("api/bookings");
+            _allBookings = result?.Items ?? new();
             GenerateCalendar(_currentMonth.Year, _currentMonth.Month);
         }
         catch

@@ -1,7 +1,7 @@
 ﻿@page "/bookings/create"
 @page "/bookings/edit/{Id:int}"
 @implements IDisposable
-@using AgroAdmin.Client.Components.Bookings
+@using AgroAdmin.Client.Components.Calendar;
 @inject BookingFormService Service
 @inject NavigationManager Nav
 
@@ -38,14 +38,14 @@
                 <BookingNotesSection Service="Service" />
 
                 <!-- 9️ Валидация -->
-                <BookingValidation Errors="validationErrors"
-                                   EarliestAvailableDate="earliestAvailableDate"
-                                   IsValidating="isValidating" />
+                <BookingValidation Errors="_validationErrors"
+                                   EarliestAvailableDate="_earliestAvailableDate"
+                                   IsValidating="_isValidating" />
 
                 <!-- 10️ Кнопки -->
                 <BookingFormActions Id="Id"
                                     OnCancel="Cancel"
-                                    IsValidating="isValidating" />
+                                    IsValidating="_isValidating" />
 
             </EditForm>
         </div>
@@ -55,9 +55,9 @@
 @code {
     [Parameter] public int? Id { get; set; }
 
-    private List<string> validationErrors = new();
-    private DateTime? earliestAvailableDate;
-    private bool isValidating = false;
+    private List<string> _validationErrors = new();
+    private DateTime? _earliestAvailableDate;
+    private bool _isValidating = false;
 
     private void Cancel() => Nav.NavigateTo("/bookings");
 
@@ -135,9 +135,9 @@
 
     private async Task HandleSubmit()
     {
-        validationErrors.Clear();
-        earliestAvailableDate = null;
-        isValidating = true;
+        _validationErrors.Clear();
+        _earliestAvailableDate = null;
+        _isValidating = true;
         StateHasChanged();
 
         try
@@ -151,17 +151,17 @@
             }
             else if (validationResult != null)
             {
-                validationErrors = validationResult.Errors ?? new();
-                earliestAvailableDate = validationResult.EarliestAvailableDate;
+                _validationErrors = validationResult.Errors ?? new();
+                _earliestAvailableDate = validationResult.EarliestAvailableDate;
             }
             else
             {
-                validationErrors = new() { "Ошибка при проверке данных" };
+                _validationErrors = new() { "Ошибка при проверке данных" };
             }
         }
         finally
         {
-            isValidating = false;
+            _isValidating = false;
             StateHasChanged();
         }
     }

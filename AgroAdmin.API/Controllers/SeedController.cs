@@ -33,11 +33,11 @@ public class SeedController(AppDbContext context) : ControllerBase
         var newGuests = new List<Guest>();
         var newBookings = new List<Booking>();
 
-        var firstNames = new[] { "Александр", "Дмитрий", "Игнат", "Себастьян", "Сергей", "Лаврентий", "Андрей", "Марио" };
-        var lastNames = new[] { "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Павлов", "Соколов" };
+        var firstNames = new[] { "Александр", "Дмитрий", "Игнат", "Себастьян", "Сергей", "Лаврентий", "Андрей", "Марио", "Евгений", "Николай" };
+        var lastNames = new[] { "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Павлов", "Соколов", "Михайлов", "Федоров" };
 
-        // Создаем гостей
-        for (int i = 0; i < 15; i++)
+        // Создаем 25 гостей (больше для пагинации)
+        for (int i = 0; i < 25; i++)
         {
             var firstName = firstNames[rand.Next(firstNames.Length)];
             var lastName = lastNames[rand.Next(lastNames.Length)];
@@ -55,18 +55,21 @@ public class SeedController(AppDbContext context) : ControllerBase
         var guests = await context.Guests.Where(g => g.FullName.StartsWith("[TEST]")).ToListAsync();
         var allExisting = await context.Bookings
             .Include(b => b.Guest)
-            .Where(b => b.Guest == null || !b.Guest.FullName.StartsWith("[TEST]")) // Исключаем тестовые из проверки
+            .Where(b => b.Guest == null || !b.Guest.FullName.StartsWith("[TEST]"))
             .ToListAsync();
 
-        var targetNewRecords = 25;
+        // Создаем 150 броней (для теста пагинации)
+        var targetNewRecords = 150;
         var attempts = 0;
 
         while (newBookings.Count < targetNewRecords && attempts < 1000)
         {
             attempts++;
             var guest = guests[rand.Next(guests.Count)];
-            var arrival = DateTime.UtcNow.AddDays(rand.Next(-5, 50)).Date;
-            var departure = arrival.AddDays(rand.Next(1, 4));
+
+            // Даты от -30 до +90 дней
+            var arrival = DateTime.UtcNow.AddDays(rand.Next(-30, 90)).Date;
+            var departure = arrival.AddDays(rand.Next(1, 14)); // от 1 до 14 дней
             var unit = (ReservedUnits)rand.Next(0, 3);
 
             var adults = rand.Next(1, 6);
@@ -80,7 +83,7 @@ public class SeedController(AppDbContext context) : ControllerBase
             // Объединяем существующие и новые брони для проверки
             var allToCheck = allExisting.Concat(newBookings).ToList();
 
-            // ПРАВИЛЬНАЯ ПРОВЕРКА КОНФЛИКТОВ
+            // Твоя правильная проверка конфликтов
             bool isBusy;
 
             if (unit == ReservedUnits.WholeHouse)
@@ -106,8 +109,6 @@ public class SeedController(AppDbContext context) : ControllerBase
 
             if (!isBusy)
             {
-                if (rand.Next(100) < 20) continue;
-
                 var booking = new Booking(
                     guestId: guest.Id,
                     arrival: arrival,
@@ -120,7 +121,7 @@ public class SeedController(AppDbContext context) : ControllerBase
                     hasDog: rand.Next(100) < 20,
                     needsSauna: rand.Next(100) < 50,
                     needsBanquetHall: rand.Next(100) < 15,
-                    isFirstTimeGuest: false,
+                    isFirstTimeGuest: rand.Next(2) == 0, // 50/50 новые/постоянные
                     adminNotes: rand.Next(100) < 20 ? "Нужны доп. полотенца" : null,
                     feedbackComment: rand.Next(100) < 30 ? "Всё отлично, приедем ещё!" : null
                 );
@@ -132,7 +133,8 @@ public class SeedController(AppDbContext context) : ControllerBase
         context.Bookings.AddRange(newBookings);
         await context.SaveChangesAsync();
 
-        return Ok($"Создано {guests.Count} тестовых гостей и добавлено {newBookings.Count} броней.");
+        return Ok($"Создано {guests.Count} тестовых гостей и добавлено {newBookings.Count} броней. " +
+                  $"Теперь можно тестировать пагинацию и фильтры!");
     }
 
     [HttpPost("create-admin")]

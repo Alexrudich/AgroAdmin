@@ -2,6 +2,9 @@
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Shared.Dto.Bookings;
+using AgroAdmin.Shared.Dto.Bookings.Events;
+using AgroAdmin.Shared.Dto.Bookings.Requests;
+using AgroAdmin.Shared.Dto.Bookings.Responses;
 using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Extensions;
 using MassTransit;
@@ -21,12 +24,71 @@ public class BookingsController(
     ILogger<BookingsController> logger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<BookingDto>>> GetAll()
+    public async Task<ActionResult<PagedResultDto<BookingDto>>> GetAll([FromQuery] BookingFilterDto filter)
     {
-        var bookings = await context.Bookings
+        var query = context.Bookings
             .Include(b => b.Guest)
             .Include(b => b.SaunaOrders)
-            .OrderByDescending(b => b.ArrivalDate)
+            .AsQueryable();
+
+        // ПРИМЕНЯЕМ ФИЛЬТРЫ
+        if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
+        {
+            var searchTerm = filter.SearchTerm.ToLower();
+            query = query.Where(b =>
+                (b.Guest.FullName != null && b.Guest.FullName.ToLower().Contains(searchTerm)) ||
+                (b.Guest.Phone != null && b.Guest.Phone.Contains(searchTerm))
+            );
+        }
+
+        if (filter.ReservedUnit.HasValue)
+            query = query.Where(b => b.ReservedUnit == filter.ReservedUnit.Value);
+
+        if (filter.IsFirstTimeGuest.HasValue)
+            query = query.Where(b => b.IsFirstTimeGuest == filter.IsFirstTimeGuest.Value);
+
+        if (filter.NeedsSauna.HasValue)
+            query = query.Where(b => b.NeedsSauna == filter.NeedsSauna.Value);
+
+        if (filter.NeedsBanquetHall.HasValue)
+            query = query.Where(b => b.NeedsBanquetHall == filter.NeedsBanquetHall.Value);
+
+        if (filter.HasDog.HasValue)
+            query = query.Where(b => b.HasDog == filter.HasDog.Value);
+
+        if (filter.DateFrom.HasValue)
+            query = query.Where(b => b.ArrivalDate >= filter.DateFrom.Value);
+
+        if (filter.DateTo.HasValue)
+            query = query.Where(b => b.ArrivalDate <= filter.DateTo.Value);
+
+        // ПРИМЕНЯЕМ СОРТИРОВКУ
+        query = filter.SortBy?.ToLower() switch
+        {
+            "guestname" => filter.SortDesc
+                ? query.OrderByDescending(b => b.Guest.FullName)
+                : query.OrderBy(b => b.Guest.FullName),
+
+            "reservedunit" => filter.SortDesc
+                ? query.OrderByDescending(b => b.ReservedUnit)
+                : query.OrderBy(b => b.ReservedUnit),
+
+            "arrivaldate" => filter.SortDesc
+                ? query.OrderByDescending(b => b.ArrivalDate)
+                : query.OrderBy(b => b.ArrivalDate),
+
+            _ => filter.SortDesc
+                ? query.OrderByDescending(b => b.ArrivalDate)
+                : query.OrderBy(b => b.ArrivalDate)
+        };
+
+        // ПОЛУЧАЕМ ОБЩЕЕ КОЛИЧЕСТВО
+        var totalCount = await query.CountAsync();
+
+        // ПРИМЕНЯЕМ ПАГИНАЦИЮ
+        var items = await query
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
             .Select(b => new BookingDto
             {
                 Id = b.Id,
@@ -54,7 +116,13 @@ public class BookingsController(
             })
             .ToListAsync();
 
-        return Ok(bookings);
+        return Ok(new PagedResultDto<BookingDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = filter.Page,
+            PageSize = filter.PageSize
+        });
     }
 
     [HttpGet("{id}")]

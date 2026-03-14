@@ -1,6 +1,5 @@
-﻿@using AgroAdmin.Shared.Dto
-@using AgroAdmin.Shared.Dto.Bookings
-@using AgroAdmin.Shared.Enums
+﻿@using AgroAdmin.Shared.Dto.Bookings.Requests
+@using AgroAdmin.Shared.Dto.Bookings.Responses
 @* Components/BookingCalendar.razor *@
 @if (ShowCalendar)
 {
@@ -8,12 +7,12 @@
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h6 class="mb-0">📅 Занятость</h6>
             <button class="btn btn-sm btn-outline-primary" @onclick="ToggleWeekRange">
-                @(showFullWeek ? "Скрыть" : "Показать больше")
+                @(_showFullWeek ? "Скрыть" : "Показать больше")
             </button>
         </div>
 
         <div class="calendar-grid-mobile">
-            @for (int i = startOffset; i < endOffset; i++)
+            @for (int i = StartOffset; i < EndOffset; i++)
             {
                 var date = Booking.ArrivalDate.AddDays(i);
                 if (date < DateTime.Today.AddDays(-30)) continue;
@@ -38,16 +37,16 @@
 
 @code {
     [Parameter] public CreateBookingDto Booking { get; set; } = new();
-    [Parameter] public List<BookingDto> AllBookings { get; set; } = new();
+    [Parameter] public List<BookingDto> AllBookings { get; set; } = [];
     [Parameter] public int? CurrentBookingId { get; set; }
     [Parameter] public bool ShowCalendar { get; set; } = true;
     [Parameter] public EventCallback<DateTime> OnDateSelected { get; set; }
 
-    private bool showFullWeek = false;
-    private int startOffset => showFullWeek ? -7 : -2;
-    private int endOffset => showFullWeek ? 14 : 5;
+    private bool _showFullWeek = false;
+    private int StartOffset => _showFullWeek ? -7 : -2;
+    private int EndOffset => _showFullWeek ? 14 : 5;
 
-    private void ToggleWeekRange() => showFullWeek = !showFullWeek;
+    private void ToggleWeekRange() => _showFullWeek = !_showFullWeek;
 
     private string GetCalendarDayStatus(DateTime date)
     {
