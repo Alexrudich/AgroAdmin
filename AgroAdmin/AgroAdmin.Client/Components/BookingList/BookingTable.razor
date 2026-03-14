@@ -1,0 +1,54 @@
+﻿@using AgroAdmin.Shared.Dto.Bookings.Responses
+@using AgroAdmin.Shared.Dto.Bookings.Requests
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+        <tr>
+            <th @onclick="@(() => SortBy("GuestName"))" style="cursor: pointer">
+                Гость
+                @if (Filter.SortBy == "GuestName")
+                {
+                    <span>@(Filter.SortDesc ? "▼" : "▲")</span>
+                }
+            </th>
+            <th @onclick="@(() => SortBy("ArrivalDate"))" style="cursor: pointer">
+                Даты
+                @if (Filter.SortBy == "ArrivalDate")
+                {
+                    <span>@(Filter.SortDesc ? "▼" : "▲")</span>
+                }
+            </th>
+            <th @onclick="@(() => SortBy("ReservedUnit"))" style="cursor: pointer">
+                Объект
+                @if (Filter.SortBy == "ReservedUnit")
+                {
+                    <span>@(Filter.SortDesc ? "▼" : "▲")</span>
+                }
+            </th>
+            <th>Люди</th>
+            <th>Статус</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var booking in Bookings)
+        {
+            <BookingTableRow Booking="booking" OnEdit="OnEdit" OnDelete="OnDelete" />
+        }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter] public List<BookingDto> Bookings { get; set; } = new();
+    [Parameter] public BookingFilterDto Filter { get; set; } = new();
+    [Parameter] public EventCallback<string> OnSort { get; set; }
+    [Parameter] public EventCallback<int> OnEdit { get; set; }
+    [Parameter] public EventCallback<(int Id, string Name)> OnDelete { get; set; }
+
+    private async Task SortBy(string field)
+    {
+        await OnSort.InvokeAsync(field);
+    }
+}

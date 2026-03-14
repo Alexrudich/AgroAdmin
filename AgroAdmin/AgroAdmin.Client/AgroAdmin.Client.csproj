@@ -19,8 +19,4 @@
     <ProjectReference Include="..\..\AgroAdmin.Shared\AgroAdmin.Shared.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Components\BookingList\" />
-  </ItemGroup>
-
 </Project>

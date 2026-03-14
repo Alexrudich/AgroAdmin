@@ -1,7 +1,5 @@
-﻿@page "/bookings"
-@using AgroAdmin.Shared.Dto.Bookings.Requests
+﻿@using AgroAdmin.Shared.Dto.Bookings.Requests
 @using AgroAdmin.Shared.Dto.Bookings.Responses
-@using AgroAdmin.Client.Components.BookingList
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime Js
@@ -16,7 +14,7 @@
         </button>
     </div>
 
-    <BookingFilters Filter="_filter" 
+    <BookingFilters Filter="filter"
                     ShowAdvancedFilters="_showAdvancedFilters"
                     ShowAdvancedFiltersChanged="((v) => _showAdvancedFilters = v)"
                     OnApply="ApplyFilters" />
@@ -33,14 +31,14 @@
     }
     else
     {
-        <BookingTable Bookings="_result.Items" 
-                      Filter="_filter"
+        <BookingTable Bookings="_result.Items"
+                      Filter="filter"
                       OnSort="SortBy"
                       OnEdit="NavigateToEdit"
                       OnDelete="HandleDelete" />
 
         <BookingPagination Page="_result.Page"
-                           PageSize="_filter.PageSize"
+                           PageSize="filter.PageSize"
                            TotalCount="_result.TotalCount"
                            TotalPages="_result.TotalPages"
                            OnPageSizeChange="OnPageSizeChange"
@@ -51,11 +49,10 @@
 
 @code {
     private PagedResultDto<BookingDto>? _result;
-    private readonly BookingFilterDto _filter = new();
+    private readonly BookingFilterDto filter = new();
     private bool _showAdvancedFilters = false;
 
     protected override async Task OnInitializedAsync() => await LoadData();
-    private void NavigateToEdit(int id) => Nav.NavigateTo($"/bookings/edit/{id}");
 
     private async Task LoadData()
     {
@@ -66,55 +63,57 @@
         }
         catch
         {
-            _result = new PagedResultDto<BookingDto> { Items = [] };
+            _result = new PagedResultDto<BookingDto> { Items = new() };
         }
     }
 
     private string BuildQueryString()
     {
         var parameters = new List<string>();
-        if (_filter.Page > 1) parameters.Add($"page={_filter.Page}");
-        if (_filter.PageSize != 20) parameters.Add($"pageSize={_filter.PageSize}");
-        if (!string.IsNullOrEmpty(_filter.SortBy)) parameters.Add($"sortBy={_filter.SortBy}");
-        if (!_filter.SortDesc) parameters.Add($"sortDesc=false");
-        if (!string.IsNullOrEmpty(_filter.SearchTerm)) parameters.Add($"searchTerm={Uri.EscapeDataString(_filter.SearchTerm)}");
-        if (_filter.ReservedUnit.HasValue) parameters.Add($"reservedUnit={(int)_filter.ReservedUnit}");
-        if (_filter.IsFirstTimeGuest.HasValue) parameters.Add($"isFirstTimeGuest={_filter.IsFirstTimeGuest.Value}");
-        if (_filter.DateFrom.HasValue) parameters.Add($"dateFrom={_filter.DateFrom:yyyy-MM-dd}");
-        if (_filter.DateTo.HasValue) parameters.Add($"dateTo={_filter.DateTo:yyyy-MM-dd}");
-        if (_filter.NeedsSauna == true) parameters.Add($"needsSauna=true");
-        if (_filter.NeedsBanquetHall == true) parameters.Add($"needsBanquetHall=true");
-        if (_filter.HasDog == true) parameters.Add($"hasDog=true");
+        if (filter.Page > 1) parameters.Add($"page={filter.Page}");
+        if (filter.PageSize != 20) parameters.Add($"pageSize={filter.PageSize}");
+        if (!string.IsNullOrEmpty(filter.SortBy)) parameters.Add($"sortBy={filter.SortBy}");
+        if (!filter.SortDesc) parameters.Add($"sortDesc=false");
+        if (!string.IsNullOrEmpty(filter.SearchTerm)) parameters.Add($"searchTerm={Uri.EscapeDataString(filter.SearchTerm)}");
+        if (filter.ReservedUnit.HasValue) parameters.Add($"reservedUnit={(int)filter.ReservedUnit}");
+        if (filter.IsFirstTimeGuest.HasValue) parameters.Add($"isFirstTimeGuest={filter.IsFirstTimeGuest.Value}");
+        if (filter.DateFrom.HasValue) parameters.Add($"dateFrom={filter.DateFrom:yyyy-MM-dd}");
+        if (filter.DateTo.HasValue) parameters.Add($"dateTo={filter.DateTo:yyyy-MM-dd}");
+        if (filter.NeedsSauna == true) parameters.Add($"needsSauna=true");
+        if (filter.NeedsBanquetHall == true) parameters.Add($"needsBanquetHall=true");
+        if (filter.HasDog == true) parameters.Add($"hasDog=true");
         return parameters.Any() ? "?" + string.Join("&", parameters) : "";
     }
 
     private async Task ApplyFilters()
     {
-        _filter.Page = 1;
+        filter.Page = 1;
         await LoadData();
     }
 
     private async Task SortBy(string field)
     {
-        if (_filter.SortBy == field) _filter.SortDesc = !_filter.SortDesc;
-        else { _filter.SortBy = field; _filter.SortDesc = true; }
+        if (filter.SortBy == field) filter.SortDesc = !filter.SortDesc;
+        else { filter.SortBy = field; filter.SortDesc = true; }
         await ApplyFilters();
     }
 
+    private void NavigateToEdit(int id) => Nav.NavigateTo($"/bookings/edit/{id}");
+
     private async Task PreviousPage()
     {
-        if (_result?.Page > 1) { _filter.Page = _result.Page - 1; await LoadData(); }
+        if (_result?.Page > 1) { filter.Page = _result.Page - 1; await LoadData(); }
     }
 
     private async Task NextPage()
     {
-        if (_result != null && _filter.Page < _result.TotalPages) { _filter.Page = _result.Page + 1; await LoadData(); }
+        if (_result != null && filter.Page < _result.TotalPages) { filter.Page = _result.Page + 1; await LoadData(); }
     }
 
     private async Task OnPageSizeChange(int newSize)
     {
-        _filter.PageSize = newSize;
-        _filter.Page = 1;
+        filter.PageSize = newSize;
+        filter.Page = 1;
         await LoadData();
     }
 

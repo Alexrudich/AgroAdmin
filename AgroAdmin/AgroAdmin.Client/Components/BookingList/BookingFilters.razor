@@ -1,0 +1,93 @@
+﻿@using AgroAdmin.Shared.Dto.Bookings.Requests
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small mb-1">🔍 Поиск</label>
+                <input type="text" class="form-control" @bind="Filter.SearchTerm"
+                       placeholder="Имя или телефон" @oninput="OnSearchInput" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">🏠 Объект</label>
+                <select class="form-select" @bind="Filter.ReservedUnit">
+                    <option value="">Все</option>
+                    @foreach (var unit in Enum.GetValues<ReservedUnits>())
+                    {
+                        <option value="@unit">@unit.ToFriendlyString()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">👤 Гость</label>
+                <select class="form-select" @bind="Filter.IsFirstTimeGuest">
+                    <option value="">Все</option>
+                    <option value="true">Новые</option>
+                    <option value="false">Постоянные</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">📅 Дата с</label>
+                <input type="date" class="form-control" @bind="Filter.DateFrom" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">📅 Дата по</label>
+                <input type="date" class="form-control" @bind="Filter.DateTo" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small mb-1">&nbsp;</label>
+                <button class="btn btn-primary w-100" @onclick="OnApply">OK</button>
+            </div>
+        </div>
+
+        <!-- Дополнительные фильтры (свернуты) -->
+        <div class="mt-2">
+            <button class="btn btn-sm btn-link" @onclick="ToggleAdvancedFilters">
+                @(ShowAdvancedFilters ? "▲ Скрыть" : "▼ Дополнительные фильтры")
+            </button>
+        </div>
+
+        @if (ShowAdvancedFilters)
+        {
+            <div class="row g-3 mt-2">
+                <div class="col-md-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="Filter.NeedsSauna" id="filterSauna" />
+                        <label class="form-check-label" for="filterSauna">🌡️ Сауна</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="Filter.NeedsBanquetHall" id="filterBanquet" />
+                        <label class="form-check-label" for="filterBanquet">🥂 Банкет</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="Filter.HasDog" id="filterDog" />
+                        <label class="form-check-label" for="filterDog">🐕 Собака</label>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public BookingFilterDto Filter { get; set; } = new();
+    [Parameter] public bool ShowAdvancedFilters { get; set; }
+    [Parameter] public EventCallback OnApply { get; set; }
+    [Parameter] public EventCallback<bool> ShowAdvancedFiltersChanged { get; set; }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        Filter.SearchTerm = e.Value?.ToString();
+        await OnApply.InvokeAsync();
+    }
+
+    private async Task ToggleAdvancedFilters()
+    {
+        ShowAdvancedFilters = !ShowAdvancedFilters;
+        await ShowAdvancedFiltersChanged.InvokeAsync(ShowAdvancedFilters);
+    }
+}
