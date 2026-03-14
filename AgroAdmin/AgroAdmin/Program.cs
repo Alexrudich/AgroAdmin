@@ -43,9 +43,46 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.Name = "AgroAdmin.Auth";
         options.LoginPath = "/login";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    });
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Всегда Secure
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+
+        // Умный выбор SameSite в зависимости от браузера
+        options.Cookie.SameSite = SameSiteMode.Lax; // Значение по умолчанию
+
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnRedirectToLogin = ctx =>
+            {
+                if (ctx.Request.Path.StartsWithSegments("/api"))
+                {
+                    ctx.Response.StatusCode = 401;
+                }
+                else
+                {
+                    ctx.Response.Redirect(ctx.RedirectUri);
+                }
+                return Task.CompletedTask;
+            },
+            // перед тем как кука будет создана, проверяем User-Agent
+            OnSigningIn = ctx =>
+            {
+                var userAgent = ctx.Request.Headers["User-Agent"].ToString();
+
+                // Определяем старые Safari (iOS 12 и ниже) и некоторые версии Chrome
+                var isProblemBrowser = userAgent.Contains("iPhone OS 12") ||
+                                       userAgent.Contains("iPad; CPU OS 12") ||
+                                       userAgent.Contains("CFNetwork"); // для старых
+
+                // Для проблемных браузеров — не указываем SameSite вообще
+                ctx.CookieOptions.SameSite = isProblemBrowser ? SameSiteMode.Unspecified :
+                    // Для всех остальных — явно None (как мы хотим)
+                    SameSiteMode.None;
+
+                return Task.CompletedTask;
+            }
+        };
+    }); 
 builder.Services.AddAuthorization();
 
 // --- 3.1 DATA PROTECTION ---
@@ -73,9 +110,9 @@ builder.Services.AddScoped<IBookingValidationService, BookingValidationService>(
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddScoped<BookingFormService>();
-builder.Services.AddHostedService<DatabaseScannerService>(); // Фоновый сканер
+builder.Services.AddHostedService<DatabaseScannerService>();
 
-// --- 5. MASSTRANSIT (RabbitMQ) ---
+// --- 5. MASSTRANSIT ---
 builder.Services.AddMassTransit(x => {
     x.AddConsumer<BookingCreatedConsumer>();
     x.UsingRabbitMq((context, cfg) => {
@@ -115,25 +152,39 @@ else
 
 app.UseHttpsRedirection();
 app.UseCors("AllowSpecificOrigin");
-app.UseStaticFiles();
-app.MapStaticAssets();
+app.UseStaticFiles(); // ✅ Статика до middleware
 
-// --- ОТЛАДКА АВТОРИЗАЦИИ ---
+// --- ДИАГНОСТИКА АВТОРИЗАЦИИ (только для API, пропускаем статику) ---
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value;
 
+    // Редирект с корня
     if (path == "/")
     {
         context.Response.Redirect("/calendar");
         return;
     }
 
+    // Пропускаем статические файлы без логирования
+    if (path.StartsWith("/_framework") ||
+        path.StartsWith("/css") ||
+        path.StartsWith("/js") ||
+        path.Contains("."))
+    {
+        await next();
+        return;
+    }
+
+    // Логируем только API-запросы
     if (!string.IsNullOrEmpty(path) && path.Contains("api/"))
     {
         var hasAuthCookie = context.Request.Cookies.ContainsKey("AgroAdmin.Auth");
-        Log.Information("[DEBUG AUTH] Path: {Path}, HasAuthCookie: {HasCookie}",
-            path, hasAuthCookie);
+        var userAgent = context.Request.Headers["User-Agent"].ToString();
+        var isMobile = userAgent.Contains("Android") || userAgent.Contains("iPhone") || userAgent.Contains("iPad");
+
+        Log.Information("[AUTH DEBUG] Path: {Path}, HasCookie: {HasCookie}, IsMobile: {IsMobile}, UA: {UserAgent}",
+            path, hasAuthCookie, isMobile, userAgent[..Math.Min(50, userAgent.Length)]);
     }
 
     await next();
@@ -148,5 +199,7 @@ app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(AgroAdmin.Client._Imports).Assembly);
+
 app.MapGet("/health", () => Results.Ok("Healthy"));
+
 app.Run();
