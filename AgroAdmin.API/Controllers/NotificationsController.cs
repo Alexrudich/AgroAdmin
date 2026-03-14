@@ -2,6 +2,7 @@
 using AgroAdmin.Shared.Dto.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
 
 namespace AgroAdmin.API.Controllers;
 
@@ -48,6 +49,13 @@ public class NotificationsController(INotificationService notificationService) :
     public async Task<IActionResult> AddRecipient([FromBody] TelegramRecipientDto dto)
     {
         await notificationService.AddRecipientAsync(dto);
+        return Ok();
+    }
+
+    [HttpPut("recipients/{id}")]
+    public async Task<IActionResult> UpdateRecipient(int id, [FromBody] TelegramRecipientDto dto)
+    {
+        await notificationService.UpdateRecipientAsync(id, dto);
         return Ok();
     }
 

@@ -8,11 +8,17 @@
     </div>
     <div class="card-body">
         <div class="row g-3 mb-3">
-            <div class="col-md-6">
-                <input @bind="newName" class="form-control" placeholder="Имя получателя" />
+            <div class="col-md-5">
+                <input @bind="_newName" class="form-control" placeholder="Имя получателя" />
             </div>
-            <div class="col-md-4">
-                <input @bind="newChatId" class="form-control" placeholder="Chat ID" />
+            <div class="col-md-3">
+                <input @bind="_newChatId" class="form-control" placeholder="Chat ID" />
+            </div>
+            <div class="col-md-2">
+                <div class="form-check mt-2">
+                    <input @bind="_newIsDefault" class="form-check-input" type="checkbox" id="defaultCheck" />
+                    <label class="form-check-label" for="defaultCheck">По умолчанию</label>
+                </div>
             </div>
             <div class="col-md-2">
                 <button class="btn btn-success w-100" @onclick="AddRecipient">➕ Добавить</button>
@@ -30,12 +36,16 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var r in recipients)
+                    @foreach (var r in _recipients)
                     {
                         <tr>
                             <td>@r.Name</td>
                             <td>@r.ChatId</td>
-                            <td>@(r.IsDefault ? "✅" : "")</td>
+                            <td>
+                                <input type="checkbox"
+                                       checked="@r.IsDefault"
+                                       @onchange="(args) => ToggleDefault(r, args.Value as bool?)" />
+                            </td>
                             <td class="text-end">
                                 <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteRecipient(r.Id)">🗑️</button>
                             </td>
@@ -49,29 +59,59 @@
 
 @code {
     [Parameter] public EventCallback OnChanged { get; set; }
-    
+
     private HttpClient Http => HttpClientFactory.CreateClient("AgroAdmin");
-    private List<TelegramRecipientDto> recipients = new();
-    private string newName = "";
-    private string newChatId = "";
+    private List<TelegramRecipientDto> _recipients = [];
+    private string _newName = "";
+    private string _newChatId = "";
+    private bool _newIsDefault = false;
 
     protected override async Task OnInitializedAsync() => await Load();
 
     private async Task Load()
     {
-        recipients = await Http.GetFromJsonAsync<List<TelegramRecipientDto>>("api/notifications/recipients") ?? new();
+        _recipients = await Http.GetFromJsonAsync<List<TelegramRecipientDto>>("api/notifications/recipients") ?? [];
     }
 
     private async Task AddRecipient()
     {
-        if (string.IsNullOrWhiteSpace(newName) || string.IsNullOrWhiteSpace(newChatId))
+        if (string.IsNullOrWhiteSpace(_newName) || string.IsNullOrWhiteSpace(_newChatId))
             return;
 
-        await Http.PostAsJsonAsync("api/notifications/recipients", 
-            new TelegramRecipientDto { Name = newName, ChatId = newChatId });
+        await Http.PostAsJsonAsync("api/notifications/recipients",
+            new TelegramRecipientDto
+            {
+                Name = _newName,
+                ChatId = _newChatId,
+                IsDefault = _newIsDefault
+            });
 
-        newName = "";
-        newChatId = "";
+        _newName = "";
+        _newChatId = "";
+        _newIsDefault = false;
+        await Load();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ToggleDefault(TelegramRecipientDto recipient, bool? isChecked)
+    {
+        if (isChecked == true)
+        {
+            foreach (var r in _recipients.Where(x => x.Id != recipient.Id))
+            {
+                r.IsDefault = false;
+                await Http.PutAsJsonAsync($"api/notifications/recipients/{r.Id}", r);
+            }
+
+            recipient.IsDefault = true;
+            await Http.PutAsJsonAsync($"api/notifications/recipients/{recipient.Id}", recipient);
+        }
+        else
+        {
+            recipient.IsDefault = false;
+            await Http.PutAsJsonAsync($"api/notifications/recipients/{recipient.Id}", recipient);
+        }
+
         await Load();
         await OnChanged.InvokeAsync();
     }
