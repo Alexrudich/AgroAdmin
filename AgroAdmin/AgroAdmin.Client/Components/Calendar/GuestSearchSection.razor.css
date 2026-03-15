@@ -94,6 +94,11 @@
     flex-shrink: 0;
 }
 
+.family-badge {
+    background-color: #6f42c1;
+    color: white;
+}
+
 .stay-badge {
     background: #e9ecef;
     padding: 4px 8px;

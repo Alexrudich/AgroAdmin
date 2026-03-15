@@ -1,5 +1,4 @@
-﻿@using AgroAdmin.Shared.Services
-@inject IJSRuntime Js
+﻿@inject IJSRuntime Js
 
 <div class="row mb-3">
     <div class="col-md-12">
@@ -34,7 +33,16 @@
                                 <div class="guest-phone">@guest.Phone</div>
                             </div>
                             <div class="guest-stats">
-                                <span class="stay-badge">🏨 @guest.TotalStays</span>
+                                @if (guest.Group != null)
+                                {
+                                    <span class="stay-badge family-badge" title="Всего визитов семьи">
+                                        👥 @guest.FamilyStays
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="stay-badge">🏨 @guest.TotalStays</span>
+                                }
                             </div>
                         </div>
                     }
@@ -89,9 +97,16 @@
                                 <div class="guest-name">@guest.FullName</div>
                                 <div class="guest-phone">@guest.Phone</div>
                             </div>
-                            <div class="guest-stats">
+                            @if (guest.Group != null)
+                            {
+                                <span class="stay-badge family-badge" title="Всего визитов семьи">
+                                    👥 @guest.FamilyStays
+                                </span>
+                            }
+                            else
+                            {
                                 <span class="stay-badge">🏨 @guest.TotalStays</span>
-                            </div>
+                            }
                         </div>
                     }
                 </div>
@@ -110,7 +125,16 @@
         <div class="selected-guest-info">
             <div class="selected-guest-name">
                 @Service.SelectedGuest.FullName
-                <span class="selected-guest-badge">Был @Service.SelectedGuest.TotalStays раз(а)</span>
+                <span class="selected-guest-badge">
+                    @if (Service.SelectedGuest.Group != null)
+                    {
+                        <span>👥 Всего визитов семьи: @Service.SelectedGuest.FamilyStays</span>
+                    }
+                    else
+                    {
+                        <span>🏨 Был @Service.SelectedGuest.TotalStays раз(а)</span>
+                    }
+                </span>
             </div>
             <div class="selected-guest-phone">📞 @Service.SelectedGuest.Phone</div>
         </div>

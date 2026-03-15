@@ -74,6 +74,9 @@ public class GuestsController(AppDbContext context) : ControllerBase
             return Ok(new List<GuestDto>());
 
         var guests = await context.Guests
+            .Include(g => g.Bookings)
+            .Include(g => g.GroupMembers)
+            .ThenInclude(m => m.Group)
             .Where(g => EF.Functions.Like(g.FullName, $"%{term}%") ||
                         EF.Functions.Like(g.Phone, $"%{term}%"))
             .Select(g => new GuestDto
@@ -84,6 +87,10 @@ public class GuestsController(AppDbContext context) : ControllerBase
                 CreatedAt = g.CreatedAt,
                 Comment = g.Comment,
                 TotalStays = g.Bookings.Count,
+                FamilyStays = g.GroupMembers
+                    .SelectMany(m => m.Group.Members)
+                    .SelectMany(m => m.Guest.Bookings)
+                    .Count(),
                 LastBookingDate = g.Bookings
                     .OrderByDescending(b => b.ArrivalDate)
                     .Select(b => b.ArrivalDate)
@@ -91,7 +98,14 @@ public class GuestsController(AppDbContext context) : ControllerBase
                 LastFeedback = g.Bookings
                     .OrderByDescending(b => b.ArrivalDate)
                     .Select(b => b.FeedbackComment)
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                Group = g.GroupMembers.Select(m => new GuestGroupDto
+                {
+                    Id = m.Group.Id,
+                    Name = m.Group.Name,
+                    Description = m.Group.Description,
+                    MembersCount = m.Group.Members.Count
+                }).FirstOrDefault()
             })
             .Take(10)
             .ToListAsync();
@@ -117,6 +131,10 @@ public class GuestsController(AppDbContext context) : ControllerBase
                 CreatedAt = g.CreatedAt,
                 Comment = g.Comment,
                 TotalStays = g.Bookings.Count,
+                FamilyStays = g.GroupMembers
+                    .SelectMany(m => m.Group.Members)
+                    .SelectMany(m => m.Guest.Bookings)
+                    .Count(),
                 LastBookingDate = g.Bookings
                     .OrderByDescending(b => b.ArrivalDate)
                     .Select(b => b.ArrivalDate)
