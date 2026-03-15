@@ -1,0 +1,44 @@
+﻿@using AgroAdmin.Shared.Dto.Guests
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">📋 Список групп</h5>
+    </div>
+    <div class="list-group list-group-flush">
+        @foreach (var group in Groups)
+        {
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>@group.Name</strong>
+                    <small class="d-block text-muted">
+                        @group.MembersCount участников • создана @group.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")
+                    </small>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-1"
+                            @onclick="() => OnViewMembers.InvokeAsync(group)"
+                            title="Участники">
+                        👥
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary me-1"
+                            @onclick="() => OnEdit.InvokeAsync(group)"
+                            title="Редактировать">
+                        ✏️
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger"
+                            @onclick="() => OnDelete.InvokeAsync(group.Id)"
+                            title="Удалить">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<GuestGroupDto> Groups { get; set; } = [];
+    [Parameter] public EventCallback<GuestGroupDto> OnViewMembers { get; set; }
+    [Parameter] public EventCallback<GuestGroupDto> OnEdit { get; set; }
+    [Parameter] public EventCallback<int> OnDelete { get; set; }
+}

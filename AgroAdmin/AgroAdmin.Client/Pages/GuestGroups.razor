@@ -1,0 +1,108 @@
+﻿@page "/guestgroups"
+@using AgroAdmin.Shared.Dto.Guests
+@using AgroAdmin.Client.Components.Guests.Groups
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Управление группами</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>👥 Группы гостей</h1>
+        <button class="btn btn-primary" @onclick="OpenCreateModal">
+            ➕ Новая группа
+        </button>
+    </div>
+
+    <GroupList Groups="_groups"
+               OnViewMembers="ViewMembers"
+               OnEdit="OpenEditModal"
+               OnDelete="DeleteGroup" />
+
+    @if (_selectedGroup != null)
+    {
+        <GroupDetails Group="_selectedGroup"
+                      Members="_members"
+                      OnAddMember="OpenAddMemberModal"
+                      OnRemoveMember="RemoveMember" />
+    }
+</div>
+
+<GroupFormModal Show="_showFormModal"
+                Group="_editGroup"
+                OnClose="CloseFormModal"
+                OnSaved="LoadGroups" />
+
+<AddMemberModal Show="_showAddMemberModal"
+                GroupId="_selectedGroup?.Id ?? 0"
+                OnClose="CloseAddMemberModal"
+                OnAdded="@(async () => await LoadMembers(_selectedGroup!.Id))" />
+
+@code {
+    private List<GuestGroupDto> _groups = [];
+    private GuestGroupDto? _selectedGroup;
+    private List<GuestDto> _members = [];
+    private GuestGroupDto? _editGroup;
+    private bool _showFormModal;
+    private bool _showAddMemberModal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGroups();
+    }
+
+    private async Task LoadGroups()
+    {
+        _groups = await Http.GetFromJsonAsync<List<GuestGroupDto>>("api/guests/groups") ?? [];
+    }
+
+    private async Task ViewMembers(GuestGroupDto group)
+    {
+        _selectedGroup = group;
+        await LoadMembers(group.Id);
+    }
+
+    private async Task LoadMembers(int groupId)
+    {
+        _members = await Http.GetFromJsonAsync<List<GuestDto>>($"api/guests/group/{groupId}/members") ?? [];
+    }
+
+    private void OpenCreateModal()
+    {
+        _editGroup = null;
+        _showFormModal = true;
+    }
+
+    private void OpenEditModal(GuestGroupDto group)
+    {
+        _editGroup = group;
+        _showFormModal = true;
+    }
+
+    private async Task DeleteGroup(int groupId)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "Удалить группу? Участники останутся без группы"))
+        {
+            await Http.DeleteAsync($"api/guests/groups/{groupId}");
+            await LoadGroups();
+            _selectedGroup = null;
+        }
+    }
+
+    private async Task RemoveMember(int memberId)
+    {
+        await Http.DeleteAsync($"api/guests/{memberId}/group");
+        await LoadMembers(_selectedGroup!.Id);
+    }
+
+    private void OpenAddMemberModal() => _showAddMemberModal = true;
+
+    private void CloseFormModal()
+    {
+        _showFormModal = false;
+        _editGroup = null;
+    }
+
+    private void CloseAddMemberModal() => _showAddMemberModal = false;
+}

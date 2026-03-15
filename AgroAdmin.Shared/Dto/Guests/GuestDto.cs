@@ -21,6 +21,8 @@ public class GuestDto
 
     // Вычисляемые поля (заполняются на основе связанных броней)
     public int TotalStays { get; set; }
+    public int FamilyStays { get; set; }
     public DateTime? LastBookingDate { get; set; }
     public string? LastFeedback { get; set; }
+    public GuestGroupDto? Group { get; set; }
 }

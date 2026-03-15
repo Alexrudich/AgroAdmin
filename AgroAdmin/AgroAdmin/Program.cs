@@ -167,10 +167,10 @@ app.Use(async (context, next) =>
     }
 
     // Пропускаем статические файлы без логирования
-    if (path.StartsWith("/_framework") ||
-        path.StartsWith("/css") ||
-        path.StartsWith("/js") ||
-        path.Contains("."))
+    if (path != null && (path.StartsWith("/_framework") ||
+                         path.StartsWith("/css") ||
+                         path.StartsWith("/js") ||
+                         path.Contains($".")))
     {
         await next();
         return;

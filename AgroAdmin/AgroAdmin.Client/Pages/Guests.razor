@@ -1,7 +1,6 @@
 ﻿@page "/guests"
-@using AgroAdmin.Client.Components.Auth
-@using AgroAdmin.Shared.Dto
 @using AgroAdmin.Shared.Dto.Guests
+@using AgroAdmin.Client.Components.Guests.Groups
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -11,34 +10,40 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>👥 Гости</h1>
-        <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/guests/create")'>
-            Новый гость
-        </button>
+        <div>
+            <button class="btn btn-outline-info me-2" @onclick='() => Nav.NavigateTo("/guestgroups")'>
+                👥 Управление группами
+            </button>
+            <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/guests/create")'>
+                Новый гость
+            </button>
+        </div>
     </div>
 
+    <!-- Поиск -->
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="input-group">
                 <span class="input-group-text">🔍</span>
-                <input type="text" class="form-control" placeholder="Поиск по имени или телефону..." 
-                       @oninput="OnSearchInput" value="@searchTerm" />
+                <input type="text" class="form-control" placeholder="Поиск по имени или телефону..."
+                       @oninput="OnSearchInput" value="@_searchTerm" />
             </div>
         </div>
     </div>
 
-    @if (isLoading)
+    @if (_isLoading)
     {
         <div class="text-center p-5">
             <div class="spinner-border text-primary" role="status"></div>
         </div>
     }
-    else if (guests == null || !guests.Any())
+    else if (_guests == null || !_guests.Any())
     {
         <div class="alert alert-info text-center p-5">
             <i class="bi bi-people fs-1 d-block mb-3"></i>
-            @(string.IsNullOrWhiteSpace(searchTerm) 
-                ? "Пока нет ни одного гостя" 
-                : "Ничего не найдено")
+            @(string.IsNullOrWhiteSpace(_searchTerm)
+                    ? "Пока нет ни одного гостя"
+                    : "Ничего не найдено")
         </div>
     }
     else
@@ -46,73 +51,100 @@
         <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead class="table-light">
-                <tr>
-                    <th>Имя</th>
-                    <th>Телефон</th>
-                    <th>Дата регистрации</th>
-                    <th>Бронирований</th>
-                    <th>Последний заезд</th>
-                    <th>Комментарий</th>
-                    <th></th>
-                </tr>
+                    <tr>
+                        <th>Имя</th>
+                        <th>Телефон</th>
+                        <th>Дата регистрации</th>
+                        <th>Бронирований</th>
+                        <th>Последний заезд</th>
+                        <th>Группа</th>
+                        <th></th>
+                    </tr>
                 </thead>
                 <tbody>
-                @foreach (var guest in guests)
-                {
-                    <tr>
-                        <td>
-                            <strong>@guest.FullName</strong>
-                        </td>
-                        <td>@guest.Phone</td>
-                        <td>@guest.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
-                        <td>
-                            <span class="badge bg-info rounded-pill">@guest.TotalStays</span>
-                        </td>
-                        <td>
-                            @if (guest.LastBookingDate.HasValue)
-                            {
-                                @guest.LastBookingDate.Value.ToLocalTime().ToString("dd.MM.yyyy")
-                            }
-                            else
-                            {
-                                <span class="text-muted">нет</span>
-                            }
-                        </td>
-                        <td>
-                            @if (!string.IsNullOrEmpty(guest.Comment))
-                            {
-                                <span class="badge bg-warning text-dark" title="@guest.Comment">
-                                    Заметка
-                                </span>
-                            }
-                        </td>
-                        <td class="text-end">
-                            <div class="btn-group">
-                                <button class="btn btn-outline-primary btn-sm" 
-                                        @onclick='() => Nav.NavigateTo($"/guests/edit/{guest.Id}")'
-                                        title="Редактировать">
-                                    ✏️
-                                </button>
-                                <button class="btn btn-outline-info btn-sm" 
-                                        @onclick='() => Nav.NavigateTo($"/guests/{guest.Id}/history")'
-                                        title="История">
-                                    📋
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                }
+                    @foreach (var guest in _guests)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@guest.FullName</strong>
+                            </td>
+                            <td>@guest.Phone</td>
+                            <td>@guest.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                            <td>
+                                <span class="badge bg-info rounded-pill">@guest.TotalStays</span>
+                            </td>
+                            <td>
+                                @if (guest.LastBookingDate.HasValue)
+                                {
+                                    @guest.LastBookingDate.Value.ToLocalTime().ToString("dd.MM.yyyy")
+                                }
+                                else
+                                {
+                                    <span class="text-muted">нет</span>
+                                }
+                            </td>
+                            <td>
+                                @if (guest.Group != null)
+                                {
+                                    <span class="badge bg-secondary" title="@guest.Group.Description">
+                                        @guest.Group.Name
+                                    </span>
+                                    <button class="btn btn-sm btn-outline-danger ms-1"
+                                            @onclick="() => RemoveFromGroup(guest.Id)"
+                                            title="Удалить из группы">
+                                        ✕
+                                    </button>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group">
+                                    <button class="btn btn-outline-primary btn-sm"
+                                            @onclick='() => OpenAddToGroup(guest)'
+                                            title="Добавить в группу">
+                                        ➕
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-sm"
+                                            @onclick='() => Nav.NavigateTo($"/guests/edit/{guest.Id}")'
+                                            title="Редактировать">
+                                        ✏️
+                                    </button>
+                                    <button class="btn btn-outline-info btn-sm"
+                                            @onclick='() => ShowHistory(guest.Id)'
+                                            title="История">
+                                        📋
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                 </tbody>
             </table>
         </div>
     }
 </div>
 
+<!-- Модалки -->
+<AddToGroupModal Show="_showAddToGroupModal"
+                 GuestId="_selectedGuestId"
+                 OnClose="CloseAddToGroupModal"
+                 OnAdded="LoadGuests"
+                 OnCreateNew="OpenCreateGroupModal" />
+
+<CreateGroupModal Show="_showCreateGroupModal"
+                  GuestId="_selectedGuestId"
+                  OnClose="CloseCreateGroupModal"
+                  OnGroupCreated="LoadGuests" />
+
 @code {
-    private List<GuestDto>? guests;
-    private string searchTerm = string.Empty;
-    private bool isLoading;
-    private Timer? debounceTimer;
+    private List<GuestDto>? _guests;
+    private string _searchTerm = string.Empty;
+    private bool _isLoading;
+    private Timer? _debounceTimer;
+
+    // Для модалок
+    private bool _showAddToGroupModal;
+    private bool _showCreateGroupModal;
+    private int _selectedGuestId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -121,11 +153,9 @@
 
     private void OnSearchInput(ChangeEventArgs e)
     {
-        searchTerm = e.Value?.ToString() ?? string.Empty;
-
-        // Debounce - ждем 500мс после последнего ввода
-        debounceTimer?.Dispose();
-        debounceTimer = new Timer(_ =>
+        _searchTerm = e.Value?.ToString() ?? string.Empty;
+        _debounceTimer?.Dispose();
+        _debounceTimer = new Timer(_ =>
         {
             InvokeAsync(async () =>
             {
@@ -137,30 +167,62 @@
 
     private async Task LoadGuests()
     {
-        isLoading = true;
+        _isLoading = true;
         try
         {
-            // Если searchTerm пустой - грузим всех через другой endpoint
-            var url = string.IsNullOrWhiteSpace(searchTerm) 
-                ? "api/guests"  // Нужен будет endpoint для всех гостей
-                : $"api/guests/search?term={Uri.EscapeDataString(searchTerm)}";
-        
-            guests = await Http.GetFromJsonAsync<List<GuestDto>>(url);
+            var url = string.IsNullOrWhiteSpace(_searchTerm)
+                ? "api/guests"
+                : $"api/guests/search?term={Uri.EscapeDataString(_searchTerm)}";
+
+            _guests = await Http.GetFromJsonAsync<List<GuestDto>>(url);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Ошибка загрузки: {ex.Message}");
-            guests = new();
+            _guests = new();
         }
         finally
         {
-            isLoading = false;
+            _isLoading = false;
             StateHasChanged();
         }
     }
 
+    private void OpenAddToGroup(GuestDto guest)
+    {
+        _selectedGuestId = guest.Id;
+        _showAddToGroupModal = true;
+    }
+
+    private void CloseAddToGroupModal()
+    {
+        _showAddToGroupModal = false;
+    }
+
+    private void OpenCreateGroupModal()
+    {
+        _showAddToGroupModal = false;
+        _showCreateGroupModal = true;
+    }
+
+    private void CloseCreateGroupModal()
+    {
+        _showCreateGroupModal = false;
+    }
+
+    private void ShowHistory(int guestId)
+    {
+        Nav.NavigateTo($"/guests/{guestId}/history");
+    }
+
+    private async Task RemoveFromGroup(int guestId)
+    {
+        await Http.DeleteAsync($"api/guests/{guestId}/group");
+        await LoadGuests();
+    }
+
     public void Dispose()
     {
-        debounceTimer?.Dispose();
+        _debounceTimer?.Dispose();
     }
 }

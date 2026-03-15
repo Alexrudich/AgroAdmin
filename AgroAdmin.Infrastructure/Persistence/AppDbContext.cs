@@ -11,6 +11,8 @@ namespace AgroAdmin.Infrastructure.Persistence
         public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
         public DbSet<ScheduledReminder> ScheduledReminders => Set<ScheduledReminder>();
         public DbSet<TelegramRecipient> TelegramRecipients => Set<TelegramRecipient>();
+        public DbSet<GuestGroup> GuestGroups => Set<GuestGroup>();
+        public DbSet<GuestGroupMember> GuestGroupMembers => Set<GuestGroupMember>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -59,6 +61,26 @@ namespace AgroAdmin.Infrastructure.Persistence
                 builder.Property(g => g.CreatedAt)
                     .IsRequired();
             });
+            modelBuilder.Entity<GuestGroup>(builder =>
+            {
+                builder.HasKey(g => g.Id);
+                builder.Property(g => g.Name).IsRequired().HasMaxLength(200);
+            });
+
+            modelBuilder.Entity<GuestGroupMember>(builder =>
+            {
+                builder.HasKey(g => new { g.GuestId, g.GroupId });
+
+                builder.HasOne(g => g.Guest)
+                    .WithMany(g => g.GroupMembers)
+                    .HasForeignKey(g => g.GuestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                builder.HasOne(g => g.Group)
+                    .WithMany(g => g.Members)
+                    .HasForeignKey(g => g.GroupId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
             // Конфигурация для AdminUser
             modelBuilder.Entity<AdminUser>(builder =>
@@ -85,7 +107,6 @@ namespace AgroAdmin.Infrastructure.Persistence
                 builder.Property(r => r.TargetChatId)
                     .HasMaxLength(500);
 
-                // Индекс на время и статус отправки (воркер будет постоянно делать такие выборки)
                 builder.HasIndex(r => new { r.ScheduledFor, r.IsSent });
             });
 
@@ -96,6 +117,7 @@ namespace AgroAdmin.Infrastructure.Persistence
                 builder.Property(t => t.Name).IsRequired().HasMaxLength(100);
                 builder.Property(t => t.ChatId).IsRequired().HasMaxLength(50);
             });
+
         }
     }
 }

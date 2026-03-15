@@ -1,0 +1,118 @@
+﻿@using AgroAdmin.Shared.Dto.Guests
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<div class="modal fade @(Show ? "show d-block" : "")" style="@(Show ? "background-color: rgba(0,0,0,0.5);" : "")" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">👥 Добавить в группу</h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Выберите группу</label>
+                    <select class="form-select" @bind="_selectedGroupId">
+                        <option value="0">-- выберите --</option>
+                        @foreach (var group in _groups)
+                        {
+                            @if (IsGroupDisabled(group))
+                            {
+                                <option value="@group.Id" disabled>
+                                    @group.Name (@group.MembersCount чел.) — уже в этой группе
+                                </option>
+                            }
+                            else
+                            {
+                                <option value="@group.Id">
+                                    @group.Name (@group.MembersCount чел.)
+                                </option>
+                            }
+                        }
+                    </select>
+                </div>
+                @if (!_groups.Any())
+                {
+                    <div class="alert alert-warning">
+                        Нет доступных групп.
+                        <button class="btn btn-sm btn-primary" @onclick="CreateNewGroup">
+                            Создать новую
+                        </button>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Close">Отмена</button>
+                <button class="btn btn-primary" @onclick="Save" disabled="@IsSaveDisabled">
+                    ✅ Добавить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public int GuestId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnAdded { get; set; }
+    [Parameter] public EventCallback OnCreateNew { get; set; }
+
+    private List<GuestGroupDto> _groups = [];
+    private GuestGroupDto? _currentGroup;
+    private int _selectedGroupId;
+    private bool IsSaveDisabled => _selectedGroupId == 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Show)
+        {
+            // Группы
+            _groups = await Http.GetFromJsonAsync<List<GuestGroupDto>>("api/guests/groups") ?? new();
+
+            // Текущая группа гостя (обрабатываем 204)
+            var response = await Http.GetAsync($"api/guests/{GuestId}/group");
+            if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+            {
+                _currentGroup = null;
+            }
+            else if (response.IsSuccessStatusCode)
+            {
+                _currentGroup = await response.Content.ReadFromJsonAsync<GuestGroupDto>();
+            }
+            else
+            {
+                _currentGroup = null;
+            }
+
+            _selectedGroupId = 0;
+        }
+    }
+
+    private bool IsGroupDisabled(GuestGroupDto group)
+    {
+        return _currentGroup != null && group.Id == _currentGroup.Id;
+    }
+
+    private async Task Save()
+    {
+        if (_selectedGroupId > 0)
+        {
+            await Http.PostAsJsonAsync($"api/guests/{GuestId}/groups", new AddToGroupRequestDto { GroupId = _selectedGroupId });
+            await OnAdded.InvokeAsync();
+            await Close();
+        }
+    }
+
+    private async Task CreateNewGroup()
+    {
+        await Close();
+        await OnCreateNew.InvokeAsync();
+    }
+
+    private async Task Close()
+    {
+        Show = false;
+        await OnClose.InvokeAsync();
+    }
+}
