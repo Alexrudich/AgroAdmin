@@ -1,6 +1,7 @@
 ﻿using AgroAdmin.Domain.Models;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Shared.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,7 @@ using OfficeOpenXml;
 
 namespace AgroAdmin.API.Controllers;
 
+[Authorize]
 [Route("api/[controller]")]
 [ApiController]
 public class SeedController(AppDbContext context) : ControllerBase
