@@ -3,7 +3,6 @@ using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Shared.Dto.Guests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
 
 namespace AgroAdmin.API.Controllers;
 
@@ -16,6 +15,35 @@ public class GuestsController : ControllerBase
     public GuestsController(AppDbContext context)
     {
         _context = context;
+    }
+
+    [HttpGet("{id}")]
+    public async Task<ActionResult<GuestDto>> GetById(int id)
+    {
+        var guest = await _context.Guests
+            .Select(g => new GuestDto
+            {
+                Id = g.Id,
+                FullName = g.FullName,
+                Phone = g.Phone,
+                CreatedAt = g.CreatedAt,
+                Comment = g.Comment,
+                TotalStays = g.Bookings.Count,
+                LastBookingDate = g.Bookings
+                    .OrderByDescending(b => b.ArrivalDate)
+                    .Select(b => b.ArrivalDate)
+                    .FirstOrDefault(),
+                LastFeedback = g.Bookings
+                    .OrderByDescending(b => b.ArrivalDate)
+                    .Select(b => b.FeedbackComment)
+                    .FirstOrDefault()
+            })
+            .FirstOrDefaultAsync(g => g.Id == id);
+
+        if (guest == null)
+            return NotFound();
+
+        return Ok(guest);
     }
 
     [HttpPost]
