@@ -1,0 +1,99 @@
+﻿@using AgroAdmin.Shared.Dto.Guests
+@inject HttpClient Http
+
+<div class="modal fade @(Show ? "show d-block" : "")" style="@(Show ? "background-color: rgba(0,0,0,0.5);" : "")" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">➕ Добавить участника</h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Поиск гостя</label>
+                    <input type="text" class="form-control" @bind="_searchTerm" @oninput="OnSearchInput" placeholder="Имя или телефон..." />
+                </div>
+
+                @if (_isSearching)
+                {
+                    <div class="text-center p-2">
+                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                    </div>
+                }
+                else if (_searchResults.Any())
+                {
+                    <div class="list-group">
+                        @foreach (var guest in _searchResults)
+                        {
+                            <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                                    @onclick="() => AddMember(guest.Id)">
+                                <div>
+                                    <strong>@guest.FullName</strong>
+                                    <small class="d-block text-muted">@guest.Phone</small>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">➕</span>
+                            </button>
+                        }
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_searchTerm) && !_isSearching)
+                {
+                    <div class="alert alert-info">Ничего не найдено</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public int GroupId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnAdded { get; set; }
+
+    private string _searchTerm = "";
+    private List<GuestDto> _searchResults = [];
+    private bool _isSearching;
+    private Timer? _debounceTimer;
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _searchTerm = e.Value?.ToString() ?? "";
+        _debounceTimer?.Dispose();
+        _debounceTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                _isSearching = true;
+                StateHasChanged();
+
+                try
+                {
+                    _searchResults = await Http.GetFromJsonAsync<List<GuestDto>>($"api/guests/search?term={Uri.EscapeDataString(_searchTerm)}") ?? [];
+                }
+                finally
+                {
+                    _isSearching = false;
+                    StateHasChanged();
+                }
+            });
+        }, null, 500, Timeout.Infinite);
+    }
+
+    private async Task AddMember(int guestId)
+    {
+        await Http.PostAsJsonAsync($"api/guests/{guestId}/groups", new AddToGroupRequestDto { GroupId = GroupId });
+        await OnAdded.InvokeAsync();
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        _searchTerm = "";
+        _searchResults = [];
+        Show = false;
+        await OnClose.InvokeAsync();
+    }
+
+    public void Dispose() => _debounceTimer?.Dispose();
+}

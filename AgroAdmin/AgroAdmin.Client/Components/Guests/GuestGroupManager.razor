@@ -1,0 +1,114 @@
+﻿@using AgroAdmin.Shared.Dto.Guests
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div class="card border-info mb-3">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">👥 Управление группами гостей</h5>
+    </div>
+    <div class="card-body">
+        @if (_isLoading)
+        {
+            <div class="text-center p-3">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Существующие группы</h6>
+                    @if (_groups.Any())
+                    {
+                        <div class="list-group">
+                            @foreach (var group in _groups)
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>@group.Name</strong>
+                                        <small class="d-block text-muted">@group.MembersCount чел.</small>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-primary me-1"
+                                                @onclick="() => ShowGroupMembers(group.Id)"
+                                                title="Участники">
+                                            👥
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            Пока нет ни одной группы
+                        </div>
+                    }
+                </div>
+                <div class="col-md-6">
+                    <h6>Создать новую группу</h6>
+                    <div class="mb-2">
+                        <input type="text" class="form-control" placeholder="Название группы" @bind="_newGroupName" />
+                    </div>
+                    <div class="mb-2">
+                        <textarea class="form-control" placeholder="Описание (необязательно)" @bind="_newGroupDescription" rows="2"></textarea>
+                    </div>
+                    <button class="btn btn-success w-100"
+                            @onclick="CreateGroup"
+                            disabled="@IsCreateDisabled">
+                        ➕ Создать группу
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<GuestGroupDto> _groups = [];
+    private string _newGroupName = string.Empty;
+    private string _newGroupDescription = string.Empty;
+    private bool _isLoading = true;
+    private bool IsCreateDisabled => string.IsNullOrWhiteSpace(_newGroupName);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGroups();
+    }
+
+    private async Task LoadGroups()
+    {
+        _isLoading = true;
+        try
+        {
+            _groups = await Http.GetFromJsonAsync<List<GuestGroupDto>>("api/guests/groups") ?? new();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateGroup()
+    {
+        var request = new CreateGroupRequestDto
+        {
+            Name = _newGroupName,
+            Description = _newGroupDescription
+        };
+
+        var response = await Http.PostAsJsonAsync("api/guests/groups", request);
+        if (response.IsSuccessStatusCode)
+        {
+            _newGroupName = string.Empty;
+            _newGroupDescription = string.Empty;
+            await LoadGroups();
+        }
+    }
+
+    private void ShowGroupMembers(int groupId)
+    {
+        Nav.NavigateTo($"/guests/group/{groupId}");
+    }
+}

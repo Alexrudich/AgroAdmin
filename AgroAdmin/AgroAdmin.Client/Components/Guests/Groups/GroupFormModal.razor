@@ -1,0 +1,77 @@
+﻿@using AgroAdmin.Shared.Dto.Guests
+@inject HttpClient Http
+
+<div class="modal fade @(Show ? "show d-block" : "")" style="@(Show ? "background-color: rgba(0,0,0,0.5);" : "")" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">@(Group?.Id > 0 ? "✏️ Редактировать группу" : "➕ Новая группа")</h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Название группы</label>
+                    <input type="text" class="form-control" @bind="_name" placeholder="Например: Семья Петровых" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Описание (необязательно)</label>
+                    <textarea class="form-control" @bind="_description" rows="2" placeholder="Комментарий"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="Close">Отмена</button>
+                <button class="btn btn-primary" @onclick="Save" disabled="@IsSaveDisabled">
+                    ✅ Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public GuestGroupDto? Group { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private string _name = "";
+    private string? _description;
+    private bool IsSaveDisabled => string.IsNullOrWhiteSpace(_name);
+
+    protected override void OnParametersSet()
+    {
+        if (Show)
+        {
+            _name = Group?.Name ?? "";
+            _description = Group?.Description;
+        }
+    }
+
+    private async Task Save()
+    {
+        var request = new CreateGroupRequestDto
+        {
+            Name = _name,
+            Description = _description
+        };
+
+        if (Group?.Id > 0)
+        {
+            // PUT /api/guests/groups/{id} — если сделаем позже
+            // пока только создание
+        }
+        else
+        {
+            await Http.PostAsJsonAsync("api/guests/groups", request);
+        }
+
+        await OnSaved.InvokeAsync();
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        Show = false;
+        await OnClose.InvokeAsync();
+    }
+}

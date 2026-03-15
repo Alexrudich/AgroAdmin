@@ -1,4 +1,4 @@
-﻿namespace AgroAdmin.Domain.Models;
+﻿using AgroAdmin.Domain.Models;
 
 public class Guest
 {
@@ -6,13 +6,15 @@ public class Guest
     public string FullName { get; private set; } = string.Empty;
     public string Phone { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
-    public string? Comment { get; private set; } // общие заметки о госте
+    public string? Comment { get; private set; }
 
-    // Навигационное свойство для связи с бронями
-    private readonly List<Booking> _bookings = new();
+    private readonly List<Booking> _bookings = [];
     public IReadOnlyCollection<Booking> Bookings => _bookings.AsReadOnly();
 
-    private Guest() { } // для EF Core
+    private readonly List<GuestGroupMember> _groupMembers = [];
+    public IReadOnlyCollection<GuestGroupMember> GroupMembers => _groupMembers.AsReadOnly();
+
+    private Guest() { }
 
     public Guest(string fullName, string phone, string? comment = null)
     {

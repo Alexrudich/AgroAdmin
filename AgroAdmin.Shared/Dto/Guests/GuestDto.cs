@@ -23,4 +23,5 @@ public class GuestDto
     public int TotalStays { get; set; }
     public DateTime? LastBookingDate { get; set; }
     public string? LastFeedback { get; set; }
+    public GuestGroupDto? Group { get; set; }
 }
