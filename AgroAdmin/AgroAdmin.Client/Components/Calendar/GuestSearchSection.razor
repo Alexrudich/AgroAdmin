@@ -18,9 +18,10 @@
                 <span class="searching-indicator">🔍</span>
             }
 
-            @if (Service.ShowNameDropdown && Service.NameSearchResults.Any())
+            @if (Service.ShowNameDropdown && (Service.NameSearchResults.Any() || Service.PhoneSearchResults.Any()))
             {
                 <div class="guest-dropdown">
+                    @* Сначала показываем результаты поиска по имени *@
                     @foreach (var guest in Service.NameSearchResults.Take(10))
                     {
                         <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
@@ -47,20 +48,50 @@
                         </div>
                     }
 
-                    @if (!Service.NameSearchResults.Any() && Service.GuestNameSearchTerm.Length >= 2)
+                    @* Потом результаты поиска по телефону (если отличаются) *@
+                    @foreach (var guest in Service.PhoneSearchResults.Take(10))
                     {
-                        <div class="guest-item new-guest"
-                             @onmousedown="() => Service.CreateNewGuestFromName()">
-                            <div class="guest-avatar">➕</div>
-                            <div class="guest-info">
-                                <div class="guest-name">Создать нового гостя</div>
-                                <div class="guest-phone">@Service.GuestNameSearchTerm</div>
+                        @if (!Service.NameSearchResults.Any(x => x.Id == guest.Id))
+                        {
+                            <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
+                                 @onmousedown="() => Service.SelectGuest(guest)">
+                                <div class="guest-avatar">
+                                    @guest.FullName.Substring(0, 1).ToUpper()
+                                </div>
+                                <div class="guest-info">
+                                    <div class="guest-name">@guest.FullName</div>
+                                    <div class="guest-phone">@guest.Phone</div>
+                                </div>
+                                @if (guest.Group != null)
+                                {
+                                    <span class="stay-badge family-badge" title="Всего визитов семьи">
+                                        👥 @guest.FamilyStays
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="stay-badge">🏨 @guest.TotalStays</span>
+                                }
                             </div>
-                        </div>
+                        }
                     }
                 </div>
             }
         </div>
+
+        @* ПОДСКАЗКА: новый гост *@
+        @if (!Service.NameSearchResults.Any() &&
+                !Service.PhoneSearchResults.Any() &&
+                Service.GuestNameSearchTerm.Length >= 2 &&
+                Service.GuestPhoneSearchTerm.Length >= 3 &&
+                Service.SelectedGuest == null)
+        {
+            <div class="alert alert-info mt-2 py-2">
+                <i class="bi bi-info-circle"></i>
+                Будет создан <strong>новый гость</strong><br />
+                <small>@Service.GuestNameSearchTerm · @Service.GuestPhoneSearchTerm</small>
+            </div>
+        }
     </div>
 </div>
 
@@ -81,35 +112,6 @@
             @if (Service.IsSearching)
             {
                 <span class="searching-indicator">🔍</span>
-            }
-
-            @if (Service.ShowPhoneDropdown && Service.PhoneSearchResults.Any())
-            {
-                <div class="guest-dropdown">
-                    @foreach (var guest in Service.PhoneSearchResults.Take(10))
-                    {
-                        <div class="guest-item @(Service.SelectedGuest?.Id == guest.Id ? "selected" : "")"
-                             @onmousedown="() => Service.SelectGuest(guest)">
-                            <div class="guest-avatar">
-                                @guest.FullName.Substring(0, 1).ToUpper()
-                            </div>
-                            <div class="guest-info">
-                                <div class="guest-name">@guest.FullName</div>
-                                <div class="guest-phone">@guest.Phone</div>
-                            </div>
-                            @if (guest.Group != null)
-                            {
-                                <span class="stay-badge family-badge" title="Всего визитов семьи">
-                                    👥 @guest.FamilyStays
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="stay-badge">🏨 @guest.TotalStays</span>
-                            }
-                        </div>
-                    }
-                </div>
             }
         </div>
     </div>
