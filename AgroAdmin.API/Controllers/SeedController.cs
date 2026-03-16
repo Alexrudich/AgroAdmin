@@ -1,11 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using AgroAdmin.Domain.Models;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Domain.Models;
 using AgroAdmin.Shared.Enums;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
 
 namespace AgroAdmin.API.Controllers;
 
+[Authorize]
 [Route("api/[controller]")]
 [ApiController]
 public class SeedController(AppDbContext context) : ControllerBase
@@ -171,5 +175,152 @@ public class SeedController(AppDbContext context) : ControllerBase
             .ExecuteDeleteAsync();
 
         return Ok($"Удалено {deletedGuests} тестовых гостей и {deletedBookings} их бронирований.");
+    }
+
+    [HttpPost("upload-excel")]
+    public async Task<IActionResult> UploadExcel(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("Файл не выбран");
+
+        var guestsAdded = 0;
+        var bookingsAdded = 0;
+        var errors = new List<string>();
+
+        // Настройка лицензии EPPlus (нужно для работы)
+        ExcelPackage.License.SetNonCommercialPersonal("AgroAdmin");
+
+        using var stream = new MemoryStream();
+        await file.CopyToAsync(stream);
+        using var package = new ExcelPackage(stream);
+
+        var worksheet = package.Workbook.Worksheets[0]; // первый лист
+        var rowCount = worksheet.Dimension?.Rows ?? 0;
+
+        for (int row = 2; row <= rowCount; row++) // с 2, потому что 1 — заголовки
+        {
+            try
+            {
+                var guestName = worksheet.Cells[row, 1].Text?.Trim();
+                var phone = worksheet.Cells[row, 2].Text?.Trim();
+                var arrivalStr = worksheet.Cells[row, 3].Text?.Trim();
+                var departureStr = worksheet.Cells[row, 4].Text?.Trim();
+                var unitStr = worksheet.Cells[row, 5].Text?.Trim();
+                var adultsStr = worksheet.Cells[row, 6].Text?.Trim();
+                var childrenStr = worksheet.Cells[row, 7].Text?.Trim();
+                var infantsStr = worksheet.Cells[row, 8].Text?.Trim();
+                var hasDogStr = worksheet.Cells[row, 9].Text?.Trim();
+                var needsSaunaStr = worksheet.Cells[row, 10].Text?.Trim();
+                var needsBanquetStr = worksheet.Cells[row, 11].Text?.Trim();
+                var notes = worksheet.Cells[row, 12].Text?.Trim();
+                var priceStr = worksheet.Cells[row, 13].Text?.Trim();
+
+                // Пропускаем пустые строки
+                if (string.IsNullOrWhiteSpace(guestName) && string.IsNullOrWhiteSpace(phone))
+                    continue;
+
+                // Поиск или создание гостя
+                Guest? guest = null;
+                if (!string.IsNullOrWhiteSpace(phone))
+                    guest = await context.Guests.FirstOrDefaultAsync(g => g.Phone == phone);
+
+                if (guest == null)
+                {
+                    guest = new Guest(
+                        fullName: string.IsNullOrWhiteSpace(guestName) ? "Без имени" : guestName,
+                        phone: string.IsNullOrWhiteSpace(phone) ? "нет телефона" : phone,
+                        comment: null
+                    );
+                    context.Guests.Add(guest);
+                    await context.SaveChangesAsync();
+                    guestsAdded++;
+                }
+
+                // Парсинг дат
+                if (!DateOnly.TryParse(arrivalStr, out var arrival))
+                {
+                    errors.Add($"Строка {row}: неверный формат даты заезда");
+                    continue;
+                }
+                if (!DateOnly.TryParse(departureStr, out var departure))
+                {
+                    errors.Add($"Строка {row}: неверный формат даты выезда");
+                    continue;
+                }
+
+                // Парсинг количества людей
+                int adults = ParseInt(adultsStr, 1);
+                int children = ParseInt(childrenStr, 0);
+                int infants = ParseInt(infantsStr, 0);
+                int total = adults + children + infants;
+
+                // Парсинг объекта
+                var unit = ParseUnit(unitStr);
+
+                // Парсинг булевых значений
+                bool hasDog = ParseBool(hasDogStr);
+                bool needsSauna = ParseBool(needsSaunaStr);
+                bool needsBanquet = ParseBool(needsBanquetStr);
+
+                // Создание брони
+                var booking = new Booking(
+                    guestId: guest.Id,
+                    arrival: arrival.ToDateTime(TimeOnly.MinValue),
+                    departure: departure.ToDateTime(TimeOnly.MinValue),
+                    unit: unit,
+                    totalGuests: total,
+                    adults: adults,
+                    children: children,
+                    infants: infants,
+                    hasDog: hasDog,
+                    needsSauna: needsSauna,
+                    needsBanquetHall: needsBanquet,
+                    isFirstTimeGuest: true,
+                    adminNotes: notes,
+                    feedbackComment: null
+                );
+
+                context.Bookings.Add(booking);
+                bookingsAdded++;
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Строка {row}: {ex.Message}");
+            }
+        }
+
+        await context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = $"Загружено {guestsAdded} гостей и {bookingsAdded} броней",
+            errors = errors.Any() ? errors : null
+        });
+    }
+
+    // Вспомогательные методы (принимают string? для безопасной работы)
+    private static int ParseInt(string? value, int defaultValue)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return defaultValue;
+        return int.TryParse(value, out var result) ? result : defaultValue;
+    }
+
+    private static bool ParseBool(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        value = value.Trim().ToLower();
+        return value == "true" || value == "1" || value == "yes" || value == "да";
+    }
+
+    private static ReservedUnits ParseUnit(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return ReservedUnits.PondSide;
+        return value.Trim() switch
+        {
+            "0" or "Пруд" or "пруд" or "половинка от пруда" => ReservedUnits.PondSide,
+            "1" or "Парковка" or "парковка" or "половинка от парковки" => ReservedUnits.ParkingSide,
+            "2" or "Дом" or "дом" or "весь дом" or "целый" => ReservedUnits.WholeHouse,
+            _ => ReservedUnits.PondSide
+        };
     }
 }

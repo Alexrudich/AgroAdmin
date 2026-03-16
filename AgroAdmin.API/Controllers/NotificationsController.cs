@@ -2,7 +2,6 @@
 using AgroAdmin.Shared.Dto.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Serilog;
 
 namespace AgroAdmin.API.Controllers;
 

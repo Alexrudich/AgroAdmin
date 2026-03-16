@@ -224,17 +224,13 @@ public class BookingFormService(
         StateChanged?.Invoke();
     }
 
-    public void CreateNewGuestFromName()
+    public void SyncGuestFromSearch()
     {
-        if (Booking.Guest != null)
-        {
-            Booking.Guest.FullName = GuestNameSearchTerm;
-            Booking.Guest.Phone = "";
-        }
-
-        SelectedGuest = null;
-        ShowNameDropdown = false;
-        StateChanged?.Invoke();
+        if (SelectedGuest != null ||
+            string.IsNullOrWhiteSpace(GuestNameSearchTerm) ||
+            string.IsNullOrWhiteSpace(GuestPhoneSearchTerm)) return;
+        Booking.Guest?.FullName = GuestNameSearchTerm;
+        Booking.Guest?.Phone = GuestPhoneSearchTerm;
     }
 
     public void ClearGuest()
