@@ -9,6 +9,7 @@ public class BookingDto
     public GuestDto? Guest { get; set; }
     public DateTime ArrivalDate { get; set; }
     public DateTime DepartureDate { get; set; }
+    public DateTime CreatedAt { get; set; }
     public ReservedUnits ReservedUnit { get; set; }
     public bool NeedsSauna { get; set; }
     public bool NeedsBanquetHall { get; set; }
