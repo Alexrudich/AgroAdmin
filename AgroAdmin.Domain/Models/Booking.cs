@@ -7,8 +7,9 @@ public class Booking
     public int Id { get; private set; }
     public int GuestId { get; private set; }
     public virtual Guest Guest { get; private set; } = null!;
-    public DateTime ArrivalDate { get; private set; }
-    public DateTime DepartureDate { get; private set; }
+    public DateTime ArrivalDate { get; private set; } = DateTime.UtcNow;
+    public DateTime DepartureDate { get; private set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
     public ReservedUnits ReservedUnit { get; private set; }
     public bool NeedsSauna { get; private set; }
     public bool NeedsBanquetHall { get; private set; }
@@ -30,6 +31,7 @@ public class Booking
         int guestId,
         DateTime arrival,
         DateTime departure,
+        DateTime createdAt,
         ReservedUnits unit,
         int totalGuests,
         int adults,
@@ -44,9 +46,10 @@ public class Booking
     {
         if (departure <= arrival) throw new Exception("Check-out must be after check-in");
 
-        GuestId = guestId;  // Сохраняем ID гостя
-        ArrivalDate = DateTime.SpecifyKind(arrival, DateTimeKind.Utc);
-        DepartureDate = DateTime.SpecifyKind(departure, DateTimeKind.Utc);
+        GuestId = guestId;
+        ArrivalDate = arrival.Kind == DateTimeKind.Utc ? arrival : arrival.ToUniversalTime();
+        DepartureDate = departure.Kind == DateTimeKind.Utc ? departure : departure.ToUniversalTime();
+        CreatedAt = createdAt.Kind == DateTimeKind.Utc ? createdAt : createdAt.ToUniversalTime();
         ReservedUnit = unit;
 
         TotalGuestsCount = totalGuests;

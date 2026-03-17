@@ -364,3 +364,4 @@ FodyWeavers.xsd
 /AgroAdmin/AgroAdmin/appsettings.json
 /.env
 /AgroAdmin/AgroAdmin/temp-keys
+secrets

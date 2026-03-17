@@ -25,6 +25,8 @@ services:
     networks:
       - agro_network
     volumes:
+      - ./secrets/oauth-credentials.json:/root/.aspnet/google/oauth-credentials.json
+      - ./secrets/token.json:/root/.aspnet/google/token.json
       - agro_keys:/root/.aspnet/DataProtection-Keys
     user: root
 

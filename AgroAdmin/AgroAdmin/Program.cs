@@ -111,6 +111,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddScoped<BookingFormService>();
 builder.Services.AddHostedService<DatabaseScannerService>();
+builder.Services.AddHostedService<DatabaseBackupService>();
 
 // --- 5. MASSTRANSIT ---
 builder.Services.AddMassTransit(x => {
@@ -152,7 +153,7 @@ else
 
 app.UseHttpsRedirection();
 app.UseCors("AllowSpecificOrigin");
-app.UseStaticFiles(); // ✅ Статика до middleware
+app.UseStaticFiles(); // Статика до middleware
 
 // --- ДИАГНОСТИКА АВТОРИЗАЦИИ (только для API, пропускаем статику) ---
 app.Use(async (context, next) =>

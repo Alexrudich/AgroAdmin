@@ -13,6 +13,7 @@ namespace AgroAdmin.Infrastructure.Persistence
         public DbSet<TelegramRecipient> TelegramRecipients => Set<TelegramRecipient>();
         public DbSet<GuestGroup> GuestGroups => Set<GuestGroup>();
         public DbSet<GuestGroupMember> GuestGroupMembers => Set<GuestGroupMember>();
+        public DbSet<BackupInfo> BackupInfos => Set<BackupInfo>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -118,6 +119,11 @@ namespace AgroAdmin.Infrastructure.Persistence
                 builder.Property(t => t.ChatId).IsRequired().HasMaxLength(50);
             });
 
+            // Конфигурация для BackupInfo
+            modelBuilder.Entity<BackupInfo>(builder =>
+            {
+                builder.HasKey(b => b.Id);
+            });
         }
     }
 }
