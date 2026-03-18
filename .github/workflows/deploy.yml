@@ -17,11 +17,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: List packages (diagnostics)
-        shell: pwsh
-        run: |
-          dotnet list AgroAdmin/AgroAdmin/AgroAdmin.csproj package --include-transitive | Select-String -Pattern "SqlClient"
-
       - name: Restore & Build
         run: |
           dotnet restore AgroAdmin.slnx
@@ -30,24 +25,35 @@ jobs:
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      - name: Check published SqlClient version
+      - name: Force correct SqlClient version
         shell: pwsh
         run: |
-          Write-Host "=== Checking SqlClient in publish folder ==="
-          $files = Get-ChildItem -Path ./publish -Recurse -Filter Microsoft.Data.SqlClient.dll
-          if ($files.Count -eq 0) {
-            Write-Host "❌ Microsoft.Data.SqlClient.dll NOT FOUND in publish!"
-            exit 1
-          }
-          foreach ($file in $files) {
-            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($file.FullName).FileVersion
-            Write-Host "✅ Found: $($file.FullName)"
-            Write-Host "   Version: $version"
+          Write-Host "=== Copying correct SqlClient version ==="
+          $nugetPath = "$env:USERPROFILE\.nuget\packages\microsoft.data.sqlclient\6.1.1\lib\net9.0\Microsoft.Data.SqlClient.dll"
+          if (Test-Path $nugetPath) {
+            Copy-Item $nugetPath ./publish/Microsoft.Data.SqlClient.dll -Force
+            Write-Host "✅ Copied from $nugetPath"
+          } else {
+            $fallbackPaths = @(
+              "$env:USERPROFILE\.nuget\packages\microsoft.data.sqlclient\6.1.1\lib\net8.0\Microsoft.Data.SqlClient.dll",
+              "$env:USERPROFILE\.nuget\packages\microsoft.data.sqlclient\6.1.1\lib\netstandard2.1\Microsoft.Data.SqlClient.dll"
+            )
+            foreach ($path in $fallbackPaths) {
+              if (Test-Path $path) {
+                Copy-Item $path ./publish/Microsoft.Data.SqlClient.dll -Force
+                Write-Host "✅ Copied from $path"
+                break
+              }
+            }
           }
           
-          Write-Host "=== Checking runtime-specific paths ==="
-          Get-ChildItem -Path ./publish -Recurse -Directory | Where-Object { $_.Name -like "*runtimes*" } | ForEach-Object {
-            Write-Host "📁 Runtime folder: $_"
+          $copiedFile = "./publish/Microsoft.Data.SqlClient.dll"
+          if (Test-Path $copiedFile) {
+            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($copiedFile).FileVersion
+            Write-Host "✅ Copied file version: $version"
+          } else {
+            Write-Host "❌ Failed to copy SqlClient!"
+            exit 1
           }
 
       # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm
