@@ -17,14 +17,38 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: List packages (diagnostics)
+        shell: pwsh
+        run: |
+          dotnet list AgroAdmin/AgroAdmin/AgroAdmin.csproj package --include-transitive | Select-String -Pattern "SqlClient"
+
       - name: Restore & Build
-        # Собираем все решение целиком, вместе с воркером
         run: |
           dotnet restore AgroAdmin.slnx
           dotnet build AgroAdmin.slnx --configuration Release --no-restore
 
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
+
+      - name: Check published SqlClient version
+        shell: pwsh
+        run: |
+          Write-Host "=== Checking SqlClient in publish folder ==="
+          $files = Get-ChildItem -Path ./publish -Recurse -Filter Microsoft.Data.SqlClient.dll
+          if ($files.Count -eq 0) {
+            Write-Host "❌ Microsoft.Data.SqlClient.dll NOT FOUND in publish!"
+            exit 1
+          }
+          foreach ($file in $files) {
+            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($file.FullName).FileVersion
+            Write-Host "✅ Found: $($file.FullName)"
+            Write-Host "   Version: $version"
+          }
+          
+          Write-Host "=== Checking runtime-specific paths ==="
+          Get-ChildItem -Path ./publish -Recurse -Directory | Where-Object { $_.Name -like "*runtimes*" } | ForEach-Object {
+            Write-Host "📁 Runtime folder: $_"
+          }
 
       # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm
       - name: Put Site Offline
