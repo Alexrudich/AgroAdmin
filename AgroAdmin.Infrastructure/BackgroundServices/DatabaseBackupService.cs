@@ -104,7 +104,7 @@ public class DatabaseBackupService(
             lastBackup.LastBackupDate.Month == now.Month)
         {
             logger.LogInformation("📭 Бэкап за текущий месяц уже есть.");
-            await telegram.SendMessageAsync($"{GetEnvShortPrefix()}📭 Бэкап за текущий месяц уже есть.");
+            //await telegram.SendMessageAsync($"{GetEnvShortPrefix()}📭 Бэкап за текущий месяц уже есть.");
             return;
         }
 
