@@ -18,7 +18,6 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore & Build
-        # Собираем все решение целиком, вместе с воркером
         run: |
           dotnet restore AgroAdmin.slnx
           dotnet build AgroAdmin.slnx --configuration Release --no-restore
@@ -44,7 +43,22 @@ jobs:
           Write-Host "Site is now OFFLINE. Waiting for IIS to release files..."
           Start-Sleep -Seconds 5
 
-      # ШАГ 2: Заливаем файлы в 10 потоков
+      # ШАГ 2: Удаляем старую версию SqlClient
+      - name: Remove old SqlClient
+        shell: pwsh
+        run: |
+          Write-Host "Removing old SqlClient.dll if exists..."
+          $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/Microsoft.Data.SqlClient.dll")
+          $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
+          $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
+          try { 
+            $ftp.GetResponse().Close()
+            Write-Host "✅ Old SqlClient.dll removed"
+          } catch { 
+            Write-Host "ℹ️ No old SqlClient.dll found"
+          }
+
+      # ШАГ 3: Заливаем файлы в 10 потоков
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -56,11 +70,16 @@ jobs:
           dangerous-clean-slate: false
           parallel: 10 
 
-      # ШАГ 3: Удаляем заглушку
+      # ШАГ 4: Удаляем заглушку
       - name: Put Site Online
         shell: pwsh
         run: |
           $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
           $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
           $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
-          try { $ftp.GetResponse().Close(); Write-Host "Site is now ONLINE." } catch { }
+          try { 
+            $ftp.GetResponse().Close()
+            Write-Host "Site is now ONLINE."
+          } catch { 
+            Write-Host "ℹ️ No offline file found"
+          }
