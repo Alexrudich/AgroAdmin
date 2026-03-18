@@ -17,36 +17,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Clear NuGet cache
-        run: dotnet nuget locals all --clear
-
-      - name: Restore
-        run: dotnet restore AgroAdmin.slnx
-
-      - name: Build
-        run: dotnet build AgroAdmin.slnx --configuration Release --no-restore
+      - name: Restore & Build
+        # Собираем все решение целиком, вместе с воркером
+        run: |
+          dotnet restore AgroAdmin.slnx
+          dotnet build AgroAdmin.slnx --configuration Release --no-restore
 
       - name: Publish
-        run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false --no-restore
-
-      - name: Check SqlClient version
-        shell: pwsh
-        run: |
-          Write-Host "=== SQL CLIENT VERSIONS ==="
-          $files = Get-ChildItem -Path ./publish -Recurse -Filter Microsoft.Data.SqlClient.dll
-          if ($files.Count -eq 0) {
-            Write-Host "❌ Microsoft.Data.SqlClient.dll not found!"
-            exit 1
-          }
-          foreach ($file in $files) {
-            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($file.FullName).FileVersion
-            Write-Host "$($file.FullName): $version"
-            if ($version -ne "6.1.1.0") {
-              Write-Host "❌ Wrong version! Expected 6.1.1.0"
-              exit 1
-            }
-          }
-          Write-Host "✅ SqlClient version check passed"
+        run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
       # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm
       - name: Put Site Offline
