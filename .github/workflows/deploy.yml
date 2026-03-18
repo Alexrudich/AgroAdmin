@@ -25,37 +25,6 @@ jobs:
       - name: Publish
         run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained false
 
-      - name: Force correct SqlClient version
-        shell: pwsh
-        run: |
-          Write-Host "=== Copying correct SqlClient version ==="
-          $nugetPath = "$env:USERPROFILE\.nuget\packages\microsoft.data.sqlclient\6.1.1\lib\net9.0\Microsoft.Data.SqlClient.dll"
-          if (Test-Path $nugetPath) {
-            Copy-Item $nugetPath ./publish/Microsoft.Data.SqlClient.dll -Force
-            Write-Host "✅ Copied from $nugetPath"
-          } else {
-            $fallbackPaths = @(
-              "$env:USERPROFILE\.nuget\packages\microsoft.data.sqlclient\6.1.1\lib\net8.0\Microsoft.Data.SqlClient.dll",
-              "$env:USERPROFILE\.nuget\packages\microsoft.data.sqlclient\6.1.1\lib\netstandard2.1\Microsoft.Data.SqlClient.dll"
-            )
-            foreach ($path in $fallbackPaths) {
-              if (Test-Path $path) {
-                Copy-Item $path ./publish/Microsoft.Data.SqlClient.dll -Force
-                Write-Host "✅ Copied from $path"
-                break
-              }
-            }
-          }
-          
-          $copiedFile = "./publish/Microsoft.Data.SqlClient.dll"
-          if (Test-Path $copiedFile) {
-            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($copiedFile).FileVersion
-            Write-Host "✅ Copied file version: $version"
-          } else {
-            Write-Host "❌ Failed to copy SqlClient!"
-            exit 1
-          }
-
       # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm
       - name: Put Site Offline
         shell: pwsh
@@ -74,7 +43,22 @@ jobs:
           Write-Host "Site is now OFFLINE. Waiting for IIS to release files..."
           Start-Sleep -Seconds 5
 
-      # ШАГ 2: Заливаем файлы в 10 потоков
+      # ШАГ 2: Удаляем старую версию SqlClient
+      - name: Remove old SqlClient
+        shell: pwsh
+        run: |
+          Write-Host "Removing old SqlClient.dll if exists..."
+          $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/Microsoft.Data.SqlClient.dll")
+          $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
+          $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
+          try { 
+            $ftp.GetResponse().Close()
+            Write-Host "✅ Old SqlClient.dll removed"
+          } catch { 
+            Write-Host "ℹ️ No old SqlClient.dll found"
+          }
+
+      # ШАГ 3: Заливаем файлы в 10 потоков
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -86,11 +70,16 @@ jobs:
           dangerous-clean-slate: false
           parallel: 10 
 
-      # ШАГ 3: Удаляем заглушку
+      # ШАГ 4: Удаляем заглушку
       - name: Put Site Online
         shell: pwsh
         run: |
           $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
           $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
           $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
-          try { $ftp.GetResponse().Close(); Write-Host "Site is now ONLINE." } catch { }
+          try { 
+            $ftp.GetResponse().Close()
+            Write-Host "Site is now ONLINE."
+          } catch { 
+            Write-Host "ℹ️ No offline file found"
+          }
