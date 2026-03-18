@@ -171,65 +171,101 @@
 }
 
 /* ========================================
-   4. МОБИЛЬНАЯ АДАПТАЦИЯ
+   4. МОБИЛЬНАЯ АДАПТАЦИЯ (ФИНАЛ: ВЫСОТА + РАБОЧИЙ КЛИК)
    ======================================== */
 @media (max-width: 768px) {
-    .calendar-cell {
-        min-height: 140px;
-    }
-
-    .date-number {
-        padding: 8px 10px;
-        font-size: 1rem;
-    }
-
-    .unit-zone {
-        padding: 8px;
-        font-size: 0.85rem;
-    }
-
-    .header-cell {
-        padding: 12px 8px;
-        font-size: 0.9rem;
-    }
-
-    .marquee-content.active {
-        animation-duration: 6s;
-    }
-
+    /* 1. Сетка: 7 колонок */
     .calendar-body {
-        max-height: calc(100vh - 200px);
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        display: grid !important;
+        grid-template-columns: repeat(7, 1fr) !important;
+        gap: 1px;
+        background-color: #dee2e6;
     }
 
-    .calendar-header {
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        background-color: #f8f9fa;
-    }
-}
-
-@media (max-width: 480px) {
+    /* 2. Ячейка: УВЕЛИЧИЛИ ВЫСОТУ (1.4 вместо 1) */
     .calendar-cell {
-        min-height: 160px;
+        width: 100% !important;
+        aspect-ratio: 1 / 1.4 !important; /* На 40% выше, чем ширина */
+        min-height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        position: relative;
+        background: #fff;
+        display: block !important;
     }
 
-    .date-number {
-        font-size: 1.1rem;
-        padding: 10px 12px;
+    /* 3. Юниты: СТРОГО КОЛОНКА (низ/верх) + ПРОБРОС КЛИКА */
+    .units-container {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        height: 100% !important;
+        padding: 0 !important;
+        gap: 0 !important;
+        pointer-events: none !important; /* КРИТИЧНО: Клик летит в ячейку */
     }
 
     .unit-zone {
-        font-size: 0.9rem;
-        padding: 10px;
+        flex: 1 !important; /* Ровно 50% высоты */
+        width: 100% !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        border-top: 4px solid transparent;
+        border-radius: 0 !important;
     }
 
-    .marquee-content.active {
-        animation-duration: 5s;
+    /* 4. Иконки: Крупные, по центру */
+    .unit-icon {
+        font-size: 1.4rem !important;
+        display: block !important;
+    }
+
+    /* Прячем текст и бегущую строку */
+    .unit-text, .marquee-wrapper, .marquee-content {
+        display: none !important;
+    }
+
+    /* 5. Цвета (твои оригинальные) */
+    .free {
+        border-top-color: #2e7d32 !important;
+        background: #e8f5e9 !important;
+    }
+
+    .busy {
+        border-top-color: #b71c1c !important;
+        background: #ffebee !important;
+    }
+
+    .full-house {
+        border-top-color: #9c27b0 !important;
+        background: #f3e5f5 !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .date-number {
+        position: absolute;
+        top: 2px;
+        left: 4px;
+        font-size: 0.65rem !important;
+        z-index: 10;
+        background: rgba(255,255,255,0.7);
+        padding: 0 2px;
+        border-radius: 2px;
     }
 }
+
 
 /* ========================================
    5. УЛУЧШЕННАЯ НАВИГАЦИЯ
@@ -426,5 +462,38 @@
         width: 32px;
         height: 32px;
         font-size: 16px;
+    }
+}
+/* ========================================
+   6. ACTION SHEET (МЕНЮ ВЫБОРА)
+   ======================================== */
+.mobile-action-sheet {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 9999; /* Чтобы точно было поверх всего */
+    display: flex;
+    align-items: flex-end;
+}
+
+.sheet-content {
+    background: white;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 24px 24px 40px 24px;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
     }
 }
