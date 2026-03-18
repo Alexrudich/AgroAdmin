@@ -17,10 +17,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Clear NuGet cache
+        run: dotnet nuget locals all --clear
+
       - name: Restore & Build
-        # Собираем все решение целиком, вместе с воркером
         run: |
-          dotnet restore AgroAdmin.slnx
+          dotnet restore AgroAdmin.slnx --no-cache
           dotnet build AgroAdmin.slnx --configuration Release --no-restore
 
       - name: Publish
@@ -63,4 +65,32 @@ jobs:
           $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
           $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
           $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
-          try { $ftp.GetResponse().Close(); Write-Host "Site is now ONLINE." } catch { }
+          try { 
+            $ftp.GetResponse().Close()
+            Write-Host "Site is now ONLINE."
+          } catch { 
+            Write-Host "ℹ️ No offline file found"
+          }
+
+      # ШАГ 4: Health check - проверяем что сайт жив и БД работает
+      - name: Health Check
+        shell: pwsh
+        run: |
+          Write-Host "Waiting for site to start..."
+          Start-Sleep -Seconds 10
+    
+          Write-Host "Checking /health endpoint..."
+          $healthResponse = Invoke-WebRequest -Uri "https://agroadmin.runasp.net/health" -UseBasicParsing
+          if ($healthResponse.StatusCode -ne 200) {
+            Write-Host "❌ Health check failed!"
+            exit 1
+          }
+          Write-Host "✅ Health check passed"
+    
+          Write-Host "Checking if site is up..."
+          $homeResponse = Invoke-WebRequest -Uri "https://agroadmin.runasp.net" -UseBasicParsing
+          if ($homeResponse.StatusCode -ne 200) {
+            Write-Host "❌ Site not responding!"
+            exit 1
+          }
+          Write-Host "✅ Site is up"
