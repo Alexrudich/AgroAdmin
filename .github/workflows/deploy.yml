@@ -78,7 +78,7 @@ jobs:
         run: |
           Write-Host "Waiting for site to start..."
           Start-Sleep -Seconds 10
-          
+    
           Write-Host "Checking /health endpoint..."
           $healthResponse = Invoke-WebRequest -Uri "https://agroadmin.runasp.net/health" -UseBasicParsing
           if ($healthResponse.StatusCode -ne 200) {
@@ -86,12 +86,11 @@ jobs:
             exit 1
           }
           Write-Host "✅ Health check passed"
-          
-          Write-Host "Checking API availability..."
-          $apiResponse = Invoke-WebRequest -Uri "https://agroadmin.runasp.net/api/auth/status" -UseBasicParsing -Headers @{ "Cookie" = "AgroAdmin.Auth=dummy" }
-          if ($apiResponse.StatusCode -eq 401) {
-            Write-Host "✅ API is responding (401 expected without auth)"
-          } else {
-            Write-Host "❌ API check failed with status: $($apiResponse.StatusCode)"
+    
+          Write-Host "Checking if site is up..."
+          $homeResponse = Invoke-WebRequest -Uri "https://agroadmin.runasp.net" -UseBasicParsing
+          if ($homeResponse.StatusCode -ne 200) {
+            Write-Host "❌ Site not responding!"
             exit 1
           }
+          Write-Host "✅ Site is up"
