@@ -201,6 +201,12 @@ app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(AgroAdmin.Client._Imports).Assembly);
 
-app.MapGet("/health", () => Results.Ok("Healthy"));
+app.MapGet("/api/debug/version", () =>
+{
+    var assembly = typeof(Microsoft.Data.SqlClient.SqlConnection).Assembly;
+    var version = assembly.GetName().Version?.ToString() ?? "unknown";
+    var location = assembly.Location;
+    return new { version, location };
+});
 
 app.Run();
