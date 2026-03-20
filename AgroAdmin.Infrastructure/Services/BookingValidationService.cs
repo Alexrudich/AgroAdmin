@@ -80,6 +80,9 @@ public class BookingValidationService(AppDbContext context, ILogger<BookingValid
                 await ValidateOptionsConflictsAsync(booking, currentBookingId, result);
             }
 
+            // 3. Проверка на дублирование броней для одного гостя
+            await ValidateGuestDuplicateUnitAsync(booking, currentBookingId, result);
+
             return result;
         }
         catch (Exception ex)
@@ -166,6 +169,46 @@ public class BookingValidationService(AppDbContext context, ILogger<BookingValid
 
             // Если уже нашли конфликт — прерываем
             if (!result.IsValid) break;
+        }
+    }
+
+    private async Task ValidateGuestDuplicateUnitAsync(CreateBookingDto booking, int? currentBookingId, BookingValidationResult result)
+    {
+        // Если гость не выбран — пропускаем
+        if (booking.Guest?.Id == null || booking.Guest.Id == 0)
+            return;
+
+        // Проверяем, есть ли у этого гостя другая бронь на этот же день
+        var dateRange = Enumerable.Range(0, (booking.DepartureDate - booking.ArrivalDate).Days)
+            .Select(offset => booking.ArrivalDate.AddDays(offset))
+            .ToList();
+
+        foreach (var date in dateRange)
+        {
+            var existingBooking = await context.Bookings
+                .Where(b => b.Id != (currentBookingId ?? 0))
+                .Where(b => b.Guest.Id == booking.Guest.Id)
+                .Where(b => date >= b.ArrivalDate.Date && date < b.DepartureDate.Date)
+                .Select(b => new { b.ReservedUnit, b.ArrivalDate, b.DepartureDate })
+                .FirstOrDefaultAsync();
+
+            if (existingBooking != null)
+            {
+                // Если гость уже бронировал что-то на этот день
+                var existingUnitName = existingBooking.ReservedUnit switch
+                {
+                    ReservedUnits.PondSide => "Половинка у пруда",
+                    ReservedUnits.ParkingSide => "Половинка у парковки",
+                    ReservedUnits.WholeHouse => "Весь дом",
+                    _ => "неизвестный объект"
+                };
+
+                result.IsValid = false;
+                result.Errors.Add($"Гость {booking.Guest.FullName} уже имеет бронь на {date:dd.MM.yyyy} " +
+                                  $"(объект: {existingUnitName}, " +
+                                  $"период: {existingBooking.ArrivalDate:dd.MM}–{existingBooking.DepartureDate:dd.MM.yyyy})");
+                break;
+            }
         }
     }
 
