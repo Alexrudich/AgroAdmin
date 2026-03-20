@@ -82,6 +82,8 @@
     private async Task HandleSubmit()
     {
         Service.SyncGuestFromSearch();
+        Service.UpdateTotal();
+
         _validationErrors.Clear();
         _earliestAvailableDate = null;
         _isValidating = true;

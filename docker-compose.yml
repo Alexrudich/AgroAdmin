@@ -1,71 +1,88 @@
-﻿name: Build and Deploy to MonsterASP.NET (FTP)
+﻿version: '3.8'
 
-on:
-  push:
-    branches: [ develop ]
-  workflow_dispatch:
+services:
+  agroadmin:
+    image: ${DOCKER_REGISTRY-}agroadmin
+    build:
+      context: .
+      dockerfile: AgroAdmin/AgroAdmin/Dockerfile
+    container_name: agro_admin_api
+    env_file: .env
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=${CONNECTIONSTRINGS__DEFAULTCONNECTION}
+      - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
+      - Telegram__ChatId=${TELEGRAM_CHAT_ID}
+      - RabbitMQ__Url=${RABBITMQ_URL}
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    networks:
+      - agro_network
+    volumes:
+      - ./secrets/oauth-credentials.json:/root/.aspnet/google/oauth-credentials.json
+      - ./secrets/token.json:/root/.aspnet/google/token.json
+      - agro_keys:/root/.aspnet/DataProtection-Keys
+    user: root
 
-jobs:
-  build_and_deploy:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  notification_worker:
+    image: ${DOCKER_REGISTRY-}agroadmin-worker
+    build:
+      context: .
+      dockerfile: AgroAdmin.NotificationWorker/Dockerfile
+    container_name: agro_notification_worker
+    env_file: .env
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=${CONNECTIONSTRINGS__DEFAULTCONNECTION}
+      - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
+      - Telegram__ChatId=${TELEGRAM_CHAT_ID}
+      - RabbitMQ__Url=${RABBITMQ_URL}
+    depends_on:
+      - rabbitmq
+      - db
+    networks:
+      - agro_network
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: agro_rabbit_local
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - agro_network
 
-      - name: Restore & Build
-        run: |
-          dotnet restore AgroAdmin.slnx
-          dotnet build AgroAdmin.slnx --configuration Release --no-restore
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: agro_mssql
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong!Password
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - agro_mssql_data:/var/opt/mssql
+    networks:
+      - agro_network
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong!Password" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-      - name: Publish
-        # Self-contained публикация
-        run: dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj --configuration Release --output ./publish --runtime win-x86 --self-contained true
+networks:
+  agro_network:
+    driver: bridge
 
-      # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm
-      - name: Put Site Offline
-        shell: pwsh
-        run: |
-          $offlineFile = "./publish/app_offline.htm"
-          "Site Updating..." | Out-File -FilePath $offlineFile -Encoding utf8
-          
-          $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
-          $ftp.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
-          $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
-          $bytes = [System.IO.File]::ReadAllBytes($offlineFile)
-          $ftp.ContentLength = $bytes.Length
-          $requestStream = $ftp.GetRequestStream()
-          $requestStream.Write($bytes, 0, $bytes.Length)
-          $requestStream.Close()
-          Write-Host "Site is now OFFLINE. Waiting for IIS to release files..."
-          Start-Sleep -Seconds 5
-
-      # ШАГ 2: Заливаем файлы в 10 потоков
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./publish/
-          server-dir: ./wwwroot/
-          dangerous-clean-slate: false
-          parallel: 10 
-
-      # ШАГ 3: Удаляем заглушку
-      - name: Put Site Online
-        shell: pwsh
-        run: |
-          $ftp = [System.Net.FtpWebRequest]::Create("ftp://${{ secrets.FTP_SERVER }}/wwwroot/app_offline.htm")
-          $ftp.Method = [System.Net.WebRequestMethods+Ftp]::DeleteFile
-          $ftp.Credentials = New-Object System.Net.NetworkCredential("${{ secrets.FTP_USERNAME }}", "${{ secrets.FTP_PASSWORD }}")
-          try { 
-            $ftp.GetResponse().Close()
-            Write-Host "Site is now ONLINE."
-          } catch { 
-            Write-Host "ℹ️ No offline file found"
-          }
+volumes:
+  agro_mssql_data:
+  agro_keys:
