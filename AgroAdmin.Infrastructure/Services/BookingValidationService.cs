@@ -71,26 +71,13 @@ public class BookingValidationService(AppDbContext context, ILogger<BookingValid
 
             var result = new BookingValidationResult { IsValid = true };
 
-            var currentDate = booking.ArrivalDate;
-            DateTime? firstBusyDate = null;
+            // 1. Проверка доступности дат по юнитам
+            await ValidateUnitAvailabilityAsync(booking, currentBookingId, result);
 
-            while (currentDate < booking.DepartureDate)
+            // 2. Проверка сауны и банкетного зала
+            if (booking.NeedsSauna || booking.NeedsBanquetHall)
             {
-                var isAvailable = await CheckDateAvailabilityAsync(currentDate, booking.ReservedUnit, currentBookingId);
-
-                if (!isAvailable)
-                {
-                    firstBusyDate ??= currentDate;
-                }
-
-                currentDate = currentDate.AddDays(1);
-            }
-
-            if (firstBusyDate.HasValue)
-            {
-                result.IsValid = false;
-                result.EarliestAvailableDate = firstBusyDate;
-                result.Errors.Add($"Объект занят с {firstBusyDate:dd.MM.yyyy}");
+                await ValidateOptionsConflictsAsync(booking, currentBookingId, result);
             }
 
             return result;
@@ -103,6 +90,82 @@ public class BookingValidationService(AppDbContext context, ILogger<BookingValid
                 IsValid = false,
                 Errors = { "Ошибка проверки доступности дат" }
             };
+        }
+    }
+
+    private async Task ValidateUnitAvailabilityAsync(CreateBookingDto booking, int? currentBookingId, BookingValidationResult result)
+    {
+        var currentDate = booking.ArrivalDate;
+        DateTime? firstBusyDate = null;
+
+        while (currentDate < booking.DepartureDate)
+        {
+            var isAvailable = await CheckDateAvailabilityAsync(currentDate, booking.ReservedUnit, currentBookingId);
+
+            if (!isAvailable)
+            {
+                firstBusyDate ??= currentDate;
+            }
+
+            currentDate = currentDate.AddDays(1);
+        }
+
+        if (firstBusyDate.HasValue)
+        {
+            result.IsValid = false;
+            result.EarliestAvailableDate = firstBusyDate;
+            result.Errors.Add($"Объект занят с {firstBusyDate:dd.MM.yyyy}");
+        }
+    }
+
+    private async Task ValidateOptionsConflictsAsync(CreateBookingDto booking, int? currentBookingId, BookingValidationResult result)
+    {
+        var dateRange = Enumerable.Range(0, (booking.DepartureDate - booking.ArrivalDate).Days)
+            .Select(offset => booking.ArrivalDate.AddDays(offset))
+            .ToList();
+
+        foreach (var date in dateRange)
+        {
+            // Проверяем сауну
+            if (booking.NeedsSauna)
+            {
+                var saunaConflict = await context.Bookings
+                    .Where(b => b.Id != (currentBookingId ?? 0))
+                    .Where(b => date >= b.ArrivalDate.Date && date < b.DepartureDate.Date)
+                    .Where(b => b.NeedsSauna)
+                    .Select(b => new { b.Guest.FullName, b.ArrivalDate, b.DepartureDate })
+                    .FirstOrDefaultAsync();
+
+                if (saunaConflict != null)
+                {
+                    result.IsValid = false;
+                    result.Errors.Add($"Сауна уже забронирована на {date:dd.MM.yyyy} " +
+                                      $"(гость: {saunaConflict.FullName}, " +
+                                      $"бронь: {saunaConflict.ArrivalDate:dd.MM}–{saunaConflict.DepartureDate:dd.MM.yyyy})");
+                }
+            }
+
+            // Проверяем банкетный зал
+            if (booking.NeedsBanquetHall)
+            {
+                var hallConflict = await context.Bookings
+                    .Where(b => b.Id != (currentBookingId ?? 0))
+                    .Where(b => date >= b.ArrivalDate.Date && date < b.DepartureDate.Date)
+                    .Where(b => b.NeedsBanquetHall)
+                    .Select(b => new { b.Guest.FullName, b.ArrivalDate, b.DepartureDate })
+                    .FirstOrDefaultAsync();
+
+                if (hallConflict != null)
+                {
+                    result.IsValid = false;
+                    result.Errors.Add($"Банкетный зал уже забронирован на {date:dd.MM.yyyy} " +
+                                      $"(гость: {hallConflict.FullName}, " +
+                                      $"бронь: {hallConflict.ArrivalDate:dd.MM}–{hallConflict.DepartureDate:dd.MM.yyyy})");
+                }
+            }
+
+            // Если уже нашли конфликт — прерываем
+            if (!result.IsValid) break;
         }
     }
 
