@@ -1,4 +1,27 @@
-﻿<div class="row mb-3 g-2">
+﻿@using AgroAdmin.Shared.Enums
+@using AgroAdmin.Shared.Extensions
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label fw-bold">📅 Заезд</label>
+        <InputDate @bind-Value="Service.Booking.ArrivalDate" @onchange="OnDateChanged" class="form-control" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">📅 Выезд</label>
+        <InputDate @bind-Value="Service.Booking.DepartureDate" @onchange="OnDateChanged" class="form-control" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">🏠 Объект</label>
+        <InputSelect @bind-Value="Service.Booking.ReservedUnit" @onchange="OnUnitChanged" class="form-select">
+            @foreach (var unit in Enum.GetValues<ReservedUnits>())
+            {
+                <option value="@unit">@unit.ToFriendlyString()</option>
+            }
+        </InputSelect>
+    </div>
+</div>
+
+<div class="row mb-3 g-2">
     <div class="col-4">
         <div class="option-card @(Service.Booking.NeedsSauna ? "active" : "")">
             <div class="form-check form-switch d-flex justify-content-center">
@@ -28,6 +51,27 @@
     </div>
 </div>
 
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label fw-bold">⏰ Время заезда</label>
+        <InputTime @bind-Value="Service.Booking.CheckInTime" class="form-control" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">💰 Стоимость проживания</label>
+        <div class="input-group">
+            <InputNumber @bind-Value="Service.Booking.AccommodationCost" 
+                         class="form-control" 
+                         step="10"
+                         min="0"
+                         format="N0" />
+            <span class="input-group-text">BYN</span>
+        </div>
+        <div class="form-text text-muted">Оставьте пустым, если не указана</div>
+    </div>
+</div>
+
 @code {
-    [Parameter] public BookingFormService Service { get; set; } = default!;
+    [Parameter] public BookingFormService Service { get; set; } = null!;
+    [Parameter] public EventCallback OnDateChanged { get; set; }
+    [Parameter] public EventCallback OnUnitChanged { get; set; }
 }

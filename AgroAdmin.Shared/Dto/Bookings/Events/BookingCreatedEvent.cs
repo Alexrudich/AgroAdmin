@@ -11,4 +11,8 @@ public record BookingCreatedEvent
     public ReservedUnits Unit { get; init; }
     public bool NeedsSauna { get; init; }
     public string? AdminNotes { get; init; }
+    public TimeSpan CheckInTime { get; set; }
+    public decimal? AccommodationCost { get; set; }
+    public int TotalGuestsCount { get; set; }
+
 }

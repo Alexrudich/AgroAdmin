@@ -272,7 +272,9 @@ public class BookingsController(
                 needsBanquetHall: dto.NeedsBanquetHall,
                 isFirstTimeGuest: dto.IsFirstTimeGuest,
                 adminNotes: dto.AdminNotes,
-                feedbackComment: dto.FeedbackComment
+                feedbackComment: dto.FeedbackComment,
+                accommodationCost: dto.AccommodationCost,
+                checkInTime: dto.CheckInTime
             );
 
             context.Bookings.Add(booking);
@@ -290,7 +292,10 @@ public class BookingsController(
                     DepartureDate = booking.DepartureDate,
                     Unit = booking.ReservedUnit,
                     NeedsSauna = booking.NeedsSauna,
-                    AdminNotes = booking.AdminNotes
+                    AdminNotes = booking.AdminNotes,
+                    CheckInTime = booking.CheckInTime,
+                    AccommodationCost = booking.AccommodationCost,
+                    TotalGuestsCount = booking.TotalGuestsCount
                 });
             }
             catch (Exception ex)
@@ -305,17 +310,26 @@ public class BookingsController(
                 try
                 {
                     var unitName = dto.ReservedUnit.ToFriendlyString();
-                    var message = $"""
-                    🔔 <b>Новая бронь!</b>
-                    
-                    👤 <b>Гость:</b> {guest.FullName}
-                    📞 <b>Тел:</b> {guest.Phone}
-                    📅 <b>Даты:</b> {dto.ArrivalDate:dd.MM} — {dto.DepartureDate:dd.MM}
-                    🏠 <b>Объект:</b> {unitName}
-                    👥 <b>Состав:</b> {dto.TotalGuestsCount} чел. (👨{dto.AdultsCount} 👦{dto.ChildrenCount} 👶{dto.InfantsCount})
-                    🛠 <b>Допы:</b> {(dto.NeedsSauna ? "🌡️" : "")} {(dto.NeedsBanquetHall ? "🥂" : "")} {(dto.HasDog ? "🐕" : "")}
-                    📝 <b>Заметка:</b> {dto.AdminNotes ?? "нет"}
-                    """;
+                    var checkInTimeStr = dto.CheckInTime != TimeSpan.Zero
+                        ? dto.CheckInTime.ToString(@"hh\:mm")
+                        : "14:00";
+
+                    var message = $"🔔 <b>Новая бронь!</b>\n" +
+                                  $"\n" +
+                                  $"👤 <b>Гость:</b> {guest.FullName}\n" +
+                                  $"📞 <b>Тел:</b> {guest.Phone}\n" +
+                                  $"📅 <b>Даты:</b> {dto.ArrivalDate:dd.MM} — {dto.DepartureDate:dd.MM}\n" +
+                                  $"⏰ <b>Заезд:</b> {checkInTimeStr}\n" +
+                                  $"🏠 <b>Объект:</b> {unitName}\n" +
+                                  $"👥 <b>Состав:</b> {dto.TotalGuestsCount} чел. (👨{dto.AdultsCount} 👦{dto.ChildrenCount} 👶{dto.InfantsCount})\n" +
+                                  $"🛠 <b>Допы:</b> {(dto.NeedsSauna ? "🌡️ " : "")}{(dto.NeedsBanquetHall ? "🥂 " : "")}{(dto.HasDog ? "🐕" : "")}".TrimEnd();
+
+                    if (dto.AccommodationCost.HasValue && dto.AccommodationCost.Value > 0)
+                    {
+                        message += $"\n💰 <b>Стоимость:</b> {dto.AccommodationCost.Value:N0} BYN";
+                    }
+
+                    message += $"\n📝 <b>Заметки:</b> {dto.AdminNotes ?? "нет"}";
 
                     await telegramService.SendMessageAsync(message);
                 }
@@ -430,6 +444,8 @@ public class BookingsController(
             booking.GetType().GetProperty("IsFirstTimeGuest")?.SetValue(booking, dto.IsFirstTimeGuest);
             booking.GetType().GetProperty("AdminNotes")?.SetValue(booking, dto.AdminNotes);
             booking.GetType().GetProperty("FeedbackComment")?.SetValue(booking, dto.FeedbackComment);
+            booking.GetType().GetProperty("AccommodationCost")?.SetValue(booking, dto.AccommodationCost);
+            booking.GetType().GetProperty("CheckInTime")?.SetValue(booking, dto.CheckInTime);
 
             await context.SaveChangesAsync();
 

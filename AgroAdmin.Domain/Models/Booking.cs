@@ -1,4 +1,5 @@
-﻿using AgroAdmin.Shared.Enums;
+﻿// AgroAdmin.Domain/Models/Booking.cs
+using AgroAdmin.Shared.Enums;
 
 namespace AgroAdmin.Domain.Models;
 
@@ -21,6 +22,8 @@ public class Booking
     public bool IsFirstTimeGuest { get; private set; }
     public string? AdminNotes { get; private set; }
     public string? FeedbackComment { get; private set; }
+    public decimal? AccommodationCost { get; private set; }
+    public TimeSpan CheckInTime { get; private set; } = new(14, 0, 0);
 
     private readonly List<SaunaOrder> _saunaOrders = new();
     public virtual IReadOnlyCollection<SaunaOrder> SaunaOrders => _saunaOrders.AsReadOnly();
@@ -42,7 +45,9 @@ public class Booking
         bool needsSauna,
         bool needsBanquetHall,
         string? adminNotes = null,
-        string? feedbackComment = null)
+        string? feedbackComment = null,
+        decimal? accommodationCost = null,
+        TimeSpan? checkInTime = null)
     {
         if (departure <= arrival) throw new Exception("Check-out must be after check-in");
 
@@ -63,18 +68,35 @@ public class Booking
         IsFirstTimeGuest = isFirstTimeGuest;
         AdminNotes = adminNotes;
         FeedbackComment = feedbackComment;
+
+        AccommodationCost = accommodationCost;
+        CheckInTime = checkInTime ?? new TimeSpan(14, 0, 0);
     }
 
+    // TODO Метод для отзыва
     public void AddFeedback(string feedback)
     {
         FeedbackComment = feedback;
     }
 
+    // TODO Метод для бронирования сауны под удаление
     public void AddSaunaOrder(DateTime scheduledTime, int durationHours)
     {
         if (scheduledTime < ArrivalDate || scheduledTime > DepartureDate.AddDays(1))
             throw new Exception("Sauna time is outside of booking dates");
 
         _saunaOrders.Add(new SaunaOrder(scheduledTime, durationHours));
+    }
+
+    // TODO Метод для обновления стоимости
+    public void UpdateAccommodationCost(decimal? cost)
+    {
+        AccommodationCost = cost;
+    }
+
+    // TODO Метод для обновления времени заезда
+    public void UpdateCheckInTime(TimeSpan checkInTime)
+    {
+        CheckInTime = checkInTime;
     }
 }

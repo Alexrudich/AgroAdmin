@@ -96,6 +96,8 @@ public class BookingFormService(
             Booking.IsFirstTimeGuest = result.IsFirstTimeGuest;
             Booking.AdminNotes = result.AdminNotes;
             Booking.FeedbackComment = result.FeedbackComment;
+            Booking.AccommodationCost = result.AccommodationCost;
+            Booking.CheckInTime = result.CheckInTime;
 
             if (result.Guest != null)
             {
@@ -325,7 +327,9 @@ public class BookingFormService(
                     NeedsBanquetHall = Booking.NeedsBanquetHall,
                     IsFirstTimeGuest = Booking.IsFirstTimeGuest,
                     AdminNotes = Booking.AdminNotes,
-                    FeedbackComment = Booking.FeedbackComment
+                    FeedbackComment = Booking.FeedbackComment,
+                    AccommodationCost = Booking.AccommodationCost,
+                    CheckInTime = Booking.CheckInTime
                 };
                 response = await http.PutAsJsonAsync($"api/bookings/{id}", updateDto);
             }

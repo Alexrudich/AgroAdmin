@@ -20,9 +20,7 @@ public class TelegramService(
     {
         try
         {
-            // Если передан конкретный ID, используем его. Если нет — берем из конфига.
             var idsToProcess = targetChatId ?? _chatId;
-
             logger.LogInformation("Sending Telegram message to chats: {ChatIds}", idsToProcess);
 
             var chatIds = idsToProcess.Split(',', StringSplitOptions.RemoveEmptyEntries);
@@ -60,7 +58,6 @@ public class TelegramService(
         }
     }
 
-
     public async Task SendBookingNotificationAsync(BookingDto booking)
     {
         var message = FormatBookingMessage(booking);
@@ -78,17 +75,29 @@ public class TelegramService(
             _ => "🏢"
         };
 
+        var checkInTime = booking.CheckInTime != TimeSpan.Zero
+            ? booking.CheckInTime.ToString(@"hh\:mm")
+            : "14:00";
+
+        var costLine = string.Empty;
+        if (booking.AccommodationCost.HasValue && booking.AccommodationCost.Value > 0)
+        {
+            costLine = $"\n💰 Стоимость: {booking.AccommodationCost.Value:N0} ₽";
+        }
+
         return $"""
                 <b>Новое бронирование!</b>
 
                 👤 Гость: {booking.Guest?.FullName}
                 📞 Телефон: {booking.Guest?.Phone}
                 📅 Даты: {booking.ArrivalDate:dd.MM.yyyy} — {booking.DepartureDate:dd.MM.yyyy}
+                ⏰ Заезд: {checkInTime}
                 🏠 Объект: {unitEmoji} {unitName}
-                👥 Гостей: {booking.TotalGuestsCount}
+                👥 Гостей: {booking.TotalGuestsCount} (взр: {booking.AdultsCount}, дети: {booking.ChildrenCount}, мл: {booking.InfantsCount})
                 🐕 Собака: {(booking.HasDog ? "✅" : "❌")}
                 🌡️ Баня: {(booking.NeedsSauna ? "✅" : "❌")}
                 🥂 Зал: {(booking.NeedsBanquetHall ? "✅" : "❌")}
+                {costLine}
                 """;
     }
 }
