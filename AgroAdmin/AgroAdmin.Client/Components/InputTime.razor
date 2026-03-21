@@ -1,0 +1,47 @@
+﻿@using System.Globalization
+@typeparam TValue
+@inherits InputBase<TValue>
+
+<input @attributes="AdditionalAttributes"
+       type="time"
+       class="@CssClass"
+       value="@GetTimeString()"
+       @onchange="OnValueChanged"
+       @oninput="OnValueChanged" />
+
+@code {
+    private string GetTimeString()
+    {
+        if (Value is TimeSpan time)
+        {
+            return time.ToString(@"hh\:mm");
+        }
+        return "14:00";
+    }
+
+    private void OnValueChanged(ChangeEventArgs e)
+    {
+        if (TimeSpan.TryParse(e.Value?.ToString(), CultureInfo.InvariantCulture, out var time))
+        {
+            CurrentValue = (TValue)(object)time;
+        }
+        else
+        {
+            CurrentValue = (TValue)(object)new TimeSpan(14, 0, 0);
+        }
+    }
+
+    protected override bool TryParseValueFromString(string? value, out TValue result, out string validationErrorMessage)
+    {
+        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var time))
+        {
+            result = (TValue)(object)time;
+            validationErrorMessage = string.Empty;
+            return true;
+        }
+
+        result = default!;
+        validationErrorMessage = "Некорректное время";
+        return false;
+    }
+}

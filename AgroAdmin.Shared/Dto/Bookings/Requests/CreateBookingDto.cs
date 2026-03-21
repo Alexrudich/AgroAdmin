@@ -1,5 +1,4 @@
-﻿// AgroAdmin.Shared/Dto/CreateBookingDto.cs
-using AgroAdmin.Shared.Dto.Guests;
+﻿using AgroAdmin.Shared.Dto.Guests;
 using AgroAdmin.Shared.Enums;
 using System.ComponentModel.DataAnnotations;
 
@@ -31,4 +30,10 @@ public class CreateBookingDto
     public bool IsFirstTimeGuest { get; set; } = true;
     public string? AdminNotes { get; set; }
     public string? FeedbackComment { get; set; }
+
+    [Range(0, 1000000, ErrorMessage = "Стоимость должна быть от 0 до 1,000,000")]
+    public decimal? AccommodationCost { get; set; }
+
+    [Required]
+    public TimeSpan CheckInTime { get; set; } = new TimeSpan(14, 0, 0); // По умолчанию 14:00
 }

@@ -20,4 +20,6 @@ public class UpdateBookingDto
     public bool IsFirstTimeGuest { get; set; }
     public string? AdminNotes { get; set; }
     public string? FeedbackComment { get; set; }
+    public decimal? AccommodationCost { get; set; }
+    public TimeSpan CheckInTime { get; set; }
 }
