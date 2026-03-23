@@ -32,7 +32,7 @@ public class BookingCreatedConsumer(
             checkInDateTime = msg.ArrivalDate.Date + new TimeSpan(14, 0, 0);
         }
 
-        var reminderTime = checkInDateTime.AddHours(-1);
+        var reminderTime = checkInDateTime.ToUniversalTime().AddHours(-1);
         if (reminderTime <= DateTime.UtcNow)
             reminderTime = DateTime.UtcNow.AddSeconds(10);
 
