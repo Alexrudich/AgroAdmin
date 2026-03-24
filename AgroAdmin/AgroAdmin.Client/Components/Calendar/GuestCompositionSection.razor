@@ -31,9 +31,9 @@
 @code {
     [Parameter] public BookingFormService Service { get; set; } = default!;
 
-    private void OnGuestCountChanged()
+    private async Task OnGuestCountChanged()
     {
         Service.UpdateTotal();
-        StateHasChanged();
+        await Service.OnGuestCompositionChanged();
     }
 }

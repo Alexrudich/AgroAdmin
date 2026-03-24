@@ -25,7 +25,11 @@
     <div class="col-4">
         <div class="option-card @(Service.Booking.NeedsSauna ? "active" : "")">
             <div class="form-check form-switch d-flex justify-content-center">
-                <InputCheckbox @bind-Value="Service.Booking.NeedsSauna" class="form-check-input" id="sauna" />
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="sauna"
+                       checked="@Service.Booking.NeedsSauna"
+                       @onchange="@((ChangeEventArgs e) => OnOptionChanged(e, "sauna"))" />
                 <label class="form-check-label ms-1" for="sauna">🌡️</label>
             </div>
             <div class="option-label">Баня</div>
@@ -34,7 +38,11 @@
     <div class="col-4">
         <div class="option-card @(Service.Booking.NeedsBanquetHall ? "active" : "")">
             <div class="form-check form-switch d-flex justify-content-center">
-                <InputCheckbox @bind-Value="Service.Booking.NeedsBanquetHall" class="form-check-input" id="hall" />
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="hall"
+                       checked="@Service.Booking.NeedsBanquetHall"
+                       @onchange="@((ChangeEventArgs e) => OnOptionChanged(e, "hall"))" />
                 <label class="form-check-label ms-1" for="hall">🥂</label>
             </div>
             <div class="option-label">Зал</div>
@@ -43,7 +51,11 @@
     <div class="col-4">
         <div class="option-card @(Service.Booking.HasDog ? "active" : "")">
             <div class="form-check form-switch d-flex justify-content-center">
-                <InputCheckbox @bind-Value="Service.Booking.HasDog" class="form-check-input" id="dog" />
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="dog"
+                       checked="@Service.Booking.HasDog"
+                       @onchange="@((ChangeEventArgs e) => OnOptionChanged(e, "dog"))" />
                 <label class="form-check-label ms-1" for="dog">🐕</label>
             </div>
             <div class="option-label">Собака</div>
@@ -59,14 +71,24 @@
     <div class="col-md-4">
         <label class="form-label fw-bold">💰 Стоимость проживания</label>
         <div class="input-group">
-            <InputNumber @bind-Value="Service.Booking.AccommodationCost" 
-                         class="form-control" 
+            <InputNumber @bind-Value="Service.Booking.AccommodationCost"
+                         class="form-control"
                          step="10"
                          min="0"
                          format="N0" />
             <span class="input-group-text">BYN</span>
         </div>
-        <div class="form-text text-muted">Оставьте пустым, если не указана</div>
+        @if (Service.CurrentPricing != null && Service.CurrentPricing.TotalPrice > 0)
+        {
+            <div class="form-text text-success">
+                <i class="bi bi-calculator"></i>
+                <strong>Рекомендуемая цена:</strong> @Service.CurrentPricing.SuggestionText
+            </div>
+        }
+        else
+        {
+            <div class="form-text text-muted">Оставьте пустым, если не указана</div>
+        }
     </div>
 </div>
 
@@ -74,4 +96,25 @@
     [Parameter] public BookingFormService Service { get; set; } = null!;
     [Parameter] public EventCallback OnDateChanged { get; set; }
     [Parameter] public EventCallback OnUnitChanged { get; set; }
+    [Parameter] public EventCallback OnOptionsChanged { get; set; }
+
+    private async Task OnOptionChanged(ChangeEventArgs e, string option)
+    {
+        bool isChecked = (bool)e.Value!;
+
+        switch (option)
+        {
+            case "sauna":
+                Service.Booking.NeedsSauna = isChecked;
+                break;
+            case "hall":
+                Service.Booking.NeedsBanquetHall = isChecked;
+                break;
+            case "dog":
+                Service.Booking.HasDog = isChecked;
+                break;
+        }
+
+        await Service.OnOptionsChanged();
+    }
 }

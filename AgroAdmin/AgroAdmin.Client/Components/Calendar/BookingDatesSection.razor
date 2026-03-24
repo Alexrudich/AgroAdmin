@@ -4,25 +4,58 @@
 <div class="row mb-3">
     <div class="col-md-4">
         <label class="form-label fw-bold">📅 Заезд</label>
-        <InputDate @bind-Value="Service.Booking.ArrivalDate" @onchange="OnDateChanged" class="form-control" />
+        <input type="date"
+               class="form-control"
+               value="@Service.Booking.ArrivalDate.ToString("yyyy-MM-dd")"
+               @onchange="@((ChangeEventArgs e) => OnDateChanged(e, "arrival"))" />
     </div>
     <div class="col-md-4">
         <label class="form-label fw-bold">📅 Выезд</label>
-        <InputDate @bind-Value="Service.Booking.DepartureDate" @onchange="OnDateChanged" class="form-control" />
+        <input type="date"
+               class="form-control"
+               value="@Service.Booking.DepartureDate.ToString("yyyy-MM-dd")"
+               @onchange="@((ChangeEventArgs e) => OnDateChanged(e, "departure"))" />
     </div>
     <div class="col-md-4">
         <label class="form-label fw-bold">🏠 Объект</label>
-        <InputSelect @bind-Value="Service.Booking.ReservedUnit" @onchange="OnUnitChanged" class="form-select">
+        <select class="form-select" @onchange="@((ChangeEventArgs e) => OnUnitChanged(e))">
             @foreach (var unit in Enum.GetValues<ReservedUnits>())
             {
-                <option value="@unit">@unit.ToFriendlyString()</option>
+                <option value="@((int)unit)" selected="@(Service.Booking.ReservedUnit == unit)">
+                    @unit.ToFriendlyString()
+                </option>
             }
-        </InputSelect>
+        </select>
     </div>
 </div>
 
 @code {
     [Parameter] public BookingFormService Service { get; set; } = default!;
-    [Parameter] public EventCallback OnDateChanged { get; set; }
-    [Parameter] public EventCallback OnUnitChanged { get; set; }
+
+    private async Task OnDateChanged(ChangeEventArgs e, string type)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var newDate))
+        {
+            if (type == "arrival")
+            {
+                Service.Booking.ArrivalDate = newDate;
+            }
+            else
+            {
+                Service.Booking.DepartureDate = newDate;
+            }
+        }
+
+        await Service.OnDateOrUnitChanged();
+    }
+
+    private async Task OnUnitChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var unitValue))
+        {
+            Service.Booking.ReservedUnit = (ReservedUnits)unitValue;
+        }
+
+        await Service.OnDateOrUnitChanged();
+    }
 }

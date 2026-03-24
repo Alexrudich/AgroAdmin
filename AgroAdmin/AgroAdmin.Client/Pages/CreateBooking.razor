@@ -18,15 +18,14 @@
                 <GuestSearchSection Service="Service" />
 
                 <!-- 4️ Даты и объект -->
-                <BookingDatesSection Service="Service"
-                                     OnDateChanged="OnDateChanged"
-                                     OnUnitChanged="OnUnitChanged" />
+                <BookingDatesSection Service="Service" />
 
                 <!-- 5️ Состав гостей -->
                 <GuestCompositionSection Service="Service" />
 
                 <!-- 6️ Опции -->
-                <BookingOptionsSection Service="Service" />
+                <BookingOptionsSection Service="Service" 
+                                       OnOptionsChanged="OnOptionsChanged" />
 
                 <!-- 7️ Заметки -->
                 <BookingNotesSection Service="Service" />
@@ -61,22 +60,19 @@
         await Service.InitializeAsync(Id, Nav.Uri);
     }
 
-    private void OnDateChanged()
+    private async Task OnDateChanged()
     {
-        if (Service.Booking.DepartureDate <= Service.Booking.ArrivalDate)
-        {
-            Service.Booking.DepartureDate = Service.Booking.ArrivalDate.AddDays(1);
-        }
-        StateHasChanged();
+        await Service.OnDateOrUnitChanged();
     }
 
-    private void OnUnitChanged()
+    private async Task OnUnitChanged()
     {
-        if (Service.Booking.DepartureDate <= Service.Booking.ArrivalDate)
-        {
-            Service.Booking.DepartureDate = Service.Booking.ArrivalDate.AddDays(1);
-        }
-        StateHasChanged();
+        await Service.OnDateOrUnitChanged();
+    }
+
+    private async Task OnOptionsChanged()
+    {
+        await Service.OnOptionsChanged();
     }
 
     private async Task HandleSubmit()

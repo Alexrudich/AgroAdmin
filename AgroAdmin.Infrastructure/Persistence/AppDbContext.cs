@@ -14,6 +14,7 @@ namespace AgroAdmin.Infrastructure.Persistence
         public DbSet<GuestGroup> GuestGroups => Set<GuestGroup>();
         public DbSet<GuestGroupMember> GuestGroupMembers => Set<GuestGroupMember>();
         public DbSet<BackupInfo> BackupInfos => Set<BackupInfo>();
+        public DbSet<PricingConfiguration> PricingConfigurations => Set<PricingConfiguration>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -123,6 +124,15 @@ namespace AgroAdmin.Infrastructure.Persistence
             modelBuilder.Entity<BackupInfo>(builder =>
             {
                 builder.HasKey(b => b.Id);
+            });
+
+            // Конфигурация для PricingConfiguration
+            modelBuilder.Entity<PricingConfiguration>(builder =>
+            {
+                builder.HasKey(p => p.Id);
+
+                builder.Property(p => p.UpdatedBy)
+                    .HasMaxLength(100);
             });
         }
     }
