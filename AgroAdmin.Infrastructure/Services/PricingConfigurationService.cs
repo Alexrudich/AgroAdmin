@@ -21,7 +21,6 @@ public class PricingConfigurationService(AppDbContext context)
 
         if (config == null)
         {
-            // Возвращаем дефолтную конфигурацию, если в БД ничего нет
             return GetDefaultConfiguration();
         }
 
@@ -32,12 +31,9 @@ public class PricingConfigurationService(AppDbContext context)
             MinPricePerNightFullHouse = config.MinPricePerNightFullHouse,
             PricePerAdultFullHouse = config.PricePerAdultFullHouse,
             IncludedAdultsFullHouse = config.IncludedAdultsFullHouse,
-            MinPricePerNightPondHalf = config.MinPricePerNightPondHalf,
-            PricePerAdultPondHalf = config.PricePerAdultPondHalf,
-            IncludedAdultsPondHalf = config.IncludedAdultsPondHalf,
-            MinPricePerNightParkingHalf = config.MinPricePerNightParkingHalf,
-            PricePerAdultParkingHalf = config.PricePerAdultParkingHalf,
-            IncludedAdultsParkingHalf = config.IncludedAdultsParkingHalf,
+            MinPricePerNightHalf = config.MinPricePerNightHalf,
+            PricePerAdultHalf = config.PricePerAdultHalf,
+            IncludedAdultsHalf = config.IncludedAdultsHalf,
             SaunaPrice = config.SaunaPrice,
             BanquetHallPrice = config.BanquetHallPrice,
             DogFee = config.DogFee
@@ -52,12 +48,9 @@ public class PricingConfigurationService(AppDbContext context)
             MinPricePerNightFullHouse = 200,
             PricePerAdultFullHouse = 50,
             IncludedAdultsFullHouse = 2,
-            MinPricePerNightPondHalf = 150,
-            PricePerAdultPondHalf = 40,
-            IncludedAdultsPondHalf = 2,
-            MinPricePerNightParkingHalf = 180,
-            PricePerAdultParkingHalf = 45,
-            IncludedAdultsParkingHalf = 2,
+            MinPricePerNightHalf = 165, // среднее между 150 и 180
+            PricePerAdultHalf = 42,      // среднее между 40 и 45
+            IncludedAdultsHalf = 2,
             SaunaPrice = 100,
             BanquetHallPrice = 150,
             DogFee = 15
@@ -73,16 +66,13 @@ public class PricingConfigurationService(AppDbContext context)
             var newConfig = new PricingConfiguration(
                 dto.MinPricePerNightFullHouse,
                 dto.PricePerAdultFullHouse,
-                dto.MinPricePerNightPondHalf,
-                dto.PricePerAdultPondHalf,
-                dto.MinPricePerNightParkingHalf,
-                dto.PricePerAdultParkingHalf,
+                dto.MinPricePerNightHalf,
+                dto.PricePerAdultHalf,
                 dto.SaunaPrice,
                 dto.BanquetHallPrice,
                 dto.DogFee,
                 dto.IncludedAdultsFullHouse,
-                dto.IncludedAdultsPondHalf,
-                dto.IncludedAdultsParkingHalf,
+                dto.IncludedAdultsHalf,
                 updatedBy);
 
             context.PricingConfigurations.Add(newConfig);
@@ -93,16 +83,13 @@ public class PricingConfigurationService(AppDbContext context)
         existing.Update(
             dto.MinPricePerNightFullHouse,
             dto.PricePerAdultFullHouse,
-            dto.MinPricePerNightPondHalf,
-            dto.PricePerAdultPondHalf,
-            dto.MinPricePerNightParkingHalf,
-            dto.PricePerAdultParkingHalf,
+            dto.MinPricePerNightHalf,
+            dto.PricePerAdultHalf,
             dto.SaunaPrice,
             dto.BanquetHallPrice,
             dto.DogFee,
             dto.IncludedAdultsFullHouse,
-            dto.IncludedAdultsPondHalf,
-            dto.IncludedAdultsParkingHalf,
+            dto.IncludedAdultsHalf,
             updatedBy);
 
         await context.SaveChangesAsync();
@@ -117,5 +104,10 @@ public class PricingConfigurationService(AppDbContext context)
             var defaultConfig = GetDefaultConfiguration();
             await CreateOrUpdateAsync(defaultConfig, "system");
         }
+    }
+
+    public async Task<PricingConfiguration> UpdateConfigurationAsync(PricingConfigurationDto dto, string? updatedBy = null)
+    {
+        return await CreateOrUpdateAsync(dto, updatedBy);
     }
 }

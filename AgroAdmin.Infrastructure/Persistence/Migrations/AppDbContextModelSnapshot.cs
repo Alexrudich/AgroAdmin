@@ -231,10 +231,7 @@ namespace AgroAdmin.Infrastructure.Persistence.Migrations
                     b.Property<int>("IncludedAdultsFullHouse")
                         .HasColumnType("int");
 
-                    b.Property<int>("IncludedAdultsParkingHalf")
-                        .HasColumnType("int");
-
-                    b.Property<int>("IncludedAdultsPondHalf")
+                    b.Property<int>("IncludedAdultsHalf")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsEnabled")
@@ -243,19 +240,13 @@ namespace AgroAdmin.Infrastructure.Persistence.Migrations
                     b.Property<int>("MinPricePerNightFullHouse")
                         .HasColumnType("int");
 
-                    b.Property<int>("MinPricePerNightParkingHalf")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MinPricePerNightPondHalf")
+                    b.Property<int>("MinPricePerNightHalf")
                         .HasColumnType("int");
 
                     b.Property<int>("PricePerAdultFullHouse")
                         .HasColumnType("int");
 
-                    b.Property<int>("PricePerAdultParkingHalf")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PricePerAdultPondHalf")
+                    b.Property<int>("PricePerAdultHalf")
                         .HasColumnType("int");
 
                     b.Property<int>("SaunaPrice")

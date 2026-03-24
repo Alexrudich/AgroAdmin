@@ -19,14 +19,10 @@ public class BasePriceStrategy : IPricingStrategy
         switch (request.ReservedUnit)
         {
             case ReservedUnits.PondSide:
-                minPrice = config.MinPricePerNightPondHalf;
-                pricePerAdult = config.PricePerAdultPondHalf;
-                includedAdults = config.IncludedAdultsPondHalf;
-                break;
             case ReservedUnits.ParkingSide:
-                minPrice = config.MinPricePerNightParkingHalf;
-                pricePerAdult = config.PricePerAdultParkingHalf;
-                includedAdults = config.IncludedAdultsParkingHalf;
+                minPrice = config.MinPricePerNightHalf;
+                pricePerAdult = config.PricePerAdultHalf;
+                includedAdults = config.IncludedAdultsHalf;
                 break;
             case ReservedUnits.WholeHouse:
             default:

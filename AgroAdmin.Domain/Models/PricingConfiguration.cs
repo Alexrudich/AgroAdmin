@@ -10,17 +10,12 @@ public class PricingConfiguration
     public int PricePerAdultFullHouse { get; private set; }
     public int IncludedAdultsFullHouse { get; private set; } = 2;
 
-    // Половинка у пруда
-    public int MinPricePerNightPondHalf { get; private set; }
-    public int PricePerAdultPondHalf { get; private set; }
-    public int IncludedAdultsPondHalf { get; private set; } = 2;
+    // Половинка (общая)
+    public int MinPricePerNightHalf { get; private set; }
+    public int PricePerAdultHalf { get; private set; }
+    public int IncludedAdultsHalf { get; private set; } = 2;
 
-    // Половинка у парковки
-    public int MinPricePerNightParkingHalf { get; private set; }
-    public int PricePerAdultParkingHalf { get; private set; }
-    public int IncludedAdultsParkingHalf { get; private set; } = 2;
-
-    // Дополнительные услуги (разовые)
+    // Дополнительные услуги
     public int SaunaPrice { get; private set; }
     public int BanquetHallPrice { get; private set; }
     public int DogFee { get; private set; }
@@ -33,16 +28,13 @@ public class PricingConfiguration
     public PricingConfiguration(
         int minPricePerNightFullHouse,
         int pricePerAdultFullHouse,
-        int minPricePerNightPondHalf,
-        int pricePerAdultPondHalf,
-        int minPricePerNightParkingHalf,
-        int pricePerAdultParkingHalf,
+        int minPricePerNightHalf,
+        int pricePerAdultHalf,
         int saunaPrice,
         int banquetHallPrice,
         int dogFee,
         int includedAdultsFullHouse = 2,
-        int includedAdultsPondHalf = 2,
-        int includedAdultsParkingHalf = 2,
+        int includedAdultsHalf = 2,
         string? updatedBy = null)
     {
         IsEnabled = true;
@@ -51,13 +43,9 @@ public class PricingConfiguration
         PricePerAdultFullHouse = pricePerAdultFullHouse;
         IncludedAdultsFullHouse = includedAdultsFullHouse;
 
-        MinPricePerNightPondHalf = minPricePerNightPondHalf;
-        PricePerAdultPondHalf = pricePerAdultPondHalf;
-        IncludedAdultsPondHalf = includedAdultsPondHalf;
-
-        MinPricePerNightParkingHalf = minPricePerNightParkingHalf;
-        PricePerAdultParkingHalf = pricePerAdultParkingHalf;
-        IncludedAdultsParkingHalf = includedAdultsParkingHalf;
+        MinPricePerNightHalf = minPricePerNightHalf;
+        PricePerAdultHalf = pricePerAdultHalf;
+        IncludedAdultsHalf = includedAdultsHalf;
 
         SaunaPrice = saunaPrice;
         BanquetHallPrice = banquetHallPrice;
@@ -70,29 +58,22 @@ public class PricingConfiguration
     public void Update(
         int minPricePerNightFullHouse,
         int pricePerAdultFullHouse,
-        int minPricePerNightPondHalf,
-        int pricePerAdultPondHalf,
-        int minPricePerNightParkingHalf,
-        int pricePerAdultParkingHalf,
+        int minPricePerNightHalf,
+        int pricePerAdultHalf,
         int saunaPrice,
         int banquetHallPrice,
         int dogFee,
         int includedAdultsFullHouse,
-        int includedAdultsPondHalf,
-        int includedAdultsParkingHalf,
+        int includedAdultsHalf,
         string? updatedBy = null)
     {
         MinPricePerNightFullHouse = minPricePerNightFullHouse;
         PricePerAdultFullHouse = pricePerAdultFullHouse;
         IncludedAdultsFullHouse = includedAdultsFullHouse;
 
-        MinPricePerNightPondHalf = minPricePerNightPondHalf;
-        PricePerAdultPondHalf = pricePerAdultPondHalf;
-        IncludedAdultsPondHalf = includedAdultsPondHalf;
-
-        MinPricePerNightParkingHalf = minPricePerNightParkingHalf;
-        PricePerAdultParkingHalf = pricePerAdultParkingHalf;
-        IncludedAdultsParkingHalf = includedAdultsParkingHalf;
+        MinPricePerNightHalf = minPricePerNightHalf;
+        PricePerAdultHalf = pricePerAdultHalf;
+        IncludedAdultsHalf = includedAdultsHalf;
 
         SaunaPrice = saunaPrice;
         BanquetHallPrice = banquetHallPrice;

@@ -24,6 +24,7 @@ namespace AgroAdmin.Client
 
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<BookingFormService>();
+            builder.Services.AddScoped<PricingConfigClientService>();
 
             await builder.Build().RunAsync();
         }

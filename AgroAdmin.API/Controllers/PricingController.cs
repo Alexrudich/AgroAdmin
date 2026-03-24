@@ -1,5 +1,6 @@
 ﻿using AgroAdmin.Infrastructure.Services;
 using AgroAdmin.Infrastructure.Services.Pricing;
+using AgroAdmin.Shared.Dto.Pricing;
 using AgroAdmin.Shared.Dto.Pricing.Requests;
 using AgroAdmin.Shared.Dto.Pricing.Responses;
 using Microsoft.AspNetCore.Authorization;
@@ -31,5 +32,35 @@ public class PricingController(PricingEngine pricingEngine, PricingConfiguration
 
         var result = await pricingEngine.CalculateAsync(request, config);
         return Ok(result);
+    }
+
+    [HttpGet("config")]
+    public async Task<ActionResult<PricingConfigurationDto>> GetConfig()
+    {
+        var config = await configService.GetActiveConfigurationDtoAsync();
+        return Ok(config);
+    }
+
+    [HttpPut("config")]
+    public async Task<ActionResult<PricingConfigurationDto>> UpdateConfig([FromBody] PricingConfigurationDto dto)
+    {
+        var updatedBy = User.Identity?.Name ?? "admin";
+
+        var config = await configService.UpdateConfigurationAsync(dto, updatedBy);
+
+        return Ok(new PricingConfigurationDto
+        {
+            Id = config.Id,
+            IsEnabled = config.IsEnabled,
+            MinPricePerNightFullHouse = config.MinPricePerNightFullHouse,
+            PricePerAdultFullHouse = config.PricePerAdultFullHouse,
+            IncludedAdultsFullHouse = config.IncludedAdultsFullHouse,
+            MinPricePerNightHalf = config.MinPricePerNightHalf,
+            PricePerAdultHalf = config.PricePerAdultHalf,
+            IncludedAdultsHalf = config.IncludedAdultsHalf,
+            SaunaPrice = config.SaunaPrice,
+            BanquetHallPrice = config.BanquetHallPrice,
+            DogFee = config.DogFee
+        });
     }
 }

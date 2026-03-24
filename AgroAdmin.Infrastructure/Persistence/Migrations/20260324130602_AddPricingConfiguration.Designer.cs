@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AgroAdmin.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260324095000_AddPricingConfiguration")]
+    [Migration("20260324130602_AddPricingConfiguration")]
     partial class AddPricingConfiguration
     {
         /// <inheritdoc />
@@ -234,10 +234,7 @@ namespace AgroAdmin.Infrastructure.Persistence.Migrations
                     b.Property<int>("IncludedAdultsFullHouse")
                         .HasColumnType("int");
 
-                    b.Property<int>("IncludedAdultsParkingHalf")
-                        .HasColumnType("int");
-
-                    b.Property<int>("IncludedAdultsPondHalf")
+                    b.Property<int>("IncludedAdultsHalf")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsEnabled")
@@ -246,19 +243,13 @@ namespace AgroAdmin.Infrastructure.Persistence.Migrations
                     b.Property<int>("MinPricePerNightFullHouse")
                         .HasColumnType("int");
 
-                    b.Property<int>("MinPricePerNightParkingHalf")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MinPricePerNightPondHalf")
+                    b.Property<int>("MinPricePerNightHalf")
                         .HasColumnType("int");
 
                     b.Property<int>("PricePerAdultFullHouse")
                         .HasColumnType("int");
 
-                    b.Property<int>("PricePerAdultParkingHalf")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PricePerAdultPondHalf")
+                    b.Property<int>("PricePerAdultHalf")
                         .HasColumnType("int");
 
                     b.Property<int>("SaunaPrice")
