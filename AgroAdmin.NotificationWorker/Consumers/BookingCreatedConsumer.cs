@@ -56,7 +56,7 @@ public class BookingCreatedConsumer(
         // Стоимость, если есть
         if (msg.AccommodationCost.HasValue && msg.AccommodationCost.Value > 0)
         {
-            text += $"\n💰 Стоимость: {msg.AccommodationCost.Value:N0} ₽";
+            text += $"\n💰 Стоимость: {msg.AccommodationCost.Value:N0} BYN";
         }
 
         // Примечания, если есть

@@ -82,7 +82,7 @@ public class TelegramService(
         var costLine = string.Empty;
         if (booking.AccommodationCost.HasValue && booking.AccommodationCost.Value > 0)
         {
-            costLine = $"\n💰 Стоимость: {booking.AccommodationCost.Value:N0} ₽";
+            costLine = $"\n💰 Стоимость: {booking.AccommodationCost.Value:N0} BYN";
         }
 
         return $"""
