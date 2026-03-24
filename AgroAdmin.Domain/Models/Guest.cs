@@ -1,4 +1,4 @@
-﻿using AgroAdmin.Domain.Models;
+﻿namespace AgroAdmin.Domain.Models;
 
 public class Guest
 {

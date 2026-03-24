@@ -1,0 +1,24 @@
+﻿using AgroAdmin.Shared.Enums;
+
+namespace AgroAdmin.Shared.Dto.Pricing.Requests;
+
+public class PricingRequestDto
+{
+    public DateTime ArrivalDate { get; set; }
+
+    public DateTime DepartureDate { get; set; }
+
+    public ReservedUnits ReservedUnit { get; set; }
+
+    public int AdultsCount { get; set; }
+
+    public int ChildrenCount { get; set; }
+
+    public int InfantsCount { get; set; }
+
+    public bool NeedsSauna { get; set; }
+
+    public bool NeedsBanquetHall { get; set; }
+
+    public bool HasDog { get; set; }
+}

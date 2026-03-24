@@ -1,0 +1,146 @@
+﻿@page "/pricingconfig"
+@using AgroAdmin.Shared.Dto.Pricing
+@inject PricingConfigClientService ConfigService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Настройка цен</PageTitle>
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">💰 Настройка цен и калькуляции</h5>
+        </div>
+        <div class="card-body">
+            @if (_isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                </div>
+            }
+            else if (_config != null)
+            {
+                <EditForm Model="_config" OnValidSubmit="SaveConfiguration">
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <div class="form-check form-switch">
+                                <InputCheckbox @bind-Value="_config.IsEnabled" class="form-check-input" id="enabled" />
+                                <label class="form-check-label fw-bold" for="enabled">✅ Включить автоматический расчет цен</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr />
+                    <h6 class="mb-3">🏠 Весь дом (до 13 человек)</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label">Мин. цена за ночь</label>
+                            <InputNumber @bind-Value="_config.MinPricePerNightFullHouse" class="form-control" step="10" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Цена за доп. взрослого</label>
+                            <InputNumber @bind-Value="_config.PricePerAdultFullHouse" class="form-control" step="10" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Включено взрослых</label>
+                            <InputNumber @bind-Value="_config.IncludedAdultsFullHouse" class="form-control" step="1" min="1" />
+                        </div>
+                    </div>
+
+                    <h6 class="mb-3">🏠 Половинка (у пруда или парковки)</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label">Мин. цена за ночь</label>
+                            <InputNumber @bind-Value="_config.MinPricePerNightHalf" class="form-control" step="10" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Цена за доп. взрослого</label>
+                            <InputNumber @bind-Value="_config.PricePerAdultHalf" class="form-control" step="10" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Включено взрослых</label>
+                            <InputNumber @bind-Value="_config.IncludedAdultsHalf" class="form-control" step="1" min="1" />
+                        </div>
+                    </div>
+
+                    <hr />
+                    <h6 class="mb-3">➕ Дополнительные услуги (разовые)</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label">🌡️ Сауна</label>
+                            <InputNumber @bind-Value="_config.SaunaPrice" class="form-control" step="10" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">🥂 Банкетный зал</label>
+                            <InputNumber @bind-Value="_config.BanquetHallPrice" class="form-control" step="10" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">🐕 Собака</label>
+                            <InputNumber @bind-Value="_config.DogFee" class="form-control" step="10" min="0" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button type="button" class="btn btn-secondary" @onclick="Cancel">Отмена</button>
+                        <button type="submit" class="btn btn-primary" disabled="@_isSaving">
+                            @(_isSaving ? "Сохранение..." : "Сохранить")
+                        </button>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private PricingConfigurationDto? _config;
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConfiguration();
+    }
+
+    private async Task LoadConfiguration()
+    {
+        _isLoading = true;
+        try
+        {
+            _config = await ConfigService.GetConfigurationAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveConfiguration()
+    {
+        if (_config == null) return;
+
+        _isSaving = true;
+        try
+        {
+            var result = await ConfigService.UpdateConfigurationAsync(_config);
+            if (result != null)
+            {
+                _config = result;
+                await JS.InvokeVoidAsync("alert", "✅ Настройки успешно сохранены!");
+            }
+        }
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        Nav.NavigateTo("/");
+    }
+}

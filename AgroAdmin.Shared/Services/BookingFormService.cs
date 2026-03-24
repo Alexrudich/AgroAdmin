@@ -1,6 +1,8 @@
 ﻿using AgroAdmin.Shared.Dto.Bookings.Requests;
 using AgroAdmin.Shared.Dto.Bookings.Responses;
 using AgroAdmin.Shared.Dto.Guests;
+using AgroAdmin.Shared.Dto.Pricing.Requests;
+using AgroAdmin.Shared.Dto.Pricing.Responses;
 using AgroAdmin.Shared.Enums;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.WebUtilities;
@@ -19,6 +21,7 @@ public class BookingFormService(
     private readonly NavigationManager _nav = nav;
     private Timer? _debounceTimer;
     private int? _currentBookingId;
+    private bool _isRefreshing = false;
 
     // Состояние
     public CreateBookingDto Booking { get; set; } = new() { Guest = new GuestDto() };
@@ -33,6 +36,9 @@ public class BookingFormService(
     public string GuestPhoneSearchTerm { get; set; } = string.Empty;
     public List<GuestDto> PhoneSearchResults { get; set; } = new();
     public bool ShowPhoneDropdown { get; set; }
+
+    // Текущий расчет цены
+    public PricingResponseDto? CurrentPricing { get; private set; }
 
     // Общие поля
     public GuestDto? SelectedGuest { get; set; }
@@ -74,6 +80,47 @@ public class BookingFormService(
         }
 
         StateChanged?.Invoke();
+    }
+
+    public async Task RefreshPricingAsync()
+    {
+        if (_isRefreshing) return;
+
+        _isRefreshing = true;
+
+        try
+        {
+            if (Booking.ArrivalDate == default || Booking.DepartureDate == default)
+                return;
+
+            var request = new PricingRequestDto
+            {
+                ArrivalDate = Booking.ArrivalDate,
+                DepartureDate = Booking.DepartureDate,
+                ReservedUnit = Booking.ReservedUnit,
+                AdultsCount = Booking.AdultsCount,
+                ChildrenCount = Booking.ChildrenCount,
+                InfantsCount = Booking.InfantsCount,
+                NeedsSauna = Booking.NeedsSauna,
+                NeedsBanquetHall = Booking.NeedsBanquetHall,
+                HasDog = Booking.HasDog
+            };
+
+            var response = await http.PostAsJsonAsync("api/pricing/calculate", request);
+            if (response.IsSuccessStatusCode)
+            {
+                CurrentPricing = await response.Content.ReadFromJsonAsync<PricingResponseDto>();
+                StateChanged?.Invoke();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Ошибка при расчете цены");
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
     }
 
     private async Task LoadBookingForEdit(int id)
@@ -264,6 +311,27 @@ public class BookingFormService(
         StateChanged?.Invoke();
     }
 
+    public async Task OnGuestCompositionChanged()
+    {
+        UpdateTotal();
+        await RefreshPricingAsync();
+    }
+
+    public async Task OnOptionsChanged()
+    {
+        await RefreshPricingAsync();
+    }
+
+    public async Task OnDateOrUnitChanged()
+    {
+        if (Booking.DepartureDate <= Booking.ArrivalDate)
+        {
+            Booking.DepartureDate = Booking.ArrivalDate.AddDays(1);
+        }
+        await RefreshPricingAsync();
+        StateChanged?.Invoke();
+    }
+
     public async Task<GuestDto?> GetGuestAsync(int id)
     {
         try
@@ -351,7 +419,7 @@ public class BookingFormService(
     {
         try
         {
-            var response = await http.PostAsJsonAsync("api/bookings/validate", booking);
+            var response = await http.PostAsJsonAsync($"api/bookings/validate?bookingId={_currentBookingId}", booking);
 
             if (response.IsSuccessStatusCode)
             {

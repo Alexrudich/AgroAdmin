@@ -3,6 +3,8 @@ using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.BackgroundServices;
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Infrastructure.Services;
+using AgroAdmin.Infrastructure.Services.Pricing;
+using AgroAdmin.Infrastructure.Services.Pricing.Strategies;
 using AgroAdmin.NotificationWorker.Consumers;
 using AgroAdmin.Shared.Services;
 using MassTransit;
@@ -112,6 +114,10 @@ builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddScoped<BookingFormService>();
 builder.Services.AddHostedService<DatabaseScannerService>();
 builder.Services.AddHostedService<DatabaseBackupService>();
+builder.Services.AddScoped<IPricingStrategy, BasePriceStrategy>();
+builder.Services.AddScoped<IPricingStrategy, AdditionalServicesStrategy>();
+builder.Services.AddScoped<PricingEngine>();
+builder.Services.AddScoped<PricingConfigurationService>();
 
 // --- 5. MASSTRANSIT ---
 builder.Services.AddMassTransit(x => {
@@ -132,10 +138,20 @@ builder.Services.AddMassTransit(x => {
 var app = builder.Build();
 
 // --- МИГРАЦИИ ---
-using (var scope = app.Services.CreateScope())
+await using (var scope = app.Services.CreateAsyncScope())
 {
-    try { scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate(); }
-    catch (Exception ex) { Log.Error(ex, "Migration error"); }
+    try
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await dbContext.Database.MigrateAsync();
+
+        var configService = scope.ServiceProvider.GetRequiredService<PricingConfigurationService>();
+        await configService.EnsureDefaultConfigurationAsync();
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Migration or seeding error");
+    }
 }
 
 // --- ПАЙПЛАЙН ---
