@@ -419,7 +419,7 @@ public class BookingFormService(
     {
         try
         {
-            var response = await http.PostAsJsonAsync("api/bookings/validate", booking);
+            var response = await http.PostAsJsonAsync($"api/bookings/validate?bookingId={_currentBookingId}", booking);
 
             if (response.IsSuccessStatusCode)
             {

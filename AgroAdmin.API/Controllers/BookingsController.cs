@@ -464,7 +464,9 @@ public class BookingsController(
     }
 
     [HttpPost("validate")]
-    public async Task<ActionResult<BookingValidationResult>> Validate([FromBody] CreateBookingDto dto)
+    public async Task<ActionResult<BookingValidationResult>> Validate(
+        [FromBody] CreateBookingDto dto,
+        [FromQuery] int? bookingId = null)
     {
         try
         {
@@ -478,8 +480,8 @@ public class BookingsController(
                 errors.AddRange(guestValidation.Errors);
             }
 
-            // 2. Валидация доступности дат
-            var dateValidation = await validationService.ValidateDatesAsync(dto);
+            // 2. Валидация доступности дат (передаем bookingId)
+            var dateValidation = await validationService.ValidateDatesAsync(dto, bookingId);
             if (!dateValidation.IsValid)
             {
                 errors.AddRange(dateValidation.Errors);
