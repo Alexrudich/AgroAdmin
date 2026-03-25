@@ -9,11 +9,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
+using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 using TelegramBotUpdate = Telegram.Bot.Types.Update;
 
 namespace AgroAdmin.Infrastructure.Services;
@@ -423,9 +425,105 @@ public class TelegramService : ITelegramService
     }
 
     private async Task CheckFreeSlotsAsync(IServiceScope scope, ITelegramBotClient botClient, Message message,
-        CancellationToken ct)
+     CancellationToken ct)
     {
-        await botClient.SendTextMessageAsync(message.Chat.Id, "🔄 Функция в разработке...", cancellationToken: ct);
+        var chatId = message.Chat.Id;
+        var parts = message.Text?.Split(' ');
+
+        // Если есть параметры — обрабатываем как ручной ввод
+        if (parts?.Length >= 2)
+        {
+            await ProcessDateRangeInput(botClient, message, ct);
+            return;
+        }
+
+        // Иначе показываем меню выбора периода
+        var inlineKeyboard = new InlineKeyboardMarkup(new[]
+        {
+        new[]
+        {
+            InlineKeyboardButton.WithCallbackData("📅 Текущий месяц", "period_current_month"),
+            InlineKeyboardButton.WithCallbackData("📆 Следующий месяц", "period_next_month")
+        },
+        new[]
+        {
+            InlineKeyboardButton.WithCallbackData("📊 Следующие 2 недели", "period_two_weeks"),
+            InlineKeyboardButton.WithCallbackData("✏️ Ввести даты вручную", "period_manual")
+        }
+    });
+
+        await botClient.SendTextMessageAsync(
+            chatId,
+            "🏠 *Выберите период для проверки свободных дат:*\n\n" +
+            "Будут показаны дни, когда полностью свободны все объекты.",
+            parseMode: ParseMode.Markdown,
+            replyMarkup: inlineKeyboard,
+            cancellationToken: ct);
+    }
+
+    private async Task ProcessDateRangeInput(ITelegramBotClient botClient, Message message, CancellationToken ct)
+    {
+        var chatId = message.Chat.Id;
+        var parts = message.Text?.Split(' ');
+
+        if (parts?.Length >= 2 && DateTime.TryParse(parts[1], out var startDate))
+        {
+            DateTime endDate;
+            if (parts.Length >= 3 && DateTime.TryParse(parts[2], out endDate))
+            {
+                if (endDate < startDate) (startDate, endDate) = (endDate, startDate);
+            }
+            else
+            {
+                endDate = startDate.AddDays(30);
+            }
+
+            if ((endDate - startDate).Days > 90)
+            {
+                endDate = startDate.AddDays(90);
+            }
+
+            // Вызываем существующую логику с датами
+            await ShowAvailability(botClient, chatId, startDate, endDate, ct);
+            return;
+        }
+
+        await botClient.SendTextMessageAsync(
+            chatId,
+            "❌ Неверный формат дат.\n\n" +
+            "Используйте:\n" +
+            "/checkFreeSlots 2026-04-01\n" +
+            "/checkFreeSlots 2026-04-01 2026-04-30",
+            cancellationToken: ct);
+    }
+
+    private async Task ShowAvailability(ITelegramBotClient botClient, long chatId, DateTime startDate, DateTime endDate, CancellationToken ct)
+    {
+        try
+        {
+            // Вызываем API
+            var httpClient = _httpClientFactory.CreateClient();
+            var apiUrl = _configuration["ApiUrl"] ?? "http://localhost:8080";
+
+            var availability = await httpClient.GetFromJsonAsync<List<DailyAvailability>>(
+                $"{apiUrl}/api/bookings/availability?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}", ct);
+
+            if (availability == null || !availability.Any())
+            {
+                await botClient.SendTextMessageAsync(chatId, "❌ Не удалось получить данные о загрузке", cancellationToken: ct);
+                return;
+            }
+
+            // Форматируем результат в стиле "Вариант 4"
+            var message = FormatAvailabilitySummary(availability, startDate, endDate);
+
+            await botClient.SendTextMessageAsync(chatId, message, parseMode: ParseMode.Markdown, cancellationToken: ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in ShowAvailability");
+            await botClient.SendTextMessageAsync(chatId, "❌ Ошибка при получении данных", cancellationToken: ct);
+        }
     }
 
     private async Task CreateFullBackupAsync(IServiceScope scope, ITelegramBotClient botClient, long chatId,
@@ -446,11 +544,63 @@ public class TelegramService : ITelegramService
         await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
     }
 
-    private async Task HandleCallbackQueryAsync(ITelegramBotClient botClient, CallbackQuery callbackQuery,
-        CancellationToken ct)
+    // В HandleCallbackQueryAsync
+    private async Task HandleCallbackQueryAsync(ITelegramBotClient botClient, CallbackQuery callbackQuery, CancellationToken ct)
     {
-        // Обработка нажатий на кнопки
-        await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: ct);
+        var chatId = callbackQuery.Message.Chat.Id;
+        var data = callbackQuery.Data;
+
+        if (data?.StartsWith("period_") == true)
+        {
+            var today = DateTime.Today;
+            DateTime startDate;
+            DateTime endDate;
+
+            switch (data)
+            {
+                case "period_current_month":
+                    startDate = today;
+                    endDate = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+                    break;
+
+                case "period_next_month":
+                    var nextMonth = today.AddMonths(1);
+                    startDate = new DateTime(nextMonth.Year, nextMonth.Month, 1);
+                    endDate = new DateTime(nextMonth.Year, nextMonth.Month, DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month));
+                    break;
+
+                case "period_two_weeks":
+                    startDate = today;
+                    endDate = today.AddDays(14);
+                    break;
+
+                case "period_manual":
+                    await botClient.SendTextMessageAsync(
+                        chatId,
+                        "✏️ *Введите даты вручную*\n\n" +
+                        "Формат: `/checkFreeSlots 2026-04-01 2026-04-30`\n\n" +
+                        "Примеры:\n" +
+                        "`/checkFreeSlots 2026-04-01` — покажет месяц\n" +
+                        "`/checkFreeSlots 2026-04-01 2026-05-15` — покажет указанный период",
+                        parseMode: ParseMode.Markdown,
+                        cancellationToken: ct);
+                    await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: ct);
+                    return;
+
+                default:
+                    return;
+            }
+
+            await ShowAvailability(botClient, chatId, startDate, endDate, ct);
+            await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: ct);
+
+            // Удаляем сообщение с кнопками
+            try
+            {
+                await botClient.DeleteMessageAsync(chatId, callbackQuery.Message.MessageId, cancellationToken: ct);
+            }
+            catch { }
+        }
     }
 
     private string FormatBookingMessage(BookingDto booking)
@@ -488,5 +638,104 @@ public class TelegramService : ITelegramService
                 🥂 Зал: {(booking.NeedsBanquetHall ? "✅" : "❌")}
                 {costLine}
                 """;
+    }
+    private string FormatAvailabilitySummary(List<DailyAvailability> availability, DateTime startDate, DateTime endDate)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine($"🏠 *СВОДКА ЗАГРУЗКИ*");
+        sb.AppendLine($"📅 {startDate:dd.MM.yyyy} — {endDate:dd.MM.yyyy}\n");
+
+        // 1. Полностью свободные даты (все 3 объекта)
+        var fullyFreeDates = availability.Where(d => d.IsFullyFree).Select(d => d.Date).ToList();
+        sb.AppendLine(FormatDateRanges("🟢 *Полностью свободно* (все 3 объекта)", fullyFreeDates));
+
+        // 2. Частично свободные даты
+        var partiallyFree = availability.Where(d => d.IsPartiallyFree).ToList();
+        if (partiallyFree.Any())
+        {
+            sb.AppendLine($"\n🟡 *Частично занято* (свободен 1-2 объекта):");
+
+            // Группируем по типу занятости
+            var onlyPondFree = partiallyFree.Where(d => d.IsPondSideFree && !d.IsParkingSideFree).Select(d => d.Date).ToList();
+            var onlyParkingFree = partiallyFree.Where(d => !d.IsPondSideFree && d.IsParkingSideFree).Select(d => d.Date).ToList();
+            var bothFreeButWholeOccupied = partiallyFree.Where(d => d.IsPondSideFree && d.IsParkingSideFree && !d.IsWholeHouseFree).Select(d => d.Date).ToList();
+
+            if (onlyPondFree.Any())
+                sb.AppendLine(FormatDateRanges("   🌊 Только PondSide", onlyPondFree));
+
+            if (onlyParkingFree.Any())
+                sb.AppendLine(FormatDateRanges("   🚗 Только ParkingSide", onlyParkingFree));
+
+            if (bothFreeButWholeOccupied.Any())
+                sb.AppendLine(FormatDateRanges("   🏠 Занят WholeHouse, свободны обе половинки", bothFreeButWholeOccupied));
+        }
+
+        // 3. Полностью занятые даты
+        var fullyOccupied = availability.Where(d => d.IsFullyOccupied).Select(d => d.Date).ToList();
+        if (fullyOccupied.Any())
+        {
+            sb.AppendLine($"\n🔴 *Полностью занято* (все 3 объекта):");
+            sb.AppendLine(FormatDateRanges("   ", fullyOccupied));
+        }
+
+        // 4. Статистика
+        var totalDays = availability.Count;
+        var freeDays = fullyFreeDates.Count;
+        var freePercent = totalDays > 0 ? (freeDays * 100.0 / totalDays) : 0;
+
+        sb.AppendLine($"\n📊 *Статистика:*");
+        sb.AppendLine($"   • Всего дней: {totalDays}");
+        sb.AppendLine($"   • Полностью свободных: {freeDays} ({freePercent:F0}%)");
+        sb.AppendLine($"   • Частично занятых: {partiallyFree.Count}");
+        sb.AppendLine($"   • Полностью занятых: {fullyOccupied.Count}");
+
+        return sb.ToString();
+    }
+
+    private string FormatDateRanges(string title, List<DateTime> dates)
+    {
+        if (!dates.Any()) return "";
+
+        var ranges = new List<string>();
+        var sorted = dates.OrderBy(d => d).ToList();
+
+        DateTime? rangeStart = null;
+        DateTime? prevDate = null;
+
+        foreach (var date in sorted)
+        {
+            if (rangeStart == null)
+            {
+                rangeStart = date;
+            }
+            else if (prevDate.HasValue && (date - prevDate.Value).Days > 1)
+            {
+                // Разрыв — закрываем текущий диапазон
+                ranges.Add(FormatSingleRange(rangeStart.Value, prevDate.Value));
+                rangeStart = date;
+            }
+
+            prevDate = date;
+        }
+
+        // Добавляем последний диапазон
+        if (rangeStart.HasValue && prevDate.HasValue)
+        {
+            ranges.Add(FormatSingleRange(rangeStart.Value, prevDate.Value));
+        }
+
+        if (string.IsNullOrEmpty(title))
+            return string.Join(", ", ranges);
+
+        return $"{title}: {string.Join(", ", ranges)}";
+    }
+
+    private string FormatSingleRange(DateTime start, DateTime end)
+    {
+        if (start == end)
+            return $"{start:dd.MM}";
+
+        return $"{start:dd.MM}—{end:dd.MM}";
     }
 }

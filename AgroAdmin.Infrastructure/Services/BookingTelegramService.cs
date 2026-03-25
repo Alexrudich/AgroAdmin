@@ -68,11 +68,93 @@ public class BookingTelegramService : IBookingTelegramService
         }
     }
 
-    public async Task<List<FreeSlotDto>> GetFreeSlotsAsync(DateTime startDate, DateTime endDate)
+    public async Task<List<DateTime>> GetFullyFreeDaysAsync(DateTime startDate, DateTime endDate)
     {
-        // TODO: реализовать позже
-        _logger.LogWarning("GetFreeSlotsAsync not implemented yet");
-        return new List<FreeSlotDto>();
+        try
+        {
+            var allUnits = new[] { ReservedUnits.PondSide, ReservedUnits.ParkingSide, ReservedUnits.WholeHouse };
+            var freeDays = new List<DateTime>();
+
+            // Получаем все бронирования за период
+            var bookings = await _context.Bookings
+                .Where(b => b.ArrivalDate <= endDate && b.DepartureDate >= startDate)
+                .ToListAsync();
+
+            // Проверяем каждый день периода
+            for (var date = startDate; date <= endDate; date = date.AddDays(1))
+            {
+                // Какие юниты заняты в этот день?
+                var occupiedUnits = bookings
+                    .Where(b => b.ArrivalDate <= date && b.DepartureDate > date)
+                    .Select(b => b.ReservedUnit)
+                    .Distinct()
+                    .ToList();
+
+                // Если ни один юнит не занят - день полностью свободен
+                if (!occupiedUnits.Any())
+                {
+                    freeDays.Add(date);
+                }
+            }
+
+            return freeDays;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetFullyFreeDaysAsync");
+            return new List<DateTime>();
+        }
+    }
+
+    public async Task<List<DailyAvailability>> GetDailyAvailabilityAsync(DateTime startDate, DateTime endDate)
+    {
+        try
+        {
+            var result = new List<DailyAvailability>();
+
+            var bookings = await _context.Bookings
+                .Where(b => b.ArrivalDate <= endDate && b.DepartureDate >= startDate)
+                .ToListAsync();
+
+            for (var date = startDate; date <= endDate; date = date.AddDays(1))
+            {
+                var daily = new DailyAvailability
+                {
+                    Date = date,
+                    IsPondSideFree = true,
+                    IsParkingSideFree = true,
+                    IsWholeHouseFree = true
+                };
+
+                foreach (var booking in bookings)
+                {
+                    if (booking.ArrivalDate <= date && booking.DepartureDate > date)
+                    {
+                        switch (booking.ReservedUnit)
+                        {
+                            case ReservedUnits.PondSide:
+                                daily.IsPondSideFree = false;
+                                break;
+                            case ReservedUnits.ParkingSide:
+                                daily.IsParkingSideFree = false;
+                                break;
+                            case ReservedUnits.WholeHouse:
+                                daily.IsWholeHouseFree = false;
+                                break;
+                        }
+                    }
+                }
+
+                result.Add(daily);
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetDailyAvailabilityAsync");
+            return new List<DailyAvailability>();
+        }
     }
 
     public async Task<BookingSummaryDto> GetBookingSummaryAsync(int year, int month)

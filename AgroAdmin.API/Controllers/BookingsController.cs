@@ -1,7 +1,7 @@
 ﻿using AgroAdmin.Domain.Models;
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Shared.Dto.Bookings;
+using AgroAdmin.Infrastructure.Services;
 using AgroAdmin.Shared.Dto.Bookings.Events;
 using AgroAdmin.Shared.Dto.Bookings.Requests;
 using AgroAdmin.Shared.Dto.Bookings.Responses;
@@ -23,6 +23,7 @@ public class BookingsController(
     ITelegramService telegramService,
     IBookingValidationService validationService,
     IPublishEndpoint publishEndpoint,
+    IBookingTelegramService bookingTelegramService,
     ILogger<BookingsController> logger) : ControllerBase
 {
     [HttpGet]
@@ -611,6 +612,28 @@ public class BookingsController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting nearest bookings for Telegram");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    [HttpGet("availability")]
+    public async Task<ActionResult<List<DailyAvailability>>> GetAvailability(
+        [FromQuery] DateTime startDate,
+        [FromQuery] DateTime endDate)
+    {
+        try
+        {
+            if (startDate == default || endDate == default)
+            {
+                return BadRequest(new { error = "startDate and endDate are required" });
+            }
+
+            var availability = await bookingTelegramService.GetDailyAvailabilityAsync(startDate, endDate);
+            return Ok(availability);
+        }
+        catch (Exception ex)
+        { 
+            logger.LogError(ex, "Error getting availability");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
