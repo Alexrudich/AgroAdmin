@@ -8,52 +8,105 @@
     </div>
     <div class="card-body">
         <div class="row g-3 mb-3">
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <input @bind="_newName" class="form-control" placeholder="Имя получателя" />
             </div>
             <div class="col-md-3">
                 <input @bind="_newChatId" class="form-control" placeholder="Chat ID" />
             </div>
             <div class="col-md-2">
+                <select @bind="_newRole" class="form-select">
+                    <option value="Viewer">Просмотр</option>
+                    <option value="Manager">Управление</option>
+                    <option value="Admin">Админ</option>
+                </select>
+            </div>
+            <div class="col-md-1">
                 <div class="form-check mt-2">
                     <input @bind="_newIsDefault" class="form-check-input" type="checkbox" id="defaultCheck" />
-                    <label class="form-check-label" for="defaultCheck">По умолчанию</label>
+                    <label class="form-check-label" for="defaultCheck">По умолч.</label>
                 </div>
             </div>
-            <div class="col-md-2">
-                <button class="btn btn-success w-100" @onclick="AddRecipient">➕ Добавить</button>
+            <div class="col-md-1">
+                <div class="form-check mt-2">
+                    <input @bind="_newIsActive" class="form-check-input" type="checkbox" id="activeCheck" />
+                    <label class="form-check-label" for="activeCheck">Активен</label>
+                </div>
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-success w-100" @onclick="AddRecipient">➕</button>
             </div>
         </div>
 
         <div class="table-responsive">
-            <table class="table table-sm">
+            <table class="table table-sm table-hover">
                 <thead>
                     <tr>
                         <th>Имя</th>
                         <th>Chat ID</th>
-                        <th>По умолчанию</th>
+                        <th>Роль</th>
+                        <th>Активен</th>
+                        <th>По умолч.</th>
+                        <th>Команд/день</th>
+                        <th>Последняя активность</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var r in _recipients)
-                    {
-                        <tr>
-                            <td>@r.Name</td>
-                            <td>@r.ChatId</td>
-                            <td>
-                                <input type="checkbox"
-                                       checked="@r.IsDefault"
-                                       @onchange="(args) => ToggleDefault(r, args.Value as bool?)" />
-                            </td>
-                            <td class="text-end">
-                                <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteRecipient(r.Id)">🗑️</button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
+                @foreach (var r in _recipients)
+                {
+                    <tr class="@(!r.IsActive ? "table-secondary" : "")">
+                        <td>
+                            <input @bind="r.Name" 
+                                   @bind:event="oninput" 
+                                   @onblur="() => UpdateRecipient(r)" 
+                                   class="form-control form-control-sm" />
+                        </td>
+                        <td>
+                            <input @bind="r.ChatId" 
+                                   @bind:event="oninput" 
+                                   @onblur="() => UpdateRecipient(r)" 
+                                   class="form-control form-control-sm" />
+                        </td>
+                        <td>
+                            <select value="@r.Role" 
+                                    @onchange="(args) => OnRoleChanged(r, args)" 
+                                    class="form-select form-select-sm">
+                                <option value="Viewer">Просмотр</option>
+                                <option value="Manager">Управление</option>
+                                <option value="Admin">Админ</option>
+                            </select>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" 
+                                   checked="@r.IsActive"
+                                   @onchange="(args) => ToggleActive(r, args.Value as bool?)" />
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox"
+                                   checked="@r.IsDefault"
+                                   @onchange="(args) => ToggleDefault(r, args.Value as bool?)" />
+                        </td>
+                        <td class="text-center">
+                            <span class="badge @(r.CommandCountToday > 25 ? "bg-warning" : "bg-secondary")">
+                                @r.CommandCountToday/30
+                            </span>
+                        </td>
+                        <td>
+                            @(r.LastActiveAt?.ToString("dd.MM HH:mm") ?? "никогда")
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteRecipient(r.Id)">🗑️</button>
+                        </td>
+                    </tr>
+                }                </tbody>
             </table>
         </div>
+        
+        <small class="text-muted">
+            💡 Роли: <strong>Просмотр</strong> - только чтение, <strong>Управление</strong> - может создавать бэкапы, 
+            <strong>Админ</strong> - полный доступ
+        </small>
     </div>
 </div>
 
@@ -64,7 +117,9 @@
     private List<TelegramRecipientDto> _recipients = [];
     private string _newName = "";
     private string _newChatId = "";
+    private string _newRole = "Viewer";
     private bool _newIsDefault = false;
+    private bool _newIsActive = true;
 
     protected override async Task OnInitializedAsync() => await Load();
 
@@ -83,14 +138,31 @@
             {
                 Name = _newName,
                 ChatId = _newChatId,
-                IsDefault = _newIsDefault
+                IsDefault = _newIsDefault,
+                IsActive = _newIsActive,
+                Role = _newRole
             });
 
         _newName = "";
         _newChatId = "";
         _newIsDefault = false;
+        _newIsActive = true;
+        _newRole = "Viewer";
         await Load();
         await OnChanged.InvokeAsync();
+    }
+
+    private async Task UpdateRecipient(TelegramRecipientDto recipient)
+    {
+        await Http.PutAsJsonAsync($"api/notifications/recipients/{recipient.Id}", recipient);
+        await Load();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ToggleActive(TelegramRecipientDto recipient, bool? isChecked)
+    {
+        recipient.IsActive = isChecked ?? false;
+        await UpdateRecipient(recipient);
     }
 
     private async Task ToggleDefault(TelegramRecipientDto recipient, bool? isChecked)
@@ -121,5 +193,11 @@
         await Http.DeleteAsync($"api/notifications/recipients/{id}");
         await Load();
         await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnRoleChanged(TelegramRecipientDto recipient, ChangeEventArgs args)
+    {
+        recipient.Role = args.Value?.ToString();
+        await UpdateRecipient(recipient);
     }
 }

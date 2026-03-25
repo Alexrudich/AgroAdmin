@@ -15,6 +15,7 @@ services:
       - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
       - Telegram__ChatId=${TELEGRAM_CHAT_ID}
       - RabbitMQ__Url=${RABBITMQ_URL}
+      - ApiUrl=${API_URL}
     ports:
       - "8080:80"
     depends_on:

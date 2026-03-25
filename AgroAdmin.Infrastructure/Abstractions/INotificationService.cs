@@ -15,4 +15,5 @@ public interface INotificationService
     Task DeleteRecipientAsync(int id);
     Task MarkAsSentAsync(int id);
     Task UpdateRecipientAsync(int id, TelegramRecipientDto dto);
+    Task UpdateRecipientStatsAsync(long chatId, bool incrementCommandCount = true);
 }

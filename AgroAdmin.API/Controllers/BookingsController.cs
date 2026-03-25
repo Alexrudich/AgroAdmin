@@ -6,6 +6,8 @@ using AgroAdmin.Shared.Dto.Bookings.Events;
 using AgroAdmin.Shared.Dto.Bookings.Requests;
 using AgroAdmin.Shared.Dto.Bookings.Responses;
 using AgroAdmin.Shared.Dto.Guests;
+using AgroAdmin.Shared.Dto.Telegram.Responses;
+using AgroAdmin.Shared.Enums;
 using AgroAdmin.Shared.Extensions;
 using MassTransit;
 using Microsoft.AspNetCore.Mvc;
@@ -552,4 +554,64 @@ public class BookingsController(
         return NoContent();
     }
 
+    [HttpGet("nearest")]
+    public async Task<ActionResult<List<TelegramBookingDto>>> GetNearestBookings([FromQuery] int days = 7)
+    {
+        try
+        {
+            var today = DateTime.Today;
+            var endDate = today.AddDays(days);
+
+            // 1. Получаем данные из БД без switch
+            var bookingsData = await context.Bookings
+                .Include(b => b.Guest)
+                .Where(b => b.ArrivalDate >= today &&
+                           b.ArrivalDate <= endDate)
+                .OrderBy(b => b.ArrivalDate)
+                .ThenBy(b => b.CheckInTime)
+                .Take(15)
+                .Select(b => new
+                {
+                    b.Id,
+                    b.Guest,
+                    b.ArrivalDate,
+                    b.DepartureDate,
+                    b.TotalGuestsCount,
+                    b.ReservedUnit,
+                    b.NeedsSauna,
+                    b.AccommodationCost,
+                    b.AdminNotes
+                })
+                .ToListAsync();
+
+            // 2. Преобразуем в DTO с вычислением эмодзи в памяти
+            var result = bookingsData.Select(b => new TelegramBookingDto
+            {
+                Id = b.Id,
+                GuestName = b.Guest?.FullName ?? "Гость не указан",
+                Phone = b.Guest?.Phone,
+                ArrivalDate = b.ArrivalDate,
+                DepartureDate = b.DepartureDate,
+                TotalGuestsCount = b.TotalGuestsCount,
+                UnitName = b.ReservedUnit.ToFriendlyString(),
+                UnitEmoji = b.ReservedUnit switch
+                {
+                    ReservedUnits.PondSide => "🌊",
+                    ReservedUnits.ParkingSide => "🚗",
+                    ReservedUnits.WholeHouse => "🏠",
+                    _ => "🏢"
+                },
+                NeedsSauna = b.NeedsSauna,
+                TotalPrice = b.AccommodationCost,
+                Notes = b.AdminNotes
+            }).ToList();
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting nearest bookings for Telegram");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
 }
