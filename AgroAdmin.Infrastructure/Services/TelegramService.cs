@@ -430,7 +430,49 @@ public class TelegramService : ITelegramService
 
     private async Task CreateFullBackupAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
     {
-        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
-    }
+        var statusMessage = await botClient.SendTextMessageAsync(
+            chatId,
+            "🔄 *Создание бэкапа...*\nЭто может занять несколько минут.",
+            parseMode: ParseMode.Markdown,
+            cancellationToken: ct);
 
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var backupService = scope.ServiceProvider.GetRequiredService<IDatabaseBackupService>();
+
+            var result = await backupService.CreateManualBackupAsync();
+
+            if (result.Success)
+            {
+                var message = $"✅ *{result.Message}*\n\n" +
+                              (result.FileLink != null ? $"🔗 [Скачать]({result.FileLink})" : "");
+
+                await botClient.EditMessageTextAsync(
+                    chatId,
+                    statusMessage.MessageId,
+                    message,
+                    parseMode: ParseMode.Markdown,
+                    cancellationToken: ct);
+            }
+            else
+            {
+                await botClient.EditMessageTextAsync(
+                    chatId,
+                    statusMessage.MessageId,
+                    $"❌ *{result.Message}*",
+                    parseMode: ParseMode.Markdown,
+                    cancellationToken: ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in CreateFullBackupAsync");
+            await botClient.EditMessageTextAsync(
+                chatId,
+                statusMessage.MessageId,
+                "❌ Критическая ошибка при создании бэкапа. Проверьте логи.",
+                cancellationToken: ct);
+        }
+    }
 }
