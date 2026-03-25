@@ -107,10 +107,11 @@ catch (Exception ex)
 }
 
 // --- 4. СЕРВИСЫ ---
+builder.Services.AddSingleton<ITelegramService, TelegramService>();
+builder.Services.AddSingleton<ITelegramApiClient, TelegramApiClient>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddScoped<BookingFormService>();
 builder.Services.AddHostedService<DatabaseScannerService>();
 builder.Services.AddHostedService<DatabaseBackupService>();

@@ -1,15 +1,15 @@
 ﻿using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
+using AgroAdmin.Shared.Constants;
 using AgroAdmin.Shared.Dto.Bookings.Responses;
-using AgroAdmin.Shared.Dto.Telegram.Responses;
 using AgroAdmin.Shared.Enums;
 using AgroAdmin.Shared.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Json;
 using System.Text;
+using AgroAdmin.Shared.Utils;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -26,7 +26,7 @@ public class TelegramService : ITelegramService
     private readonly IConfiguration _configuration;
     private readonly ILogger<TelegramService> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ITelegramApiClient _apiClient;
     private readonly string _defaultChatId;
     private CancellationTokenSource? _receivingCts;
 
@@ -34,12 +34,13 @@ public class TelegramService : ITelegramService
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         ILogger<TelegramService> logger,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        ITelegramApiClient apiClient)
     {
-        _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _logger = logger;
         _scopeFactory = scopeFactory;
+        _apiClient = apiClient;
 
         var botToken = configuration["Telegram:BotToken"]
                        ?? throw new InvalidOperationException("Telegram:BotToken not configured");
@@ -49,7 +50,6 @@ public class TelegramService : ITelegramService
         _botClient = new TelegramBotClient(botToken);
     }
 
-    // Существующий метод отправки сообщений (оставляем как есть)
     public async Task SendMessageAsync(string message, string? targetChatId = null)
     {
         try
@@ -69,7 +69,6 @@ public class TelegramService : ITelegramService
                         chatId: trimmedChatId,
                         text: message,
                         parseMode: ParseMode.Html);
-
                     successCount++;
                 }
                 catch (Exception ex)
@@ -89,22 +88,17 @@ public class TelegramService : ITelegramService
 
     public async Task SendBookingNotificationAsync(BookingDto booking)
     {
-        var message = FormatBookingMessage(booking);
+        var message = TelegramMessageFormatter.FormatBookingMessage(booking);
         await SendMessageAsync(message);
     }
 
-    // НОВЫЙ МЕТОД: Запуск получения команд
     public async Task StartReceivingAsync(CancellationToken cancellationToken)
     {
         _receivingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var receiverOptions = new ReceiverOptions
         {
-            AllowedUpdates = new[]
-            {
-                UpdateType.Message,
-                UpdateType.CallbackQuery
-            },
+            AllowedUpdates = new[] { UpdateType.Message, UpdateType.CallbackQuery },
             ThrowPendingUpdates = true
         };
 
@@ -112,8 +106,7 @@ public class TelegramService : ITelegramService
             HandleUpdateAsync,
             HandleErrorAsync,
             receiverOptions,
-            _receivingCts.Token
-        );
+            _receivingCts.Token);
 
         _logger.LogInformation("Telegram bot started receiving updates");
         await Task.CompletedTask;
@@ -127,11 +120,9 @@ public class TelegramService : ITelegramService
             _receivingCts.Dispose();
             _logger.LogInformation("Telegram bot stopped receiving updates");
         }
-
         await Task.CompletedTask;
     }
 
-    // Обработка входящих обновлений
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, TelegramBotUpdate update, CancellationToken ct)
     {
         try
@@ -140,27 +131,18 @@ public class TelegramService : ITelegramService
             {
                 var chatId = update.Message.Chat.Id;
 
-                // Проверяем авторизацию
                 if (!await IsAuthorizedAsync(chatId, ct))
                 {
-                    await botClient.SendTextMessageAsync(
-                        chatId,
-                        "⛔ У вас нет доступа к этому боту. Обратитесь к администратору.",
-                        cancellationToken: ct);
+                    await botClient.SendTextMessageAsync(chatId, "⛔ У вас нет доступа к этому боту.", cancellationToken: ct);
                     return;
                 }
 
-                // Проверяем rate limit
                 if (!await CheckRateLimitAsync(chatId, ct))
                 {
-                    await botClient.SendTextMessageAsync(
-                        chatId,
-                        "⚠️ Слишком много запросов. Подождите немного.",
-                        cancellationToken: ct);
+                    await botClient.SendTextMessageAsync(chatId, "⚠️ Слишком много запросов. Подождите немного.", cancellationToken: ct);
                     return;
                 }
 
-                // Обрабатываем команду
                 if (messageText.StartsWith('/'))
                 {
                     await HandleCommandAsync(botClient, update.Message, ct);
@@ -184,12 +166,10 @@ public class TelegramService : ITelegramService
             ApiRequestException apiEx => $"Telegram API Error: {apiEx.ErrorCode} - {apiEx.Message}",
             _ => exception.Message
         };
-
         _logger.LogError(exception, "Telegram bot error: {Error}", errorMessage);
         return Task.CompletedTask;
     }
 
-    // Проверка авторизации
     private async Task<bool> IsAuthorizedAsync(long chatId, CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -200,34 +180,12 @@ public class TelegramService : ITelegramService
 
         if (recipient == null) return false;
 
-        // Обновляем статистику активности
         var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
         await notificationService.UpdateRecipientStatsAsync(chatId, false);
 
         return recipient.IsActive;
     }
 
-    // Проверка роли для команд
-    private async Task<bool> HasPermissionAsync(long chatId, string requiredRole, CancellationToken ct)
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var recipient = await dbContext.TelegramRecipients
-            .FirstOrDefaultAsync(r => r.ChatId == chatId.ToString(), ct);
-
-        if (recipient == null) return false;
-
-        return recipient.IsActive && recipient.Role switch
-        {
-            "Admin" => true,
-            "Manager" => requiredRole != "Admin",
-            "Viewer" => requiredRole == "Viewer",
-            _ => false
-        };
-    }
-
-    // Rate limiting
     private async Task<bool> CheckRateLimitAsync(long chatId, CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -239,18 +197,12 @@ public class TelegramService : ITelegramService
         if (recipient == null) return false;
 
         var today = DateTime.UtcNow.Date;
-
-        // Сбрасываем счетчик если новый день
         if (recipient.LastCommandAt?.Date != today)
         {
             recipient.CommandCountToday = 0;
         }
 
-        // Лимит: 30 команд в день
-        if (recipient.CommandCountToday >= 30)
-        {
-            return false;
-        }
+        if (recipient.CommandCountToday >= 30) return false;
 
         recipient.CommandCountToday++;
         recipient.LastCommandAt = DateTime.UtcNow;
@@ -259,7 +211,6 @@ public class TelegramService : ITelegramService
         return true;
     }
 
-    // Обработка команд (продолжение следует)
     private async Task HandleCommandAsync(ITelegramBotClient botClient, Message message, CancellationToken ct)
     {
         var chatId = message.Chat.Id;
@@ -272,185 +223,93 @@ public class TelegramService : ITelegramService
         switch (command)
         {
             case "/start":
-                await SendWelcomeMessageAsync(botClient, chatId, ct);
+                await botClient.SendTextMessageAsync(chatId, TelegramMessages.Welcome, parseMode: ParseMode.Markdown, cancellationToken: ct);
                 break;
 
             case "/help":
-                await SendHelpMessageAsync(botClient, chatId, ct);
+                await botClient.SendTextMessageAsync(chatId, TelegramMessages.Help, parseMode: ParseMode.Markdown, cancellationToken: ct);
                 break;
 
             case "/nearestbookings":
-                await ShowNearestBookingsAsync(scope, botClient, chatId, ct);
+                await ShowNearestBookingsAsync(botClient, chatId, message, ct);
                 break;
 
             case "/checkfreeslots":
-                await CheckFreeSlotsAsync(scope, botClient, message, ct);
+                await CheckFreeSlotsAsync(botClient, message, ct);
                 break;
 
             case "/createfullbackup":
-                await CreateFullBackupAsync(scope, botClient, chatId, ct);
+                await CreateFullBackupAsync(botClient, chatId, ct);
                 break;
 
             case "/bookingsummary":
-                await ShowBookingSummaryAsync(scope, botClient, chatId, ct);
+                await ShowBookingSummaryAsync(botClient, chatId, ct);
                 break;
 
             case "/checkcapacity":
-                await CheckCapacityAsync(scope, botClient, chatId, ct);
+                await CheckCapacityAsync(botClient, chatId, ct);
                 break;
 
             default:
-                await botClient.SendTextMessageAsync(
-                    chatId,
-                    "❓ Неизвестная команда. Используйте /help для списка команд.",
-                    cancellationToken: ct);
+                await botClient.SendTextMessageAsync(chatId, "❓ Неизвестная команда. Используйте /help.", cancellationToken: ct);
                 break;
         }
     }
 
-    // Вспомогательные методы (пока заглушки)
-    private async Task SendWelcomeMessageAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
-    {
-        var welcomeMessage =
-            "🌿 *Добро пожаловать в AgroAdmin Bot!*\n\n" +
-            "Я помогу вам управлять усадьбой прямо из Telegram.\n\n" +
-            "*Доступные команды:*\n" +
-            "/help - показать список команд\n" +
-            "/nearestBookings - ближайшие бронирования\n" +
-            "/checkFreeSlots [дата_начала] [дата_конца] - свободные даты\n" +
-            "/createFullBackup - создать полный бэкап\n" +
-            "/bookingSummary - сводка за текущий месяц\n" +
-            "/checkCapacity - отчет по загрузке\n\n" +
-            "🔔 Вы будете получать уведомления о новых бронированиях и бэкапах.";
-
-        await botClient.SendTextMessageAsync(
-            chatId,
-            welcomeMessage,
-            parseMode: ParseMode.Markdown,
-            cancellationToken: ct);
-    }
-
-    private async Task SendHelpMessageAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
-    {
-        var helpMessage =
-            "📖 *Справка по командам*\n\n" +
-            "*/nearestBookings* - показать бронирования на ближайшие 7 дней\n" +
-            "*/checkFreeSlots 2026-04-01 2026-04-30* - проверить свободные даты\n" +
-            "*/createFullBackup* - создать полный бэкап всех данных\n" +
-            "*/bookingSummary* - сводка по бронированиям за текущий месяц\n" +
-            "*/checkCapacity* - график загрузки на неделю\n" +
-            "*/help* - показать эту справку";
-
-        await botClient.SendTextMessageAsync(
-            chatId,
-            helpMessage,
-            parseMode: ParseMode.Markdown,
-            cancellationToken: ct);
-    }
-
-    // Обработчики команд (пока заглушки, реализуем позже)
-    private async Task ShowNearestBookingsAsync(IServiceScope scope, ITelegramBotClient botClient, long chatId,
-        CancellationToken ct)
+    private async Task ShowNearestBookingsAsync(ITelegramBotClient botClient, long chatId, Message message, CancellationToken ct)
     {
         try
         {
-            // Получаем параметр days из команды
-            // Нужно передать message, чтобы достать текст команды
-            // Пока используем chatId, но message нам нужен для парсинга
-
-            var days = 7; // значение по умолчанию
-
-            // Вызываем API
-            var httpClient = _httpClientFactory.CreateClient();
-            var apiUrl = _configuration["ApiUrl"] ?? "http://localhost:8080";
-
-            var response = await httpClient.GetFromJsonAsync<List<TelegramBookingDto>>(
-                $"{apiUrl}/api/bookings/nearest?days={days}", ct);
-
-            if (response == null || response.Count == 0)
+            var parts = message.Text?.Split(' ');
+            var days = 7;
+            if (parts?.Length > 1 && int.TryParse(parts[1], out var parsedDays))
             {
-                await botClient.SendTextMessageAsync(
-                    chatId,
-                    $"📭 *Нет бронирований на ближайшие {days} дней.*\n\n" +
-                    "Используйте /checkFreeSlots чтобы посмотреть свободные даты.",
-                    parseMode: ParseMode.Markdown,
-                    cancellationToken: ct);
-                return;
+                days = Math.Clamp(parsedDays, 1, 30);
             }
 
-            var message = $"📅 *Ближайшие бронирования ({days} дней):*\n\n";
-
-            foreach (var booking in response)
-            {
-                var nights = (booking.DepartureDate - booking.ArrivalDate).Days;
-                var nightsText = nights switch
-                {
-                    1 => "ночь",
-                    <= 4 => "ночи",
-                    _ => "ночей"
-                };
-
-                message += $"*{booking.UnitEmoji} {booking.GuestName}*\n";
-                message += $"   📅 {booking.ArrivalDate:dd.MM} — {booking.DepartureDate:dd.MM} ({nights} {nightsText})\n";
-                message += $"   👥 {booking.TotalGuestsCount} чел.";
-
-                if (booking.NeedsSauna)
-                    message += " 🌡️";
-
-                if (booking.TotalPrice.HasValue && booking.TotalPrice.Value > 0)
-                    message += $"\n   💰 {booking.TotalPrice.Value:N0} BYN";
-
-                if (!string.IsNullOrEmpty(booking.Phone))
-                    message += $"\n   📞 {booking.Phone}";
-
-                message += "\n\n";
-            }
-
-            message += $"📊 *Итого:* {response.Count} бронирований";
-
-            await botClient.SendTextMessageAsync(
-                chatId,
-                message,
-                parseMode: ParseMode.Markdown,
-                cancellationToken: ct);
+            var bookings = await _apiClient.GetNearestBookingsAsync(days);
+            var response = TelegramMessageFormatter.FormatNearestBookings(bookings, days);
+            await botClient.SendTextMessageAsync(chatId, response, parseMode: ParseMode.Markdown, cancellationToken: ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in ShowNearestBookingsAsync");
-            await botClient.SendTextMessageAsync(
-                chatId,
-                "❌ Ошибка при получении списка бронирований. Попробуйте позже.",
-                cancellationToken: ct);
+            await botClient.SendTextMessageAsync(chatId, "❌ Ошибка при получении списка бронирований.", cancellationToken: ct);
         }
     }
 
-    private async Task CheckFreeSlotsAsync(IServiceScope scope, ITelegramBotClient botClient, Message message,
-     CancellationToken ct)
+    private async Task CheckFreeSlotsAsync(ITelegramBotClient botClient, Message message, CancellationToken ct)
     {
         var chatId = message.Chat.Id;
-        var parts = message.Text?.Split(' ');
 
-        // Если есть параметры — обрабатываем как ручной ввод
+        // Если есть параметры — показываем предупреждение, что теперь только кнопки
+        var parts = message.Text?.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts?.Length >= 2)
         {
-            await ProcessDateRangeInput(botClient, message, ct);
+            await botClient.SendTextMessageAsync(
+                chatId,
+                "📱 *Теперь выбор периода осуществляется через кнопки*\n\n" +
+                "Нажмите на одну из кнопок ниже, чтобы проверить свободные даты.",
+                parseMode: ParseMode.Markdown,
+                cancellationToken: ct);
             return;
         }
 
-        // Иначе показываем меню выбора периода
+        // Меню с кнопками
         var inlineKeyboard = new InlineKeyboardMarkup(new[]
         {
-        new[]
-        {
-            InlineKeyboardButton.WithCallbackData("📅 Текущий месяц", "period_current_month"),
-            InlineKeyboardButton.WithCallbackData("📆 Следующий месяц", "period_next_month")
-        },
-        new[]
-        {
-            InlineKeyboardButton.WithCallbackData("📊 Следующие 2 недели", "period_two_weeks"),
-            InlineKeyboardButton.WithCallbackData("✏️ Ввести даты вручную", "period_manual")
-        }
-    });
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("📅 Текущий месяц", "period_current_month"),
+                InlineKeyboardButton.WithCallbackData("📆 Следующий месяц", "period_next_month")
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("📊 2 недели", "period_two_weeks"),
+                InlineKeyboardButton.WithCallbackData("📅 30 дней", "period_30_days"),
+                InlineKeyboardButton.WithCallbackData("📆 90 дней", "period_90_days")
+            }
+        });
 
         await botClient.SendTextMessageAsync(
             chatId,
@@ -461,62 +320,18 @@ public class TelegramService : ITelegramService
             cancellationToken: ct);
     }
 
-    private async Task ProcessDateRangeInput(ITelegramBotClient botClient, Message message, CancellationToken ct)
-    {
-        var chatId = message.Chat.Id;
-        var parts = message.Text?.Split(' ');
-
-        if (parts?.Length >= 2 && DateTime.TryParse(parts[1], out var startDate))
-        {
-            DateTime endDate;
-            if (parts.Length >= 3 && DateTime.TryParse(parts[2], out endDate))
-            {
-                if (endDate < startDate) (startDate, endDate) = (endDate, startDate);
-            }
-            else
-            {
-                endDate = startDate.AddDays(30);
-            }
-
-            if ((endDate - startDate).Days > 90)
-            {
-                endDate = startDate.AddDays(90);
-            }
-
-            // Вызываем существующую логику с датами
-            await ShowAvailability(botClient, chatId, startDate, endDate, ct);
-            return;
-        }
-
-        await botClient.SendTextMessageAsync(
-            chatId,
-            "❌ Неверный формат дат.\n\n" +
-            "Используйте:\n" +
-            "/checkFreeSlots 2026-04-01\n" +
-            "/checkFreeSlots 2026-04-01 2026-04-30",
-            cancellationToken: ct);
-    }
-
     private async Task ShowAvailability(ITelegramBotClient botClient, long chatId, DateTime startDate, DateTime endDate, CancellationToken ct)
     {
         try
         {
-            // Вызываем API
-            var httpClient = _httpClientFactory.CreateClient();
-            var apiUrl = _configuration["ApiUrl"] ?? "http://localhost:8080";
-
-            var availability = await httpClient.GetFromJsonAsync<List<DailyAvailability>>(
-                $"{apiUrl}/api/bookings/availability?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}", ct);
-
-            if (availability == null || !availability.Any())
+            var availability = await _apiClient.GetAvailabilityAsync(startDate, endDate);
+            if (!availability.Any())
             {
                 await botClient.SendTextMessageAsync(chatId, "❌ Не удалось получить данные о загрузке", cancellationToken: ct);
                 return;
             }
 
-            // Форматируем результат в стиле "Вариант 4"
-            var message = FormatAvailabilitySummary(availability, startDate, endDate);
-
+            var message = TelegramMessageFormatter.FormatAvailabilitySummary(availability, startDate, endDate);
             await botClient.SendTextMessageAsync(chatId, message, parseMode: ParseMode.Markdown, cancellationToken: ct);
         }
         catch (Exception ex)
@@ -526,35 +341,22 @@ public class TelegramService : ITelegramService
         }
     }
 
-    private async Task CreateFullBackupAsync(IServiceScope scope, ITelegramBotClient botClient, long chatId,
-        CancellationToken ct)
-    {
-        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
-    }
-
-    private async Task ShowBookingSummaryAsync(IServiceScope scope, ITelegramBotClient botClient, long chatId,
-        CancellationToken ct)
-    {
-        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
-    }
-
-    private async Task CheckCapacityAsync(IServiceScope scope, ITelegramBotClient botClient, long chatId,
-        CancellationToken ct)
-    {
-        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
-    }
-
-    // В HandleCallbackQueryAsync
     private async Task HandleCallbackQueryAsync(ITelegramBotClient botClient, CallbackQuery callbackQuery, CancellationToken ct)
     {
+        if (callbackQuery.Message == null)
+        {
+            _logger.LogWarning("Callback query without message");
+            await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, "Ошибка", cancellationToken: ct);
+            return;
+        }
+
         var chatId = callbackQuery.Message.Chat.Id;
         var data = callbackQuery.Data;
 
         if (data?.StartsWith("period_") == true)
         {
             var today = DateTime.Today;
-            DateTime startDate;
-            DateTime endDate;
+            DateTime startDate, endDate;
 
             switch (data)
             {
@@ -574,18 +376,15 @@ public class TelegramService : ITelegramService
                     endDate = today.AddDays(14);
                     break;
 
-                case "period_manual":
-                    await botClient.SendTextMessageAsync(
-                        chatId,
-                        "✏️ *Введите даты вручную*\n\n" +
-                        "Формат: `/checkFreeSlots 2026-04-01 2026-04-30`\n\n" +
-                        "Примеры:\n" +
-                        "`/checkFreeSlots 2026-04-01` — покажет месяц\n" +
-                        "`/checkFreeSlots 2026-04-01 2026-05-15` — покажет указанный период",
-                        parseMode: ParseMode.Markdown,
-                        cancellationToken: ct);
-                    await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: ct);
-                    return;
+                case "period_30_days":
+                    startDate = today;
+                    endDate = today.AddDays(30);
+                    break;
+
+                case "period_90_days":
+                    startDate = today;
+                    endDate = today.AddDays(90);
+                    break;
 
                 default:
                     return;
@@ -594,7 +393,6 @@ public class TelegramService : ITelegramService
             await ShowAvailability(botClient, chatId, startDate, endDate, ct);
             await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: ct);
 
-            // Удаляем сообщение с кнопками
             try
             {
                 await botClient.DeleteMessageAsync(chatId, callbackQuery.Message.MessageId, cancellationToken: ct);
@@ -603,139 +401,20 @@ public class TelegramService : ITelegramService
         }
     }
 
-    private string FormatBookingMessage(BookingDto booking)
+    private async Task CreateFullBackupAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
     {
-        var unitName = booking.ReservedUnit.ToFriendlyString();
-        var unitEmoji = booking.ReservedUnit switch
-        {
-            ReservedUnits.PondSide => "🌊",
-            ReservedUnits.ParkingSide => "🚗",
-            ReservedUnits.WholeHouse => "🏠",
-            _ => "🏢"
-        };
-
-        var checkInTime = booking.CheckInTime != TimeSpan.Zero
-            ? booking.CheckInTime.ToString(@"hh\:mm")
-            : "14:00";
-
-        var costLine = string.Empty;
-        if (booking.AccommodationCost.HasValue && booking.AccommodationCost.Value > 0)
-        {
-            costLine = $"\n💰 Стоимость: {booking.AccommodationCost.Value:N0} BYN";
-        }
-
-        return $"""
-                <b>Новое бронирование!</b>
-
-                👤 Гость: {booking.Guest?.FullName}
-                📞 Телефон: {booking.Guest?.Phone}
-                📅 Даты: {booking.ArrivalDate:dd.MM.yyyy} — {booking.DepartureDate:dd.MM.yyyy}
-                ⏰ Заезд: {checkInTime}
-                🏠 Объект: {unitEmoji} {unitName}
-                👥 Гостей: {booking.TotalGuestsCount} (взр: {booking.AdultsCount}, дети: {booking.ChildrenCount}, мл: {booking.InfantsCount})
-                🐕 Собака: {(booking.HasDog ? "✅" : "❌")}
-                🌡️ Баня: {(booking.NeedsSauna ? "✅" : "❌")}
-                🥂 Зал: {(booking.NeedsBanquetHall ? "✅" : "❌")}
-                {costLine}
-                """;
-    }
-    private string FormatAvailabilitySummary(List<DailyAvailability> availability, DateTime startDate, DateTime endDate)
-    {
-        var sb = new StringBuilder();
-
-        sb.AppendLine($"🏠 *СВОДКА ЗАГРУЗКИ*");
-        sb.AppendLine($"📅 {startDate:dd.MM.yyyy} — {endDate:dd.MM.yyyy}\n");
-
-        // 1. Полностью свободные даты (все 3 объекта)
-        var fullyFreeDates = availability.Where(d => d.IsFullyFree).Select(d => d.Date).ToList();
-        sb.AppendLine(FormatDateRanges("🟢 *Полностью свободно* (все 3 объекта)", fullyFreeDates));
-
-        // 2. Частично свободные даты
-        var partiallyFree = availability.Where(d => d.IsPartiallyFree).ToList();
-        if (partiallyFree.Any())
-        {
-            sb.AppendLine($"\n🟡 *Частично занято* (свободен 1-2 объекта):");
-
-            // Группируем по типу занятости
-            var onlyPondFree = partiallyFree.Where(d => d.IsPondSideFree && !d.IsParkingSideFree).Select(d => d.Date).ToList();
-            var onlyParkingFree = partiallyFree.Where(d => !d.IsPondSideFree && d.IsParkingSideFree).Select(d => d.Date).ToList();
-            var bothFreeButWholeOccupied = partiallyFree.Where(d => d.IsPondSideFree && d.IsParkingSideFree && !d.IsWholeHouseFree).Select(d => d.Date).ToList();
-
-            if (onlyPondFree.Any())
-                sb.AppendLine(FormatDateRanges("   🌊 Только PondSide", onlyPondFree));
-
-            if (onlyParkingFree.Any())
-                sb.AppendLine(FormatDateRanges("   🚗 Только ParkingSide", onlyParkingFree));
-
-            if (bothFreeButWholeOccupied.Any())
-                sb.AppendLine(FormatDateRanges("   🏠 Занят WholeHouse, свободны обе половинки", bothFreeButWholeOccupied));
-        }
-
-        // 3. Полностью занятые даты
-        var fullyOccupied = availability.Where(d => d.IsFullyOccupied).Select(d => d.Date).ToList();
-        if (fullyOccupied.Any())
-        {
-            sb.AppendLine($"\n🔴 *Полностью занято* (все 3 объекта):");
-            sb.AppendLine(FormatDateRanges("   ", fullyOccupied));
-        }
-
-        // 4. Статистика
-        var totalDays = availability.Count;
-        var freeDays = fullyFreeDates.Count;
-        var freePercent = totalDays > 0 ? (freeDays * 100.0 / totalDays) : 0;
-
-        sb.AppendLine($"\n📊 *Статистика:*");
-        sb.AppendLine($"   • Всего дней: {totalDays}");
-        sb.AppendLine($"   • Полностью свободных: {freeDays} ({freePercent:F0}%)");
-        sb.AppendLine($"   • Частично занятых: {partiallyFree.Count}");
-        sb.AppendLine($"   • Полностью занятых: {fullyOccupied.Count}");
-
-        return sb.ToString();
+        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
     }
 
-    private string FormatDateRanges(string title, List<DateTime> dates)
+    private async Task ShowBookingSummaryAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
     {
-        if (!dates.Any()) return "";
-
-        var ranges = new List<string>();
-        var sorted = dates.OrderBy(d => d).ToList();
-
-        DateTime? rangeStart = null;
-        DateTime? prevDate = null;
-
-        foreach (var date in sorted)
-        {
-            if (rangeStart == null)
-            {
-                rangeStart = date;
-            }
-            else if (prevDate.HasValue && (date - prevDate.Value).Days > 1)
-            {
-                // Разрыв — закрываем текущий диапазон
-                ranges.Add(FormatSingleRange(rangeStart.Value, prevDate.Value));
-                rangeStart = date;
-            }
-
-            prevDate = date;
-        }
-
-        // Добавляем последний диапазон
-        if (rangeStart.HasValue && prevDate.HasValue)
-        {
-            ranges.Add(FormatSingleRange(rangeStart.Value, prevDate.Value));
-        }
-
-        if (string.IsNullOrEmpty(title))
-            return string.Join(", ", ranges);
-
-        return $"{title}: {string.Join(", ", ranges)}";
+        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
     }
 
-    private string FormatSingleRange(DateTime start, DateTime end)
+    private async Task CheckCapacityAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
     {
-        if (start == end)
-            return $"{start:dd.MM}";
-
-        return $"{start:dd.MM}—{end:dd.MM}";
+        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
     }
+
+    
 }

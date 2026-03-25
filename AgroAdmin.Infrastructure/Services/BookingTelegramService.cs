@@ -8,17 +8,9 @@ using Microsoft.Extensions.Logging;
 
 namespace AgroAdmin.Infrastructure.Services;
 
-public class BookingTelegramService : IBookingTelegramService
+public class BookingTelegramService(AppDbContext context, ILogger<BookingTelegramService> logger)
+    : IBookingTelegramService
 {
-    private readonly AppDbContext _context;
-    private readonly ILogger<BookingTelegramService> _logger;
-
-    public BookingTelegramService(AppDbContext context, ILogger<BookingTelegramService> logger)
-    {
-        _context = context;
-        _logger = logger;
-    }
-
     public async Task<List<TelegramBookingDto>> GetNearestBookingsAsync(int days = 7)
     {
         try
@@ -26,7 +18,7 @@ public class BookingTelegramService : IBookingTelegramService
             var today = DateTime.Today;
             var endDate = today.AddDays(days);
 
-            var bookingsData = await _context.Bookings
+            var bookingsData = await context.Bookings
                 .Include(b => b.Guest)
                 .Where(b => b.ArrivalDate >= today && b.ArrivalDate <= endDate)
                 .OrderBy(b => b.ArrivalDate)
@@ -63,46 +55,8 @@ public class BookingTelegramService : IBookingTelegramService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in GetNearestBookingsAsync");
+            logger.LogError(ex, "Error in GetNearestBookingsAsync");
             return new List<TelegramBookingDto>();
-        }
-    }
-
-    public async Task<List<DateTime>> GetFullyFreeDaysAsync(DateTime startDate, DateTime endDate)
-    {
-        try
-        {
-            var allUnits = new[] { ReservedUnits.PondSide, ReservedUnits.ParkingSide, ReservedUnits.WholeHouse };
-            var freeDays = new List<DateTime>();
-
-            // Получаем все бронирования за период
-            var bookings = await _context.Bookings
-                .Where(b => b.ArrivalDate <= endDate && b.DepartureDate >= startDate)
-                .ToListAsync();
-
-            // Проверяем каждый день периода
-            for (var date = startDate; date <= endDate; date = date.AddDays(1))
-            {
-                // Какие юниты заняты в этот день?
-                var occupiedUnits = bookings
-                    .Where(b => b.ArrivalDate <= date && b.DepartureDate > date)
-                    .Select(b => b.ReservedUnit)
-                    .Distinct()
-                    .ToList();
-
-                // Если ни один юнит не занят - день полностью свободен
-                if (!occupiedUnits.Any())
-                {
-                    freeDays.Add(date);
-                }
-            }
-
-            return freeDays;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in GetFullyFreeDaysAsync");
-            return new List<DateTime>();
         }
     }
 
@@ -112,7 +66,7 @@ public class BookingTelegramService : IBookingTelegramService
         {
             var result = new List<DailyAvailability>();
 
-            var bookings = await _context.Bookings
+            var bookings = await context.Bookings
                 .Where(b => b.ArrivalDate <= endDate && b.DepartureDate >= startDate)
                 .ToListAsync();
 
@@ -152,7 +106,7 @@ public class BookingTelegramService : IBookingTelegramService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in GetDailyAvailabilityAsync");
+            logger.LogError(ex, "Error in GetDailyAvailabilityAsync");
             return new List<DailyAvailability>();
         }
     }
@@ -160,7 +114,7 @@ public class BookingTelegramService : IBookingTelegramService
     public async Task<BookingSummaryDto> GetBookingSummaryAsync(int year, int month)
     {
         // TODO: реализовать позже
-        _logger.LogWarning("GetBookingSummaryAsync not implemented yet");
+        logger.LogWarning("GetBookingSummaryAsync not implemented yet");
         return new BookingSummaryDto
         {
             Year = year,
