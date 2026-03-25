@@ -82,13 +82,34 @@ public class NotificationService(AppDbContext context) : INotificationService
     public async Task<List<TelegramRecipientDto>> GetRecipientsAsync()
     {
         return await context.TelegramRecipients
-            .Select(t => new TelegramRecipientDto { Id = t.Id, Name = t.Name, ChatId = t.ChatId, IsDefault = t.IsDefault })
+            .Select(t => new TelegramRecipientDto
+            {
+                Id = t.Id,
+                Name = t.Name,
+                ChatId = t.ChatId,
+                IsDefault = t.IsDefault,
+                IsActive = t.IsActive,
+                Role = t.Role,
+                LastActiveAt = t.LastActiveAt,
+                CreatedAt = t.CreatedAt,
+                CommandCountToday = t.CommandCountToday
+            })
             .ToListAsync();
     }
 
     public async Task AddRecipientAsync(TelegramRecipientDto dto)
     {
-        var recipient = new TelegramRecipient { Name = dto.Name, ChatId = dto.ChatId, IsDefault = dto.IsDefault };
+        var recipient = new TelegramRecipient
+        {
+            Name = dto.Name,
+            ChatId = dto.ChatId,
+            IsDefault = dto.IsDefault,
+            IsActive = dto.IsActive,
+            Role = dto.Role,
+            CreatedAt = DateTime.UtcNow,
+            CommandCountToday = 0
+        };
+
         context.TelegramRecipients.Add(recipient);
         await context.SaveChangesAsync();
     }
@@ -121,6 +142,25 @@ public class NotificationService(AppDbContext context) : INotificationService
             recipient.Name = dto.Name;
             recipient.ChatId = dto.ChatId;
             recipient.IsDefault = dto.IsDefault;
+            recipient.IsActive = dto.IsActive;
+            recipient.Role = dto.Role;
+            // LastActiveAt и CommandCountToday обновляются автоматически при использовании бота
+            await context.SaveChangesAsync();
+        }
+    }
+
+    public async Task UpdateRecipientStatsAsync(long chatId, bool incrementCommandCount = true)
+    {
+        var recipient = await context.TelegramRecipients
+            .FirstOrDefaultAsync(r => r.ChatId == chatId.ToString());
+
+        if (recipient != null)
+        {
+            recipient.LastActiveAt = DateTime.UtcNow;
+            if (incrementCommandCount)
+            {
+                recipient.CommandCountToday++;
+            }
             await context.SaveChangesAsync();
         }
     }

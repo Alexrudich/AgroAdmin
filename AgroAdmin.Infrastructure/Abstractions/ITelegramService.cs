@@ -6,4 +6,6 @@ public interface ITelegramService
 {
     Task SendMessageAsync(string message, string? targetChatId = null);
     Task SendBookingNotificationAsync(BookingDto booking);
+    Task StartReceivingAsync(CancellationToken cancellationToken);
+    Task StopReceivingAsync();
 }

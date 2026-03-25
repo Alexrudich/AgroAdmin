@@ -107,17 +107,23 @@ catch (Exception ex)
 }
 
 // --- 4. СЕРВИСЫ ---
+builder.Services.AddSingleton<ITelegramService, TelegramService>();
+builder.Services.AddSingleton<ITelegramApiClient, TelegramApiClient>();
+builder.Services.AddSingleton<DatabaseBackupService>();
+builder.Services.AddSingleton<IDatabaseBackupService>(sp => sp.GetRequiredService<DatabaseBackupService>());
+
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DatabaseBackupService>());
+builder.Services.AddHostedService<DatabaseScannerService>();
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddScoped<BookingFormService>();
-builder.Services.AddHostedService<DatabaseScannerService>();
-builder.Services.AddHostedService<DatabaseBackupService>();
 builder.Services.AddScoped<IPricingStrategy, BasePriceStrategy>();
 builder.Services.AddScoped<IPricingStrategy, AdditionalServicesStrategy>();
 builder.Services.AddScoped<PricingEngine>();
 builder.Services.AddScoped<PricingConfigurationService>();
+builder.Services.AddScoped<IBookingTelegramService, BookingTelegramService>();
 
 // --- 5. MASSTRANSIT ---
 builder.Services.AddMassTransit(x => {
@@ -170,6 +176,28 @@ else
 app.UseHttpsRedirection();
 app.UseCors("AllowSpecificOrigin");
 app.UseStaticFiles(); // Статика до middleware
+
+// --- ЗАПУСК TELEGRAM БОТА ---
+try
+{
+    var telegramService = app.Services.GetRequiredService<ITelegramService>();
+    var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+
+    // Запускаем получение команд
+    _ = telegramService.StartReceivingAsync(lifetime.ApplicationStopping);
+
+    // Регистрируем остановку при завершении приложения
+    lifetime.ApplicationStopping.Register(() =>
+    {
+        telegramService.StopReceivingAsync().Wait();
+    });
+
+    Log.Information("Telegram bot started successfully");
+}
+catch (Exception ex)
+{
+    Log.Error(ex, "Failed to start Telegram bot");
+}
 
 // --- ДИАГНОСТИКА АВТОРИЗАЦИИ (только для API, пропускаем статику) ---
 app.Use(async (context, next) =>

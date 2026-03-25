@@ -1,6 +1,7 @@
 ﻿using AgroAdmin.Domain.Models;
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
+using AgroAdmin.Shared.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,7 +17,7 @@ namespace AgroAdmin.Infrastructure.BackgroundServices;
 public class DatabaseBackupService(
     IServiceProvider services,
     ILogger<DatabaseBackupService> logger)
-    : BackgroundService
+    : BackgroundService, IDatabaseBackupService
 {
     private readonly TimeSpan _backupInterval = TimeSpan.FromDays(7);
     private readonly string _backupDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "backups");
@@ -346,6 +347,136 @@ public class DatabaseBackupService(
         catch (Exception ex)
         {
             logger.LogError(ex, "❌ Критическая ошибка при работе с папкой");
+            return null;
+        }
+    }
+
+    public async Task<(bool Success, string Message, string? FileLink)> CreateManualBackupAsync()
+    {
+        try
+        {
+            logger.LogInformation("🔄 Ручной запуск полного бэкапа");
+
+            using var scope = services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // Получаем все бронирования с гостями
+            var allBookings = await dbContext.Bookings
+                .Include(b => b.Guest)
+                .OrderBy(b => b.ArrivalDate)
+                .ToListAsync();
+
+            if (!allBookings.Any())
+            {
+                return (false, "📭 Нет данных для бэкапа", null);
+            }
+
+            // Создаем файл с полными данными
+            var now = DateTime.UtcNow;
+            var fileName = $"{GetFilePrefix()}full_backup_{now:yyyy-MM-dd_HHmmss}.xlsx";
+            var filePath = await CreateFullBackupExcelAsync(allBookings, fileName);
+
+            if (filePath == null)
+            {
+                return (false, "❌ Ошибка создания файла бэкапа", null);
+            }
+
+            // Загружаем на Google Drive
+            var fileLink = await UploadToGoogleDriveAsync(filePath, fileName);
+
+            if (string.IsNullOrEmpty(fileLink))
+            {
+                return (false, "❌ Ошибка загрузки бэкапа на Google Drive", null);
+            }
+
+            // Подсчитываем общую сумму
+            var totalCost = allBookings.Sum(b => b.AccommodationCost ?? 0);
+            var totalGuests = allBookings.Sum(b => b.TotalGuestsCount);
+
+            logger.LogInformation("✅ Полный бэкап создан: {FileName}, записей: {Count}, сумма: {TotalCost:C}, гостей: {TotalGuests}",
+                fileName, allBookings.Count, totalCost, totalGuests);
+
+            var message = $"✅ *Полный бэкап создан*\n\n" +
+                          $"📊 Записей: {allBookings.Count}\n" +
+                          $"👥 Всего гостей: {totalGuests}\n" +
+                          $"💰 Общая сумма: {totalCost:N0} BYN\n\n" +
+                          $"🔗 [Скачать]({fileLink})";
+
+            return (true, message, fileLink);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "❌ Ошибка при ручном создании полного бэкапа");
+            return (false, $"❌ Ошибка: {ex.Message}", null);
+        }
+    }
+
+    private async Task<string?> CreateFullBackupExcelAsync(List<Booking> bookings, string fileName)
+    {
+        try
+        {
+            ExcelPackage.License.SetNonCommercialPersonal("AgroAdmin");
+
+            using var package = new ExcelPackage();
+            var worksheet = package.Workbook.Worksheets.Add("FullBackup");
+
+            // Заголовки
+            worksheet.Cells[1, 1].Value = "ID";
+            worksheet.Cells[1, 2].Value = "GuestName";
+            worksheet.Cells[1, 3].Value = "Phone";
+            worksheet.Cells[1, 4].Value = "ArrivalDate";
+            worksheet.Cells[1, 5].Value = "DepartureDate";
+            worksheet.Cells[1, 6].Value = "ReservedUnit";
+            worksheet.Cells[1, 7].Value = "AdultsCount";
+            worksheet.Cells[1, 8].Value = "ChildrenCount";
+            worksheet.Cells[1, 9].Value = "InfantsCount";
+            worksheet.Cells[1, 10].Value = "TotalGuestsCount";
+            worksheet.Cells[1, 11].Value = "HasDog";
+            worksheet.Cells[1, 12].Value = "NeedsSauna";
+            worksheet.Cells[1, 13].Value = "NeedsBanquetHall";
+            worksheet.Cells[1, 14].Value = "AccommodationCost";
+            worksheet.Cells[1, 15].Value = "CheckInTime";
+            worksheet.Cells[1, 16].Value = "CreatedAt";
+            worksheet.Cells[1, 17].Value = "AdminNotes";
+            worksheet.Cells[1, 18].Value = "FeedbackComment";
+
+            var row = 2;
+            foreach (var b in bookings)
+            {
+                worksheet.Cells[row, 1].Value = b.Id;
+                worksheet.Cells[row, 2].Value = b.Guest?.FullName;
+                worksheet.Cells[row, 3].Value = b.Guest?.Phone;
+                worksheet.Cells[row, 4].Value = b.ArrivalDate.ToString("yyyy-MM-dd");
+                worksheet.Cells[row, 5].Value = b.DepartureDate.ToString("yyyy-MM-dd");
+                worksheet.Cells[row, 6].Value = b.ReservedUnit.ToFriendlyString();
+                worksheet.Cells[row, 7].Value = b.AdultsCount;
+                worksheet.Cells[row, 8].Value = b.ChildrenCount;
+                worksheet.Cells[row, 9].Value = b.InfantsCount;
+                worksheet.Cells[row, 10].Value = b.TotalGuestsCount;
+                worksheet.Cells[row, 11].Value = b.HasDog;
+                worksheet.Cells[row, 12].Value = b.NeedsSauna;
+                worksheet.Cells[row, 13].Value = b.NeedsBanquetHall;
+                worksheet.Cells[row, 14].Value = b.AccommodationCost;
+                worksheet.Cells[row, 15].Value = b.CheckInTime.ToString(@"hh\:mm");
+                worksheet.Cells[row, 16].Value = b.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss");
+                worksheet.Cells[row, 17].Value = b.AdminNotes;
+                worksheet.Cells[row, 18].Value = b.FeedbackComment;
+                row++;
+            }
+
+            worksheet.Cells.AutoFitColumns();
+
+            var yearPath = Path.Combine(_backupDir, DateTime.UtcNow.Year.ToString());
+            Directory.CreateDirectory(yearPath);
+            var filePath = Path.Combine(yearPath, fileName);
+            await package.SaveAsAsync(new FileInfo(filePath));
+
+            logger.LogInformation("✅ Создан полный бэкап: {FilePath}", filePath);
+            return filePath;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "❌ Ошибка создания Excel файла");
             return null;
         }
     }
