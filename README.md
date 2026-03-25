@@ -101,6 +101,7 @@ Update-Database -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin -Con
 | `GOOGLE_OAUTH_CREDENTIALS_PATH` | `D:\Sites\site57408\wwwroot\secrets\oauth-credentials.json` |
 | `GOOGLE_PRIVATE_EMAIL` | `ken123us7@gmail.com` |
 | `ASPNETCORE_ENVIRONMENT` | `Production` |
+| `ApiUrl` | `https://agroadmin.runasp.net` |
 
 ---
 
