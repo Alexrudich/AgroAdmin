@@ -131,6 +131,35 @@ namespace AgroAdmin.Infrastructure.Services
                     """;
         }
 
+        public static string FormatBookingSummary(BookingSummaryDto summary)
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"📊 *СВОДКА ПО БРОНИРОВАНИЯМ*");
+            sb.AppendLine($"📅 {summary.StartDate:dd.MM.yyyy} — {summary.EndDate:dd.MM.yyyy}\n");
+
+            sb.AppendLine($"🏠 *Бронирования:* {summary.TotalBookings}");
+            sb.AppendLine($"👥 *Гости:* {summary.TotalGuests} чел.");
+            sb.AppendLine($"💰 *Выручка:* {summary.TotalRevenue:N0} BYN");
+            sb.AppendLine($"📈 *Загрузка:* {summary.OccupancyRate:F1}%");
+
+            var nightsText = summary.AvgStayLength switch
+            {
+                < 1.1 => "ночь",
+                < 2.1 => "ночи",
+                _ => "ночей"
+            };
+            sb.AppendLine($"⭐ *Средняя продолжительность:* {summary.AvgStayLength:F1} {nightsText}");
+
+            if (summary.CancelledBookings > 0)
+            {
+                sb.AppendLine($"🔄 *Отменено:* {summary.CancelledBookings}");
+            }
+            sb.AppendLine($"✅ *Завершено:* {summary.CompletedBookings}");
+
+            return sb.ToString();
+        }
+
         private static string FormatDateRanges(string title, List<DateTime> dates)
         {
             if (!dates.Any()) return "";

@@ -2,14 +2,11 @@
 using AgroAdmin.Infrastructure.Persistence;
 using AgroAdmin.Shared.Constants;
 using AgroAdmin.Shared.Dto.Bookings.Responses;
-using AgroAdmin.Shared.Enums;
-using AgroAdmin.Shared.Extensions;
+using AgroAdmin.Shared.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Text;
-using AgroAdmin.Shared.Utils;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -31,7 +28,6 @@ public class TelegramService : ITelegramService
     private CancellationTokenSource? _receivingCts;
 
     public TelegramService(
-        IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         ILogger<TelegramService> logger,
         IServiceScopeFactory scopeFactory,
@@ -246,10 +242,6 @@ public class TelegramService : ITelegramService
                 await ShowBookingSummaryAsync(botClient, chatId, ct);
                 break;
 
-            case "/checkcapacity":
-                await CheckCapacityAsync(botClient, chatId, ct);
-                break;
-
             default:
                 await botClient.SendTextMessageAsync(chatId, "❓ Неизвестная команда. Используйте /help.", cancellationToken: ct);
                 break;
@@ -355,50 +347,85 @@ public class TelegramService : ITelegramService
 
         if (data?.StartsWith("period_") == true)
         {
-            var today = DateTime.Today;
-            DateTime startDate, endDate;
-
-            switch (data)
-            {
-                case "period_current_month":
-                    startDate = today;
-                    endDate = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
-                    break;
-
-                case "period_next_month":
-                    var nextMonth = today.AddMonths(1);
-                    startDate = new DateTime(nextMonth.Year, nextMonth.Month, 1);
-                    endDate = new DateTime(nextMonth.Year, nextMonth.Month, DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month));
-                    break;
-
-                case "period_two_weeks":
-                    startDate = today;
-                    endDate = today.AddDays(14);
-                    break;
-
-                case "period_30_days":
-                    startDate = today;
-                    endDate = today.AddDays(30);
-                    break;
-
-                case "period_90_days":
-                    startDate = today;
-                    endDate = today.AddDays(90);
-                    break;
-
-                default:
-                    return;
-            }
-
-            await ShowAvailability(botClient, chatId, startDate, endDate, ct);
-            await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: ct);
-
-            try
-            {
-                await botClient.DeleteMessageAsync(chatId, callbackQuery.Message.MessageId, cancellationToken: ct);
-            }
-            catch { }
+            await HandlePeriodCallbackAsync(botClient, callbackQuery, chatId, data, ct);
         }
+        else if (data?.StartsWith("summary_") == true)
+        {
+            await HandleSummaryCallbackAsync(botClient, callbackQuery, chatId, data, ct);
+        }
+    }
+
+    private async Task HandlePeriodCallbackAsync(ITelegramBotClient botClient, CallbackQuery callbackQuery, long chatId, string data, CancellationToken ct)
+    {
+        var (startDate, endDate) = TelegramDateHelper.GetPeriodDates(data);
+
+        if (startDate == default || endDate == default)
+        {
+            await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, "Ошибка выбора периода", cancellationToken: ct);
+            return;
+        }
+
+        await ShowAvailability(botClient, chatId, startDate, endDate, ct);
+        await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: ct);
+
+        try
+        {
+            await botClient.DeleteMessageAsync(chatId, callbackQuery.Message!.MessageId, cancellationToken: ct);
+        }
+        catch { }
+    }
+
+    private async Task HandleSummaryCallbackAsync(ITelegramBotClient botClient, CallbackQuery callbackQuery, long chatId, string data, CancellationToken ct)
+    {
+        var (startDate, endDate) = TelegramDateHelper.GetSummaryDates(data);
+
+        if (startDate == default || endDate == default)
+        {
+            await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, "Ошибка выбора периода", cancellationToken: ct);
+            return;
+        }
+
+        // Создаем scope для доступа к Scoped сервису
+        using var scope = _scopeFactory.CreateScope();
+        var bookingTelegramService = scope.ServiceProvider.GetRequiredService<IBookingTelegramService>();
+        var summary = await bookingTelegramService.GetBookingSummaryAsync(startDate, endDate);
+        var message = TelegramMessageFormatter.FormatBookingSummary(summary);
+
+        await botClient.SendTextMessageAsync(chatId, message, parseMode: ParseMode.Markdown, cancellationToken: ct);
+        await botClient.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: ct);
+
+        try
+        {
+            await botClient.DeleteMessageAsync(chatId, callbackQuery.Message!.MessageId, cancellationToken: ct);
+        }
+        catch { }
+    }
+
+    private async Task ShowBookingSummaryAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
+    {
+        // Показываем меню с кнопками для выбора периода
+        var inlineKeyboard = new InlineKeyboardMarkup(new[]
+        {
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("📅 Текущий месяц", "summary_current_month"),
+                InlineKeyboardButton.WithCallbackData("📆 Предыдущий месяц", "summary_prev_month"),
+                InlineKeyboardButton.WithCallbackData("📅 Следующий месяц", "summary_next_month")
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("📊 7 дней", "summary_7_days"),
+                InlineKeyboardButton.WithCallbackData("📅 30 дней", "summary_30_days"),
+                InlineKeyboardButton.WithCallbackData("📆 90 дней", "summary_90_days")
+            }
+        });
+
+        await botClient.SendTextMessageAsync(
+            chatId,
+            "📊 *Выберите период для сводки по бронированиям:*",
+            parseMode: ParseMode.Markdown,
+            replyMarkup: inlineKeyboard,
+            cancellationToken: ct);
     }
 
     private async Task CreateFullBackupAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
@@ -406,15 +433,4 @@ public class TelegramService : ITelegramService
         await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
     }
 
-    private async Task ShowBookingSummaryAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
-    {
-        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
-    }
-
-    private async Task CheckCapacityAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
-    {
-        await botClient.SendTextMessageAsync(chatId, "🔄 Функция в разработке...", cancellationToken: ct);
-    }
-
-    
 }

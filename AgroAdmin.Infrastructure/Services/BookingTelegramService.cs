@@ -111,22 +111,61 @@ public class BookingTelegramService(AppDbContext context, ILogger<BookingTelegra
         }
     }
 
-    public async Task<BookingSummaryDto> GetBookingSummaryAsync(int year, int month)
+    public async Task<BookingSummaryDto> GetBookingSummaryAsync(DateTime startDate, DateTime endDate)
     {
-        // TODO: реализовать позже
-        logger.LogWarning("GetBookingSummaryAsync not implemented yet");
-        return new BookingSummaryDto
+        try
         {
-            Year = year,
-            Month = month,
-            TotalBookings = 0,
-            TotalGuests = 0,
-            TotalRevenue = 0,
-            OccupancyRate = 0,
-            AvgStayLength = 0,
-            CancelledBookings = 0,
-            CompletedBookings = 0
-        };
+            var bookings = await context.Bookings
+                .Where(b => b.ArrivalDate >= startDate && b.ArrivalDate <= endDate)
+                .ToListAsync();
+
+            var totalBookings = bookings.Count;
+            var totalGuests = bookings.Sum(b => b.TotalGuestsCount);
+            var totalRevenue = bookings.Sum(b => b.AccommodationCost ?? 0);
+
+            // Расчет загрузки (упрощенно: занятые дни / общее кол-во дней * 3 объекта)
+            var totalDays = (endDate - startDate).Days + 1;
+            var bookedDays = bookings.Sum(b => (b.DepartureDate - b.ArrivalDate).Days);
+            var maxPossibleDays = totalDays * 3; // 3 объекта
+            var occupancyRate = maxPossibleDays > 0 ? (double)bookedDays / maxPossibleDays * 100 : 0;
+
+            var avgStayLength = totalBookings > 0
+                ? (double)bookedDays / totalBookings
+                : 0;
+
+            // TODO: когда добавите статусы, можно будет считать отмены
+            var cancelledBookings = 0;
+            var completedBookings = totalBookings;
+
+            return new BookingSummaryDto
+            {
+                StartDate = startDate,
+                EndDate = endDate,
+                TotalBookings = totalBookings,
+                TotalGuests = totalGuests,
+                TotalRevenue = totalRevenue,
+                OccupancyRate = occupancyRate,
+                AvgStayLength = avgStayLength,
+                CancelledBookings = cancelledBookings,
+                CompletedBookings = completedBookings
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error in GetBookingSummaryAsync");
+            return new BookingSummaryDto
+            {
+                StartDate = startDate,
+                EndDate = endDate,
+                TotalBookings = 0,
+                TotalGuests = 0,
+                TotalRevenue = 0,
+                OccupancyRate = 0,
+                AvgStayLength = 0,
+                CancelledBookings = 0,
+                CompletedBookings = 0
+            };
+        }
     }
 
     private static string GetUnitEmoji(ReservedUnits unit)

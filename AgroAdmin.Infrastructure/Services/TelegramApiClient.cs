@@ -42,5 +42,20 @@ namespace AgroAdmin.Infrastructure.Services
                 return new();
             }
         }
+
+        public async Task<BookingSummaryDto> GetBookingSummaryAsync(DateTime startDate, DateTime endDate)
+        {
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<BookingSummaryDto>(
+                           $"{_apiUrl}/api/bookings/summary?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}")
+                       ?? new BookingSummaryDto();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to get booking summary");
+                return new BookingSummaryDto();
+            }
+        }
     }
 }

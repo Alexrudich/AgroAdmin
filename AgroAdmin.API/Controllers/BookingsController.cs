@@ -637,4 +637,26 @@ public class BookingsController(
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
+
+    [HttpGet("summary")]
+    public async Task<ActionResult<BookingSummaryDto>> GetSummary(
+        [FromQuery] DateTime startDate,
+        [FromQuery] DateTime endDate)
+    {
+        try
+        {
+            if (startDate == default || endDate == default)
+            {
+                return BadRequest(new { error = "startDate and endDate are required" });
+            }
+
+            var summary = await bookingTelegramService.GetBookingSummaryAsync(startDate, endDate);
+            return Ok(summary);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting booking summary");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
 }

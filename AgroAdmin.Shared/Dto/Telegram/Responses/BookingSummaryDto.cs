@@ -2,8 +2,8 @@
 
 public class BookingSummaryDto
 {
-    public int Year { get; set; }
-    public int Month { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
     public int TotalBookings { get; set; }
     public int TotalGuests { get; set; }
     public decimal TotalRevenue { get; set; }

@@ -12,8 +12,7 @@ public static class TelegramMessages
                                   /nearestBookings - ближайшие бронирования
                                   /checkFreeSlots - свободные даты
                                   /createFullBackup - создать полный бэкап
-                                  /bookingSummary - сводка за текущий месяц
-                                  /checkCapacity - отчет по загрузке
+                                  /bookingSummary - сводка за период
 
                                   🔔 Вы будете получать уведомления о новых бронированиях и бэкапах.
                                   """;
@@ -24,8 +23,7 @@ public static class TelegramMessages
                                */nearestBookings* - показать бронирования на ближайшие 7 дней
                                */checkFreeSlots* - выбрать период для проверки свободных дат
                                */createFullBackup* - создать полный бэкап всех данных
-                               */bookingSummary* - сводка по бронированиям за текущий месяц
-                               */checkCapacity* - график загрузки на неделю
+                               */bookingSummary* - сводка по бронированиям за период
                                """;
 
 }
