@@ -445,8 +445,12 @@ public class TelegramService : ITelegramService
 
             if (result.Success)
             {
-                var message = $"✅ *{result.Message}*\n\n" +
-                              (result.FileLink != null ? $"🔗 [Скачать]({result.FileLink})" : "");
+                var message = result.Message;
+
+                if (!string.IsNullOrEmpty(result.FileLink))
+                {
+                    message += $"\n\n🔗 [Скачать]({result.FileLink})";
+                }
 
                 await botClient.EditMessageTextAsync(
                     chatId,

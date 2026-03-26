@@ -399,8 +399,7 @@ public class DatabaseBackupService(
             var message = $"✅ *Полный бэкап создан*\n\n" +
                           $"📊 Записей: {allBookings.Count}\n" +
                           $"👥 Всего гостей: {totalGuests}\n" +
-                          $"💰 Общая сумма: {totalCost:N0} BYN\n\n" +
-                          $"🔗 [Скачать]({fileLink})";
+                          $"💰 Общая сумма: {totalCost:N0} BYN";
 
             return (true, message, fileLink);
         }
