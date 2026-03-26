@@ -24,14 +24,14 @@ jobs:
         run: |
           dotnet restore AgroAdmin.slnx --no-cache
           dotnet build AgroAdmin.slnx --configuration Release --no-restore
-
       - name: Publish
         run: |
           dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj `
             --configuration Release `
             --output ./publish `
             --runtime win-x86 `
-            --self-contained true `
+            --self-contained false `
+            -p:CopyLocalLockFileAssemblies=true
 
       # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm
       - name: Put Site Offline
