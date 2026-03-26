@@ -42,6 +42,25 @@ public class DatabaseBackupService(
 
         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
 
+        // Проверяем токен при старте
+        try
+        {
+            logger.LogInformation("🔍 Проверка Google Drive токена...");
+            var credential = await GetUserCredentialAsync();
+            if (credential != null)
+            {
+                logger.LogInformation("✅ Google Drive токен валиден");
+            }
+            else
+            {
+                logger.LogWarning("⚠️ Не удалось проверить Google Drive токен");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "❌ Ошибка проверки токена при старте");
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -105,7 +124,6 @@ public class DatabaseBackupService(
             lastBackup.LastBackupDate.Month == now.Month)
         {
             logger.LogInformation("📭 Бэкап за текущий месяц уже есть.");
-            //await telegram.SendMessageAsync($"{GetEnvShortPrefix()}📭 Бэкап за текущий месяц уже есть.");
             return;
         }
 
@@ -120,7 +138,6 @@ public class DatabaseBackupService(
         if (filePath == null)
         {
             logger.LogInformation("📭 Нет данных за {0}-{1:D2}", backupMonth.Year, backupMonth.Month);
-            await telegram.SendMessageAsync($"{GetEnvShortPrefix()}📭 Нет данных за {backupMonth.Year}-{backupMonth.Month:D2}");
             return;
         }
 
@@ -221,28 +238,11 @@ public class DatabaseBackupService(
         {
             logger.LogInformation("☁️ Загрузка в Google Drive: {FileName}", fileName);
 
-            if (!File.Exists(_tokenPath))
+            var credential = await GetUserCredentialAsync();
+            if (credential == null)
             {
-                logger.LogError("❌ Файл токена не найден: {Path}", _tokenPath);
                 return null;
             }
-
-            var tokenJson = await File.ReadAllTextAsync(_tokenPath);
-            var token = JsonConvert.DeserializeObject<Google.Apis.Auth.OAuth2.Responses.TokenResponse>(tokenJson);
-
-            using var oauthStream = new FileStream(_oauthCredentialsPath, FileMode.Open, FileAccess.Read);
-            var secrets = GoogleClientSecrets.FromStream(oauthStream).Secrets;
-
-            var initializer = new Google.Apis.Auth.OAuth2.Flows.AuthorizationCodeFlow.Initializer(
-                "https://accounts.google.com/o/oauth2/auth",
-                "https://oauth2.googleapis.com/token")
-            {
-                ClientSecrets = secrets,
-                Scopes = new[] { DriveService.Scope.Drive }
-            };
-
-            var flow = new Google.Apis.Auth.OAuth2.Flows.AuthorizationCodeFlow(initializer);
-            var credential = new UserCredential(flow, _myEmail, token);
 
             var service = new DriveService(new BaseClientService.Initializer
             {
@@ -408,6 +408,59 @@ public class DatabaseBackupService(
         {
             logger.LogError(ex, "❌ Ошибка при ручном создании полного бэкапа");
             return (false, $"❌ Ошибка: {ex.Message}", null);
+        }
+    }
+
+    private async Task<UserCredential?> GetUserCredentialAsync()
+    {
+        try
+        {
+            if (!File.Exists(_tokenPath))
+            {
+                logger.LogError("❌ Файл токена не найден: {Path}", _tokenPath);
+                return null;
+            }
+
+            var tokenJson = await File.ReadAllTextAsync(_tokenPath);
+            var token = JsonConvert.DeserializeObject<Google.Apis.Auth.OAuth2.Responses.TokenResponse>(tokenJson);
+
+            await using var oauthStream = new FileStream(_oauthCredentialsPath, FileMode.Open, FileAccess.Read);
+            var secrets = (await GoogleClientSecrets.FromStreamAsync(oauthStream)).Secrets;
+
+            var initializer = new Google.Apis.Auth.OAuth2.Flows.AuthorizationCodeFlow.Initializer(
+                "https://accounts.google.com/o/oauth2/auth",
+                "https://oauth2.googleapis.com/token")
+            {
+                ClientSecrets = secrets,
+                Scopes = [DriveService.Scope.Drive]
+            };
+
+            var flow = new Google.Apis.Auth.OAuth2.Flows.AuthorizationCodeFlow(initializer);
+            var credential = new UserCredential(flow, _myEmail, token);
+
+            // Проверяем, не истек ли токен (IsStale вместо IsExpired)
+            if (credential.Token.IsStale)
+            {
+                logger.LogInformation("🔄 Токен устарел, обновляем...");
+                await credential.RefreshTokenAsync(CancellationToken.None);
+
+                // После обновления сохраняем новый токен в файл
+                var newTokenJson = JsonConvert.SerializeObject(credential.Token, Formatting.Indented);
+                await File.WriteAllTextAsync(_tokenPath, newTokenJson);
+                logger.LogInformation("✅ Обновленный токен сохранен в файл: {Path}", _tokenPath);
+            }
+
+            logger.LogInformation("✅ UserCredential получен, токен действителен до: {Expiry}",
+                credential.Token.ExpiresInSeconds.HasValue
+                    ? DateTime.UtcNow.AddSeconds(credential.Token.ExpiresInSeconds.Value).ToString("yyyy-MM-dd HH:mm:ss")
+                    : "неизвестно");
+
+            return credential;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "❌ Ошибка получения UserCredential");
+            return null;
         }
     }
 
