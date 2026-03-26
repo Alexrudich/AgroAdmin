@@ -32,7 +32,6 @@ jobs:
             --output ./publish `
             --runtime win-x86 `
             --self-contained true `
-            -p:UseAppHost=false
 
       # ШАГ 1: Создаем и заливаем ТОЛЬКО app_offline.htm
       - name: Put Site Offline
