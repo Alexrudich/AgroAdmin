@@ -99,7 +99,7 @@ Update-Database -Project AgroAdmin.Infrastructure -StartupProject AgroAdmin -Con
 | `RabbitMQ__Url` | `amqps://mggmcflf:данные_для_подключения.lmq.cloudamqp.com/mggmcflf` |
 | `GOOGLE_TOKEN_PATH` | `D:\Sites\site57408\wwwroot\secrets\token.json` |
 | `GOOGLE_OAUTH_CREDENTIALS_PATH` | `D:\Sites\site57408\wwwroot\secrets\oauth-credentials.json` |
-| `GOOGLE_PRIVATE_EMAIL` | `ken123us7@gmail.com` |
+| `GOOGLE_PRIVATE_EMAIL` | `ken1234567@gmail.com` |
 | `ASPNETCORE_ENVIRONMENT` | `Production` |
 | `ApiUrl` | `https://agroadmin.runasp.net` |
 
