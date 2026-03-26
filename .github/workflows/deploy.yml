@@ -29,7 +29,6 @@ jobs:
           dotnet publish AgroAdmin/AgroAdmin/AgroAdmin.csproj `
             --configuration Release `
             --output ./publish `
-            --runtime win-x86 `
             --self-contained false `
             -p:CopyLocalLockFileAssemblies=true
 
