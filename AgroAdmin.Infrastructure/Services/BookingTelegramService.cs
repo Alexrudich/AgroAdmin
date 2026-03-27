@@ -133,7 +133,7 @@ public class BookingTelegramService(AppDbContext context, ILogger<BookingTelegra
                 ? (double)bookedDays / totalBookings
                 : 0;
 
-            // TODO: когда добавите статусы, можно будет считать отмены
+            // TODO: когда добавятся статусы, можно будет считать отмены
             var cancelledBookings = 0;
             var completedBookings = totalBookings;
 
