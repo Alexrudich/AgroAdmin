@@ -412,9 +412,9 @@ public class TelegramService : ITelegramService
         {
             new[]
             {
-                InlineKeyboardButton.WithCallbackData("📅 Текущий месяц", "summary_current_month"),
-                InlineKeyboardButton.WithCallbackData("📆 Предыдущий месяц", "summary_prev_month"),
-                InlineKeyboardButton.WithCallbackData("📅 Следующий месяц", "summary_next_month")
+                InlineKeyboardButton.WithCallbackData("📅 Тек. месяц", "summary_current_month"),
+                InlineKeyboardButton.WithCallbackData("◀️ Пред. месяц", "summary_prev_month"),
+                InlineKeyboardButton.WithCallbackData("След. месяц ▶️", "summary_next_month")
             },
             new[]
             {
