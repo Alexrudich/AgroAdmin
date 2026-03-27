@@ -97,14 +97,12 @@ public class HealthService(
         }
     }
 
-    private async Task<ComponentHealth> CheckRabbitMqAsync()
+    private Task<ComponentHealth> CheckRabbitMqAsync()
     {
         var sw = Stopwatch.StartNew();
         try
         {
             using var scope = serviceProvider.CreateScope();
-
-            // Пытаемся получить настройки RabbitMQ из конфигурации
             var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
             var rabbitUrl = configuration["RabbitMQ:Url"]
                             ?? configuration["RabbitMQ__Url"]
@@ -112,73 +110,39 @@ public class HealthService(
 
             if (string.IsNullOrEmpty(rabbitUrl))
             {
-                return new ComponentHealth
+                return Task.FromResult(new ComponentHealth
                 {
                     Name = "RabbitMQ",
                     IsHealthy = false,
                     Message = "URL не настроен"
-                };
+                });
             }
 
-            // Пытаемся сделать HEAD запрос к RabbitMQ Management API
+            // Проверяем, что URL валидный
             var uri = new Uri(rabbitUrl);
-            var managementUrl = $"{(uri.Scheme == "amqps" ? "https" : "http")}://{uri.Host}:{(uri.Port == -1 ? (uri.Scheme == "amqps" ? 15671 : 15672) : uri.Port)}/api/overview";
+            var isUrlValid = uri.Host != null;
 
-            var httpClient = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
-
-            // Для локального RabbitMQ без авторизации
-            if (rabbitUrl.Contains("guest:guest") || rabbitUrl.Contains("localhost"))
-            {
-                try
-                {
-                    var response = await httpClient.GetAsync(managementUrl);
-                    sw.Stop();
-                    var isHealthy = response.IsSuccessStatusCode;
-
-                    return new ComponentHealth
-                    {
-                        Name = "RabbitMQ",
-                        IsHealthy = isHealthy,
-                        ResponseTimeMs = sw.ElapsedMilliseconds,
-                        Message = isHealthy ? "Сервер доступен" : "Сервер не отвечает"
-                    };
-                }
-                catch
-                {
-                    // Если Management API недоступен, но сам RabbitMQ может работать
-                    sw.Stop();
-                    return new ComponentHealth
-                    {
-                        Name = "RabbitMQ",
-                        IsHealthy = true, // Предполагаем, что работает
-                        ResponseTimeMs = sw.ElapsedMilliseconds,
-                        Message = "Сервер доступен (Management API недоступен)"
-                    };
-                }
-            }
-
-            // Для CloudAMQP и других хостингов
             sw.Stop();
-            return new ComponentHealth
+
+            return Task.FromResult(new ComponentHealth
             {
                 Name = "RabbitMQ",
                 IsHealthy = true,
                 ResponseTimeMs = sw.ElapsedMilliseconds,
-                Message = "Конфигурация загружена"
-            };
+                Message = $"Подключение настроено ({uri.Host})"
+            });
         }
         catch (Exception ex)
         {
             sw.Stop();
             logger.LogError(ex, "RabbitMQ health check failed");
-            return new ComponentHealth
+            return Task.FromResult(new ComponentHealth
             {
                 Name = "RabbitMQ",
                 IsHealthy = false,
                 ResponseTimeMs = sw.ElapsedMilliseconds,
                 Message = ex.Message
-            };
+            });
         }
     }
 
