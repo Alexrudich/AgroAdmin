@@ -13,7 +13,7 @@ public class DatabaseScannerService(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Database scanner started");
+        logger.LogInformation("✅ Database scanner started");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -26,33 +26,43 @@ public class DatabaseScannerService(
                 var pendingReminders = await notificationService.GetActiveRemindersAsync();
                 var now = DateTime.UtcNow;
 
-                foreach (var reminder in pendingReminders.Where(r => r.ScheduledFor <= now))
+                var remindersToSend = pendingReminders.Where(r => r.ScheduledFor <= now).ToList();
+
+                if (remindersToSend.Any())
                 {
-                    logger.LogInformation("Sending reminder {Id} with TargetChatId: '{TargetChatId}'",
-                        reminder.Id, reminder.TargetChatId ?? "null");
+                    logger.LogInformation("📬 Sending {Count} reminders", remindersToSend.Count);
 
-                    var prefix = reminder.Priority switch
+                    foreach (var reminder in remindersToSend)
                     {
-                        ReminderPriority.Urgent => "🚨 <b>СРОЧНО:</b> ",
-                        ReminderPriority.High => "⚠️ <b>Внимание:</b> ",
-                        ReminderPriority.Low => "ℹ️ ",
-                        _ => "🔔 "
-                    };
+                        var prefix = reminder.Priority switch
+                        {
+                            ReminderPriority.Urgent => "🚨 <b>СРОЧНО:</b> ",
+                            ReminderPriority.High => "⚠️ <b>Внимание:</b> ",
+                            ReminderPriority.Low => "ℹ️ ",
+                            _ => "🔔 "
+                        };
 
-                    logger.LogInformation("Calling telegram.SendMessageAsync with chatId: {ChatId}",
-                        reminder.TargetChatId ?? "default");
-
-                    await telegram.SendMessageAsync(prefix + reminder.Message, reminder.TargetChatId);
-
-                    await notificationService.MarkAsSentAsync(reminder.Id);
+                        await telegram.SendMessageAsync(prefix + reminder.Message, reminder.TargetChatId);
+                        await notificationService.MarkAsSentAsync(reminder.Id);
+                    }
+                }
+                else
+                {
+                    // Логируем только в Debug режиме или раз в минуту
+                    if (logger.IsEnabled(LogLevel.Debug))
+                    {
+                        logger.LogDebug("No reminders to send");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error in database scanner");
+                logger.LogError(ex, "❌ Error in database scanner");
             }
 
             await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
         }
+
+        logger.LogInformation("🛑 Database scanner stopped");
     }
 }
