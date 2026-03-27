@@ -241,6 +241,9 @@ public class TelegramService : ITelegramService
             case "/bookingsummary":
                 await ShowBookingSummaryAsync(botClient, chatId, ct);
                 break;
+            case "/health":
+                await ShowHealthAsync(botClient, chatId, ct);
+                break;
 
             default:
                 await botClient.SendTextMessageAsync(chatId, "❓ Неизвестная команда. Используйте /help.", cancellationToken: ct);
@@ -477,6 +480,23 @@ public class TelegramService : ITelegramService
                 statusMessage.MessageId,
                 "❌ Критическая ошибка при создании бэкапа. Проверьте логи.",
                 cancellationToken: ct);
+        }
+    }
+
+    private async Task ShowHealthAsync(ITelegramBotClient botClient, long chatId, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var healthService = scope.ServiceProvider.GetRequiredService<IHealthService>();
+
+            var message = await healthService.FormatForTelegramAsync();
+            await botClient.SendTextMessageAsync(chatId, message, parseMode: ParseMode.Markdown, cancellationToken: ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in ShowHealthAsync");
+            await botClient.SendTextMessageAsync(chatId, "❌ Ошибка при проверке здоровья системы", cancellationToken: ct);
         }
     }
 }

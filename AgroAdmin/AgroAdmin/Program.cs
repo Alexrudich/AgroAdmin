@@ -109,11 +109,13 @@ catch (Exception ex)
 // --- 4. СЕРВИСЫ ---
 builder.Services.AddSingleton<ITelegramService, TelegramService>();
 builder.Services.AddSingleton<ITelegramApiClient, TelegramApiClient>();
-builder.Services.AddSingleton<DatabaseBackupService>();
-builder.Services.AddSingleton<IDatabaseBackupService>(sp => sp.GetRequiredService<DatabaseBackupService>());
 
+builder.Services.AddSingleton<DatabaseBackupService>();
+builder.Services.AddSingleton<DatabaseScannerService>();
+builder.Services.AddSingleton<IDatabaseBackupService>(sp => sp.GetRequiredService<DatabaseBackupService>());
+builder.Services.AddSingleton<IDatabaseBackupService>(sp => sp.GetRequiredService<DatabaseBackupService>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DatabaseBackupService>());
-builder.Services.AddHostedService<DatabaseScannerService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DatabaseScannerService>());
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IBookingValidationService, BookingValidationService>();
@@ -124,6 +126,7 @@ builder.Services.AddScoped<IPricingStrategy, AdditionalServicesStrategy>();
 builder.Services.AddScoped<PricingEngine>();
 builder.Services.AddScoped<PricingConfigurationService>();
 builder.Services.AddScoped<IBookingTelegramService, BookingTelegramService>();
+builder.Services.AddScoped<IHealthService, HealthService>();
 
 // --- 5. MASSTRANSIT ---
 builder.Services.AddMassTransit(x => {
