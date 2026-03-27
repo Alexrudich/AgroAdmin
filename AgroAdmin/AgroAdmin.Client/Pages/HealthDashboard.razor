@@ -1,0 +1,119 @@
+﻿@page "/health-dashboard"
+@using AgroAdmin.Shared.Dto.Health
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Health Dashboard</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <span class="me-2">🏥</span>
+            Health Dashboard
+        </h1>
+        <button class="btn btn-primary" @onclick="Refresh">
+            🔄 Обновить
+        </button>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-center p-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2">Загрузка данных...</p>
+        </div>
+    }
+    else if (_health != null)
+    {
+        <div class="alert @(_health.IsHealthy ? "alert-success" : "alert-danger")">
+            <h4 class="alert-heading">
+                @(_health.IsHealthy ? "🟢 Все системы работают нормально" : "🔴 Обнаружены проблемы")
+            </h4>
+            <hr />
+            <p class="mb-0">📅 Последняя проверка: @_health.CheckedAt.ToString("dd.MM.yyyy HH:mm:ss") UTC</p>
+        </div>
+
+        <div class="row">
+            @foreach (var component in _health.Components)
+            {
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100 @(component.IsHealthy ? "border-success" : "border-danger")">
+                        <div class="card-header @(component.IsHealthy ? "bg-success text-white" : "bg-danger text-white")">
+                            <h5 class="mb-0">
+                                @(component.IsHealthy ? "✅" : "❌") @component.Name
+                                @if (component.ResponseTimeMs.HasValue)
+                                {
+                                    <span class="badge bg-light text-dark float-end">@component.ResponseTimeMs ms</span>
+                                }
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            @if (!string.IsNullOrEmpty(component.Message))
+                            {
+                                <p class="card-text">
+                                    <strong>Статус:</strong> @component.Message
+                                </p>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="mt-4 text-muted text-center small">
+            <i class="bi bi-info-circle"></i>
+            Автоматическое обновление каждые 30 секунд
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            ⚠️ Не удалось загрузить данные. Проверьте подключение.
+        </div>
+    }
+</div>
+
+@code {
+    private HealthCheckDto? _health;
+    private bool _isLoading = true;
+    private Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+        StartAutoRefresh();
+    }
+
+    private async Task Refresh()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            _health = await Http.GetFromJsonAsync<HealthCheckDto>("api/health");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading health: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void StartAutoRefresh()
+    {
+        _timer = new Timer(_ =>
+        {
+            InvokeAsync(async () => await Refresh());
+        }, null, 30000, 30000);
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

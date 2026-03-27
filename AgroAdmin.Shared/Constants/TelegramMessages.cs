@@ -13,7 +13,8 @@ public static class TelegramMessages
                                   /checkFreeSlots - свободные даты
                                   /createFullBackup - создать полный бэкап
                                   /bookingSummary - сводка за период
-
+                                  */health* - Проверить состояние системы
+                                  
                                   🔔 Вы будете получать уведомления о новых бронированиях и бэкапах.
                                   """;
 
@@ -24,6 +25,7 @@ public static class TelegramMessages
                                */checkFreeSlots* - выбрать период для проверки свободных дат
                                */createFullBackup* - создать полный бэкап всех данных
                                */bookingSummary* - сводка по бронированиям за период
+                               */health* - Проверить состояние системы
                                """;
 
 }
