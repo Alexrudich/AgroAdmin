@@ -1,10 +1,10 @@
-﻿using AgroAdmin.Shared.Dto.Telegram.Responses;
-using System.Text;
+﻿using System.Text;
 using AgroAdmin.Shared.Dto.Bookings.Responses;
+using AgroAdmin.Shared.Dto.Telegram.Responses;
 using AgroAdmin.Shared.Enums;
 using AgroAdmin.Shared.Extensions;
 
-namespace AgroAdmin.Infrastructure.Services
+namespace AgroAdmin.Shared.Services
 {
     public static class TelegramMessageFormatter
     {
