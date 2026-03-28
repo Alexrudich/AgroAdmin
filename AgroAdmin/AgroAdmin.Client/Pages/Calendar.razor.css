@@ -86,6 +86,13 @@
         background-color: #c8e6c9;
     }
 
+    /* Добавляем стиль для пустого свободного слота */
+    .free:empty::before {
+        content: "Свободно";
+        opacity: 0.5;
+        font-size: 0.7rem;
+    }
+
 .busy {
     background-color: #ffebee;
     color: #b71c1c;
@@ -106,6 +113,17 @@
     border-left: 4px solid #9c27b0;
     justify-content: center;
     font-weight: bold;
+}
+
+/* Мобильная версия: скрываем текст "Свободно" */
+@media (max-width: 768px) {
+    .free .unit-text {
+        display: none !important;
+    }
+
+    .free:empty::before {
+        content: "" !important;
+    }
 }
 
 /* ========================================

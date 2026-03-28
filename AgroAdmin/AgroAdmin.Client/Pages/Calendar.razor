@@ -93,19 +93,45 @@
                             }
                             else
                             {
-                                <div class="unit-zone @(pond != null ? "busy" : "free")"
-                                     @onclick:stopPropagation="true"
-                                     @onclick="() => OnCellClick(date, pond, ReservedUnits.PondSide)">
-                                    <span class="unit-icon">🌊</span>
-                                    <span class="unit-text d-none d-md-inline"> @(pond != null ? pond.Guest?.FullName : "Пруд")</span>
-                                </div>
+                                // Пруд - показываем только если занят
+                                @if (pond != null)
+                                {
+                                    <div class="unit-zone busy"
+                                         @onclick:stopPropagation="true"
+                                         @onclick="() => OnCellClick(date, pond)">
+                                        <span class="unit-icon">🌊</span>
+                                        <span class="unit-text d-none d-md-inline"> @pond.Guest?.FullName</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    // Свободный слот - показываем пустую область (но с классом free для стилей)
+                                    <div class="unit-zone free"
+                                         @onclick:stopPropagation="true"
+                                         @onclick="() => OnCellClick(date, null, ReservedUnits.PondSide)">
+                                        <span class="unit-text d-none d-md-inline">Свободно</span>
+                                    </div>
+                                }
 
-                                <div class="unit-zone @(park != null ? "busy" : "free")"
-                                     @onclick:stopPropagation="true"
-                                     @onclick="() => OnCellClick(date, park, ReservedUnits.ParkingSide)">
-                                    <span class="unit-icon">🚗</span>
-                                    <span class="unit-text d-none d-md-inline"> @(park != null ? park.Guest?.FullName : "Парк")</span>
-                                </div>
+                                // Парковка - показываем только если занят
+                                @if (park != null)
+                                {
+                                    <div class="unit-zone busy"
+                                         @onclick:stopPropagation="true"
+                                         @onclick="() => OnCellClick(date, park)">
+                                        <span class="unit-icon">🚗</span>
+                                        <span class="unit-text d-none d-md-inline"> @park.Guest?.FullName</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    // Свободный слот - показываем пустую область (но с классом free для стилей)
+                                    <div class="unit-zone free"
+                                         @onclick:stopPropagation="true"
+                                         @onclick="() => OnCellClick(date, null, ReservedUnits.ParkingSide)">
+                                        <span class="unit-text d-none d-md-inline">Свободно</span>
+                                    </div>
+                                }
                             }
                         </div>
                     </div>
