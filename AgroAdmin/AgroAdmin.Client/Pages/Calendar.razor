@@ -72,12 +72,12 @@
                     var pond = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.PondSide);
                     var park = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.ParkingSide);
                     var whole = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.WholeHouse);
-    
+
                     var isWholeOccupied = whole != null;
                     var isPondOccupied = pond != null;
                     var isParkOccupied = park != null;
                     var occupiedCount = (isPondOccupied ? 1 : 0) + (isParkOccupied ? 1 : 0);
-    
+
                     // Определяем класс ячейки
                     string cellClass = "";
                     if (isWholeOccupied || occupiedCount == 2) cellClass = "cell-both";
@@ -89,7 +89,7 @@
                         <div class="date-number">@date.Day</div>
                         @* Десктопная информация (скрывается на мобилке) *@
                         <div class="desktop-info">
-                            @if (isWholeOccupied)
+                            @if (isWholeOccupied && whole != null)
                             {
                                 <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(whole)">
                                     <span class="info-badge badge-whole">Дом</span>
@@ -111,7 +111,7 @@
                                     </span>
                                 </div>
                             }
-                            else if (occupiedCount == 2)
+                            else if (occupiedCount == 2 && pond != null && park != null)
                             {
                                 <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(pond)">
                                     <span class="info-badge badge-pond">Пруд</span>
@@ -158,28 +158,31 @@
                                 var unitType = pond != null ? "Пруд" : "Парковка";
                                 var badgeClass = pond != null ? "badge-pond" : "badge-park";
 
-                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(occupiedUnit)">
-                                    <span class="info-badge @badgeClass">@unitType</span>
-                                    <span class="info-name">@occupiedUnit.Guest?.FullName</span>
-                                    <span class="info-details">
-                                        👥 @occupiedUnit.TotalGuestsCount
-                                        @if (occupiedUnit.NeedsSauna)
-                                        {
-                                            <text>🌡️</text>
-                                        }
-                                        @if (occupiedUnit.NeedsBanquetHall)
-                                        {
-                                            <text>🥂</text>
-                                        }
-                                        @if (occupiedUnit.HasDog)
-                                        {
-                                            <text>🐕</text>
-                                        }
-                                    </span>
-                                </div>
+                                if (occupiedUnit != null)
+                                {
+                                    <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(occupiedUnit)">
+                                        <span class="info-badge @badgeClass">@unitType</span>
+                                        <span class="info-name">@occupiedUnit.Guest?.FullName</span>
+                                        <span class="info-details">
+                                            👥 @occupiedUnit.TotalGuestsCount
+                                            @if (occupiedUnit.NeedsSauna)
+                                            {
+                                                <text>🌡️</text>
+                                            }
+                                            @if (occupiedUnit.NeedsBanquetHall)
+                                            {
+                                                <text>🥂</text>
+                                            }
+                                            @if (occupiedUnit.HasDog)
+                                            {
+                                                <text>🐕</text>
+                                            }
+                                        </span>
+                                    </div>
+                                }
                             }
                         </div>
-        
+
                         @if (!isWholeOccupied && occupiedCount > 0)
                         {
                             <div class="mobile-badge-container">
@@ -201,7 +204,7 @@
                         }
                     </div>
                 }
-                </div>
+            </div>
         </div>
     }
 </div>
@@ -387,6 +390,7 @@
 
     private void OnEditBooking(BookingDto booking)
     {
+        if (booking == null) return;
         Nav.NavigateTo($"/bookings/edit/{booking.Id}");
     }
 
