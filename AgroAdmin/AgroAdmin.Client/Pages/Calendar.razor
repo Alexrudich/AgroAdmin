@@ -2,24 +2,22 @@
 @using System.Globalization
 @using AgroAdmin.Shared.Dto.Auth
 @using AgroAdmin.Shared.Dto.Bookings.Responses
+@using AgroAdmin.Shared.Extensions
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Шахматка усадьбы</PageTitle>
 
 <div class="container-fluid mt-4">
-    @* Навигация по месяцам *@
     <div class="month-navigation-container">
         <div class="month-navigation">
             <button class="month-nav-btn" @onclick="PreviousMonth">←</button>
-
             <div class="month-selector" @onclick="ToggleMonthPicker">
                 <span class="current-month-display">@_currentMonth.ToString("MMMM yyyy")</span>
                 <span class="dropdown-icon">▼</span>
             </div>
-
             <button class="month-nav-btn" @onclick="NextMonth">→</button>
-
             @if (_currentMonth.ToString("yyyyMM") != DateTime.Now.ToString("yyyyMM"))
             {
                 <button class="today-nav-btn" @onclick="GoToToday" title="Сегодня">
@@ -40,7 +38,6 @@
                     @for (var i = 0; i < 12; i++)
                     {
                         var monthNum = i + 1;
-                        var monthDate = new DateTime(_pickerYear, monthNum, 1);
                         var isCurrent = _currentMonth.Year == _pickerYear && _currentMonth.Month == monthNum;
                         <div class="month-picker-item @(isCurrent ? "selected" : "")"
                              @onclick="() => SelectMonth(monthNum)">
@@ -60,7 +57,7 @@
     }
     else
     {
-        <div class="calendar-grid shadow-sm">
+        <div class="calendar-grid">
             <div class="calendar-header">
                 @foreach (var day in GetSortedDaysOfWeek())
                 {
@@ -75,117 +72,226 @@
                     var pond = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.PondSide);
                     var park = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.ParkingSide);
                     var whole = dayBookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.WholeHouse);
+    
+                    var isWholeOccupied = whole != null;
+                    var isPondOccupied = pond != null;
+                    var isParkOccupied = park != null;
+                    var occupiedCount = (isPondOccupied ? 1 : 0) + (isParkOccupied ? 1 : 0);
+    
+                    // Определяем класс ячейки
+                    string cellClass = "";
+                    if (isWholeOccupied || occupiedCount == 2) cellClass = "cell-both";
+                    else if (occupiedCount == 1) cellClass = "cell-one";
+                    else cellClass = "cell-free";
 
-                    <div class="calendar-cell @(date.Date == DateTime.Today ? "is-today" : "") @(date.Month != _currentMonth.Month ? "other-month" : "")"
-                         @onclick="() => HandleMobileCellClick(date, dayBookings)">
-
+                    <div class="calendar-cell @cellClass @(date.Month != _currentMonth.Month ? "other-month" : "")"
+                         @onclick="() => HandleCellClick(date, dayBookings)">
                         <div class="date-number">@date.Day</div>
-
-                        <div class="units-container">
-                            @if (whole != null)
+                        @* Десктопная информация (скрывается на мобилке) *@
+                        <div class="desktop-info">
+                            @if (isWholeOccupied)
                             {
-                                <div class="unit-zone full-house"
-                                     @onclick:stopPropagation="true"
-                                     @onclick="() => OnCellClick(date, whole)">
-                                    <span class="unit-icon">🏠</span>
-                                    <span class="unit-text d-none d-md-inline"> @whole.Guest?.FullName</span>
+                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(whole)">
+                                    <span class="info-badge badge-whole">Дом</span>
+                                    <span class="info-name">@whole.Guest?.FullName</span>
+                                    <span class="info-details">
+                                        👥 @whole.TotalGuestsCount
+                                        @if (whole.NeedsSauna)
+                                        {
+                                            <text>🌡️</text>
+                                        }
+                                        @if (whole.NeedsBanquetHall)
+                                        {
+                                            <text>🥂</text>
+                                        }
+                                        @if (whole.HasDog)
+                                        {
+                                            <text>🐕</text>
+                                        }
+                                    </span>
                                 </div>
                             }
-                            else
+                            else if (occupiedCount == 2)
                             {
-                                <div class="unit-zone @(pond != null ? "busy" : "free")"
-                                     @onclick:stopPropagation="true"
-                                     @onclick="() => OnCellClick(date, pond, ReservedUnits.PondSide)">
-                                    <span class="unit-icon">🌊</span>
-                                    <span class="unit-text d-none d-md-inline"> @(pond != null ? pond.Guest?.FullName : "Пруд")</span>
+                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(pond)">
+                                    <span class="info-badge badge-pond">Пруд</span>
+                                    <span class="info-name">@pond.Guest?.FullName</span>
+                                    <span class="info-details">
+                                        👥 @pond.TotalGuestsCount
+                                        @if (pond.NeedsSauna)
+                                        {
+                                            <text>🌡️</text>
+                                        }
+                                        @if (pond.NeedsBanquetHall)
+                                        {
+                                            <text>🥂</text>
+                                        }
+                                        @if (pond.HasDog)
+                                        {
+                                            <text>🐕</text>
+                                        }
+                                    </span>
                                 </div>
+                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(park)">
+                                    <span class="info-badge badge-park">Парковка</span>
+                                    <span class="info-name">@park.Guest?.FullName</span>
+                                    <span class="info-details">
+                                        👥 @park.TotalGuestsCount
+                                        @if (park.NeedsSauna)
+                                        {
+                                            <text>🌡️</text>
+                                        }
+                                        @if (park.NeedsBanquetHall)
+                                        {
+                                            <text>🥂</text>
+                                        }
+                                        @if (park.HasDog)
+                                        {
+                                            <text>🐕</text>
+                                        }
+                                    </span>
+                                </div>
+                            }
+                            else if (occupiedCount == 1)
+                            {
+                                var occupiedUnit = pond ?? park;
+                                var unitType = pond != null ? "Пруд" : "Парковка";
+                                var badgeClass = pond != null ? "badge-pond" : "badge-park";
 
-                                <div class="unit-zone @(park != null ? "busy" : "free")"
-                                     @onclick:stopPropagation="true"
-                                     @onclick="() => OnCellClick(date, park, ReservedUnits.ParkingSide)">
-                                    <span class="unit-icon">🚗</span>
-                                    <span class="unit-text d-none d-md-inline"> @(park != null ? park.Guest?.FullName : "Парк")</span>
+                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(occupiedUnit)">
+                                    <span class="info-badge @badgeClass">@unitType</span>
+                                    <span class="info-name">@occupiedUnit.Guest?.FullName</span>
+                                    <span class="info-details">
+                                        👥 @occupiedUnit.TotalGuestsCount
+                                        @if (occupiedUnit.NeedsSauna)
+                                        {
+                                            <text>🌡️</text>
+                                        }
+                                        @if (occupiedUnit.NeedsBanquetHall)
+                                        {
+                                            <text>🥂</text>
+                                        }
+                                        @if (occupiedUnit.HasDog)
+                                        {
+                                            <text>🐕</text>
+                                        }
+                                    </span>
                                 </div>
                             }
                         </div>
+        
+                        @if (!isWholeOccupied && occupiedCount > 0)
+                        {
+                            <div class="mobile-badge-container">
+                                @if (isPondOccupied)
+                                {
+                                    <div class="badge badge-pond">Пруд</div>
+                                }
+                                @if (isParkOccupied)
+                                {
+                                    <div class="badge badge-park">Парковка</div>
+                                }
+                            </div>
+                        }
+                        @if (isWholeOccupied)
+                        {
+                            <div class="mobile-badge-container">
+                                <div class="badge badge-whole">Дом</div>
+                            </div>
+                        }
                     </div>
                 }
-            </div>
+                </div>
         </div>
     }
 </div>
 
-@* Всплывающее меню выбора (Action Sheet) *@
-@if (_selectedDateForAction.HasValue)
+@* Модалка *@
+@if (_selectedDate.HasValue)
 {
-    var selDate = _selectedDateForAction.Value;
+    var selDate = _selectedDate.Value;
     var bookings = GetBookingsForDate(selDate);
+    var pond = bookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.PondSide);
+    var park = bookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.ParkingSide);
+    var whole = bookings.FirstOrDefault(b => b.ReservedUnit == ReservedUnits.WholeHouse);
 
-    <div class="mobile-action-sheet" @onclick="() => _selectedDateForAction = null">
-        <div class="sheet-content" @onclick:stopPropagation="true">
-            <div class="sheet-header">
-                <h5 class="m-0">@selDate.ToString("dd MMMM")</h5>
-                <button type="button" class="btn-close" @onclick="() => _selectedDateForAction = null"></button>
+    var isWholeOccupied = whole != null;
+    var isPondOccupied = pond != null;
+    var isParkOccupied = park != null;
+    var hasFreeSlots = !isWholeOccupied && (!isPondOccupied || !isParkOccupied);
+
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h5>@selDate.ToString("dd MMMM yyyy")</h5>
+                <button class="modal-close" @onclick="CloseModal">×</button>
             </div>
-            <div class="list-group mt-3">
-                @foreach (var b in bookings)
+            <div class="modal-body">
+                @if (bookings.Any())
                 {
-                    <button type="button" class="list-group-item list-group-item-action d-flex align-items-center"
-                            @onclick="() => { OnCellClick(selDate, b); _selectedDateForAction = null; }">
-                        <span class="me-3">@(b.ReservedUnit == ReservedUnits.PondSide ? "🌊" : b.ReservedUnit == ReservedUnits.ParkingSide ? "🚗" : "🏠")</span>
-                        <div class="flex-grow-1">
-                            <div class="fw-bold">@b.Guest?.FullName</div>
-                            <small class="text-muted">@(b.ReservedUnit == ReservedUnits.PondSide ? "Пруд" : b.ReservedUnit == ReservedUnits.ParkingSide ? "Парковка" : "Весь дом")</small>
+                    @foreach (var b in bookings)
+                    {
+                        <div class="booking-card" @onclick="() => OnEditBooking(b)">
+                            <div class="booking-title">
+                                <span class="booking-badge @(b.ReservedUnit == ReservedUnits.PondSide ? "badge-pond" : b.ReservedUnit == ReservedUnits.ParkingSide ? "badge-park" : "badge-whole")">
+                                    @(b.ReservedUnit == ReservedUnits.PondSide ? "Пруд" : b.ReservedUnit == ReservedUnits.ParkingSide ? "Парковка" : "Дом")
+                                </span>
+                                <span class="booking-name">@b.Guest?.FullName</span>
+                            </div>
+                            <div class="booking-details">
+                                👥 @b.TotalGuestsCount чел.
+                                @if (b.NeedsSauna)
+                                {
+                                    <text>🌡️ Сауна</text>
+                                }
+                                @if (b.NeedsBanquetHall)
+                                {
+                                    <text>🥂 Зал</text>
+                                }
+                                @if (b.HasDog)
+                                {
+                                    <text>🐕 Собака</text>
+                                }
+                            </div>
                         </div>
-                    </button>
+                    }
                 }
 
-                @if (bookings.Count < 2 && bookings.All(x => x.ReservedUnit != ReservedUnits.WholeHouse))
+                @if (hasFreeSlots)
                 {
-                    <div class="mt-2 pt-2 border-top">
-                        @* 1. Если день совсем пустой — предлагаем Весь дом как приоритет *@
-                        @if (bookings.Count == 0)
+                    <div class="create-section">
+                        <div class="create-title">Создать бронь:</div>
+                        @if (!isPondOccupied)
                         {
-                            <button type="button" class="list-group-item list-group-item-action text-primary"
-                                    @onclick="() => { OnCellClick(selDate, null, ReservedUnits.WholeHouse); _selectedDateForAction = null; }">
-                                🏠 Забронировать весь дом
+                            <button class="create-btn create-pond" @onclick="() => OnCreateBooking(selDate, ReservedUnits.PondSide)">
+                                🌊 Пруд
                             </button>
                         }
-
-                        @* 2. Половинка у Пруда (показываем, если она не занята и не забронирован весь дом) *@
-                        @if (bookings.All(x => x.ReservedUnit != ReservedUnits.PondSide))
+                        @if (!isParkOccupied)
                         {
-                            <button type="button" class="list-group-item list-group-item-action text-primary"
-                                    @onclick="() => { OnCellClick(selDate, null, ReservedUnits.PondSide); _selectedDateForAction = null; }">
-                                🌊 Забронировать половинку у пруда
+                            <button class="create-btn create-park" @onclick="() => OnCreateBooking(selDate, ReservedUnits.ParkingSide)">
+                                🚗 Парковка
                             </button>
                         }
-
-                        @* 3. Половинка у Парковки *@
-                        @if (bookings.All(x => x.ReservedUnit != ReservedUnits.ParkingSide))
+                        @if (!isPondOccupied && !isParkOccupied)
                         {
-                            <button type="button" class="list-group-item list-group-item-action text-primary"
-                                    @onclick="() => { OnCellClick(selDate, null, ReservedUnits.ParkingSide); _selectedDateForAction = null; }">
-                                🚗 Забронировать половинку у парковки
+                            <button class="create-btn create-whole" @onclick="() => OnCreateBooking(selDate, ReservedUnits.WholeHouse)">
+                                🏠 Весь дом
                             </button>
                         }
                     </div>
                 }
-
             </div>
         </div>
     </div>
 }
-
 @code {
     private List<BookingDto>? _allBookings;
     private readonly List<DateTime> _calendarDays = new();
     private DateTime _currentMonth = DateTime.Now;
     private bool _showMonthPicker = false;
     private int _pickerYear = DateTime.Now.Year;
-
-    // Поле для управления мобильным меню
-    private DateTime? _selectedDateForAction;
+    private DateTime? _selectedDate;
 
     protected override async Task OnInitializedAsync()
     {
@@ -211,7 +317,6 @@
     {
         try
         {
-            // Здесь можно добавить фильтрацию по датам, чтобы не тянуть все брони за все время
             var result = await Http.GetFromJsonAsync<PagedResultDto<BookingDto>>("api/bookings");
             _allBookings = result?.Items ?? new();
             GenerateCalendar(_currentMonth.Year, _currentMonth.Month);
@@ -227,7 +332,6 @@
     {
         _calendarDays.Clear();
         var firstDayOfMonth = new DateTime(year, month, 1);
-        // Вычисляем отступ, чтобы неделя начиналась с понедельника
         var offset = ((int)firstDayOfMonth.DayOfWeek == 0) ? 6 : (int)firstDayOfMonth.DayOfWeek - 1;
 
         for (var i = 0; i < 42; i++)
@@ -236,8 +340,6 @@
         }
         StateHasChanged();
     }
-
-    // --- Навигация по календарю ---
 
     private void PreviousMonth()
     {
@@ -277,29 +379,27 @@
         _showMonthPicker = false;
     }
 
-    // --- Логика кликов и переходов ---
-
-    // Основной метод перехода (используется и в ячейках, и в меню)
-    private void OnCellClick(DateTime date, BookingDto? b, ReservedUnits? unit = null)
+    private void HandleCellClick(DateTime date, List<BookingDto> bookings)
     {
-        if (b != null)
-        {
-            Nav.NavigateTo($"/bookings/edit/{b.Id}");
-        }
-        else
-        {
-            var unitVal = (int)(unit ?? ReservedUnits.WholeHouse);
-            Nav.NavigateTo($"/bookings/create?start={date:yyyy-MM-dd}&unit={unitVal}");
-        }
+        _selectedDate = date;
+        StateHasChanged();
     }
 
-    // Метод для мобильной версии: просто открывает меню выбора
-    private void HandleMobileCellClick(DateTime date, List<BookingDto> bookings)
+    private void OnEditBooking(BookingDto booking)
     {
-        _selectedDateForAction = date;
+        Nav.NavigateTo($"/bookings/edit/{booking.Id}");
     }
 
-    // --- Вспомогательные методы ---
+    private void OnCreateBooking(DateTime date, ReservedUnits unit)
+    {
+        Nav.NavigateTo($"/bookings/create?start={date:yyyy-MM-dd}&unit={(int)unit}");
+    }
+
+    private void CloseModal()
+    {
+        _selectedDate = null;
+        StateHasChanged();
+    }
 
     private List<BookingDto> GetBookingsForDate(DateTime d) =>
         _allBookings?

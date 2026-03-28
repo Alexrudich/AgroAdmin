@@ -1,5 +1,5 @@
 ﻿/* ========================================
-   1. ОСНОВНАЯ СЕТКА КАЛЕНДАРЯ
+   1. СЕТКА КАЛЕНДАРЯ
    ======================================== */
 .calendar-grid {
     display: flex;
@@ -8,7 +8,6 @@
     background: #fff;
     border-radius: 8px;
     overflow: hidden;
-    width: 100%;
 }
 
 .calendar-header {
@@ -32,149 +31,262 @@
 
 .calendar-cell {
     width: 14.285%;
-    min-height: 120px;
+    min-height: 100px;
     border: 0.5px solid #f1f1f1;
-    display: flex;
-    flex-direction: column;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 .other-month {
-    background-color: #fafafa;
-    opacity: 0.5;
+    opacity: 0.4;
 }
 
 .date-number {
-    padding: 6px 10px;
+    position: absolute;
+    top: 6px;
+    left: 8px;
     font-size: 0.85rem;
     font-weight: bold;
-    color: #adb5bd;
+    color: #6c757d;
+    z-index: 2;
 }
 
-.units-container {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-    gap: 3px;
-    padding: 4px;
-}
-
-/* ========================================
-   2. СТИЛИ ЯЧЕЕК БРОНИРОВАНИЯ
-   ======================================== */
-.unit-zone {
-    flex-grow: 1;
-    border-radius: 4px;
-    padding: 6px;
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border-left: 4px solid transparent;
-    background-color: #f8f9fa;
-    color: #495057;
-    margin-bottom: 2px;
-    overflow: hidden;
-}
-
-.free {
+/* Цвета ячеек */
+.cell-free {
     background-color: #e8f5e9;
-    color: #2e7d32;
-    border: 1px solid #a5d6a7;
-    border-left: 4px solid #2e7d32;
 }
 
-    .free:hover {
+    .cell-free:hover {
         background-color: #c8e6c9;
     }
 
-.busy {
+.cell-one {
+    background-color: #fff3e0;
+}
+
+    .cell-one:hover {
+        background-color: #ffe0b2;
+    }
+
+.cell-both {
     background-color: #ffebee;
-    color: #b71c1c;
-    border: 1px solid #ef9a9a;
-    border-left: 4px solid #b71c1c;
-    font-weight: 500;
 }
 
-    .busy:hover {
+    .cell-both:hover {
         background-color: #ffcdd2;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
-.full-house {
-    background-color: #f3e5f5;
-    color: #4a148c;
-    border: 1px solid #e1bee7;
-    border-left: 4px solid #9c27b0;
-    justify-content: center;
-    font-weight: bold;
-}
 
 /* ========================================
-   3. НЕПРЕРЫВНАЯ БЕГУЩАЯ СТРОКА
+   2. БЕЙДЖИ ДЛЯ МОБИЛКИ
    ======================================== */
-.marquee-wrapper {
-    width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    position: relative;
-}
-
-.marquee-content {
-    display: inline-block;
-    transform: translateX(0);
-    will-change: transform;
-}
-
-    .marquee-content.active {
-        animation: marquee-scroll 8s linear infinite;
-    }
-
-    .marquee-content.long-text.active {
-        animation-duration: 12s;
-    }
-
-@keyframes marquee-scroll {
-    0% {
-        transform: translateX(0);
-    }
-
-    100% {
-        transform: translateX(-100%);
-    }
-}
-
-.marquee-wrapper::before,
-.marquee-wrapper::after {
-    content: '';
+.mobile-badge-container {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 30px;
-    z-index: 2;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
 }
 
-.marquee-wrapper::before {
-    left: 0;
-    background: linear-gradient(to right, rgba(255,255,255,0.95), transparent);
+/* Скрываем на десктопе */
+@media (min-width: 769px) {
+    .mobile-badge-container {
+        display: none;
+    }
 }
 
-.marquee-wrapper::after {
-    right: 0;
-    background: linear-gradient(to left, rgba(255,255,255,0.95), transparent);
+.badge {
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 0.6rem;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid;
 }
 
-.marquee-wrapper:has(.marquee-content.active)::before,
-.marquee-wrapper:has(.marquee-content.active)::after {
-    opacity: 1;
+.badge-pond {
+    color: #1976d2;
+    border-color: #1976d2;
+}
+
+.badge-park {
+    color: #388e3c;
+    border-color: #388e3c;
+}
+
+.badge-whole {
+    color: #7b1fa2;
+    border-color: #7b1fa2;
 }
 
 /* ========================================
-   4. МОБИЛЬНАЯ АДАПТАЦИЯ (ФИНАЛ: ВЫСОТА + РАБОЧИЙ КЛИК)
+   3. МОДАЛКА
+   ======================================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 450px;
+    max-height: 80vh;
+    overflow: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+    .modal-header h5 {
+        margin: 0;
+        font-size: 1.1rem;
+    }
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6c757d;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+    .modal-close:hover {
+        background: #f8f9fa;
+    }
+
+.modal-body {
+    padding: 20px;
+}
+
+/* Карточки бронирований */
+.booking-card {
+    padding: 12px;
+    border-radius: 12px;
+    background: #f8f9fa;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+    .booking-card:hover {
+        background: #e9ecef;
+        transform: translateX(4px);
+    }
+
+.booking-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.booking-badge {
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid;
+}
+
+.booking-name {
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.booking-details {
+    display: flex;
+    gap: 12px;
+    font-size: 0.7rem;
+    color: #6c757d;
+    flex-wrap: wrap;
+}
+
+/* Секция создания брони */
+.create-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e9ecef;
+}
+
+.create-title {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 12px;
+}
+
+.create-btn {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.85rem;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.create-pond {
+    color: #1976d2;
+    border-color: #1976d2;
+}
+
+    .create-pond:hover {
+        background: #e3f2fd;
+    }
+
+.create-park {
+    color: #388e3c;
+    border-color: #388e3c;
+}
+
+    .create-park:hover {
+        background: #e8f5e9;
+    }
+
+.create-whole {
+    color: #7b1fa2;
+    border-color: #7b1fa2;
+}
+
+    .create-whole:hover {
+        background: #f3e5f5;
+    }
+
+/* ========================================
+   4. АДАПТАЦИЯ ДЛЯ МОБИЛКИ
    ======================================== */
 @media (max-width: 768px) {
-    /* 1. Сетка: 7 колонок */
     .calendar-body {
         display: grid !important;
         grid-template-columns: repeat(7, 1fr) !important;
@@ -182,93 +294,37 @@
         background-color: #dee2e6;
     }
 
-    /* 2. Ячейка: УВЕЛИЧИЛИ ВЫСОТУ (1.4 вместо 1) */
     .calendar-cell {
         width: 100% !important;
-        aspect-ratio: 1 / 1.4 !important; /* На 40% выше, чем ширина */
+        aspect-ratio: 1 / 1 !important;
         min-height: auto !important;
         padding: 0 !important;
         margin: 0 !important;
         position: relative;
-        background: #fff;
-        display: block !important;
-    }
-
-    /* 3. Юниты: СТРОГО КОЛОНКА (низ/верх) + ПРОБРОС КЛИКА */
-    .units-container {
-        display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-        height: 100% !important;
-        padding: 0 !important;
-        gap: 0 !important;
-        pointer-events: none !important; /* КРИТИЧНО: Клик летит в ячейку */
-    }
-
-    .unit-zone {
-        flex: 1 !important; /* Ровно 50% высоты */
-        width: 100% !important;
-        display: flex !important;
-        align-items: center;
-        justify-content: center;
-        margin: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        border-top: 4px solid transparent;
-        border-radius: 0 !important;
-    }
-
-    /* 4. Иконки: Крупные, по центру */
-    .unit-icon {
-        font-size: 1.4rem !important;
-        display: block !important;
-    }
-
-    /* Прячем текст и бегущую строку */
-    .unit-text, .marquee-wrapper, .marquee-content {
-        display: none !important;
-    }
-
-    /* 5. Цвета (твои оригинальные) */
-    .free {
-        border-top-color: #2e7d32 !important;
-        background: #e8f5e9 !important;
-    }
-
-    .busy {
-        border-top-color: #b71c1c !important;
-        background: #ffebee !important;
-    }
-
-    .full-house {
-        border-top-color: #9c27b0 !important;
-        background: #f3e5f5 !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
 
     .date-number {
-        position: absolute;
-        top: 2px;
+        font-size: 0.7rem;
+        top: 4px;
         left: 4px;
-        font-size: 0.65rem !important;
-        z-index: 10;
         background: rgba(255,255,255,0.7);
-        padding: 0 2px;
-        border-radius: 2px;
+        padding: 0 4px;
+        border-radius: 8px;
+    }
+
+    .mobile-badge-container {
+        right: 4px;
+        gap: 3px;
+    }
+
+    .badge {
+        font-size: 0.55rem;
+        padding: 1px 4px;
     }
 }
 
-
 /* ========================================
-   5. УЛУЧШЕННАЯ НАВИГАЦИЯ
+   5. НАВИГАЦИЯ
    ======================================== */
 .month-navigation-container {
     display: flex;
@@ -330,7 +386,6 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s;
 }
 
     .month-nav-btn:hover {
@@ -348,13 +403,11 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s;
     margin-left: 4px;
 }
 
     .today-nav-btn:hover {
         background: #1565c0;
-        transform: scale(1.05);
     }
 
 .month-picker-dropdown {
@@ -391,14 +444,8 @@
     border-radius: 50%;
     border: 1px solid #dee2e6;
     background: white;
-    color: #495057;
     cursor: pointer;
-    transition: all 0.2s;
 }
-
-    .month-picker-nav:hover {
-        background: #f8f9fa;
-    }
 
 .month-picker-grid {
     display: grid;
@@ -411,7 +458,6 @@
     text-align: center;
     border-radius: 30px;
     cursor: pointer;
-    transition: all 0.2s;
     font-size: 14px;
     font-weight: 500;
     color: #495057;
@@ -448,52 +494,97 @@
     }
 }
 
-@media (max-width: 480px) {
-    .month-selector {
-        min-width: 120px;
-        padding: 6px 8px;
-    }
-
-    .current-month-display {
-        font-size: 13px;
-    }
-
-    .month-nav-btn, .today-nav-btn {
-        width: 32px;
-        height: 32px;
-        font-size: 16px;
-    }
-}
 /* ========================================
-   6. ACTION SHEET (МЕНЮ ВЫБОРА)
+   6. ДЕСКТОПНАЯ ИНФОРМАЦИЯ В ЯЧЕЙКАХ
    ======================================== */
-.mobile-action-sheet {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 9999; /* Чтобы точно было поверх всего */
+.desktop-info {
     display: flex;
-    align-items: flex-end;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 28px;
+    padding: 0 4px;
 }
 
-.sheet-content {
-    background: white;
-    width: 100%;
-    border-radius: 20px 20px 0 0;
-    padding: 24px 24px 40px 24px;
-    box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
-    animation: slideUp 0.3s ease-out;
+.booking-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(2px);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.7rem;
 }
 
-@keyframes slideUp {
-    from {
-        transform: translateY(100%);
+    .booking-info:hover {
+        background: rgba(255, 255, 255, 0.85);
+        transform: translateX(2px);
     }
 
-    to {
-        transform: translateY(0);
+/* Бейджи - только текст с цветом */
+.info-badge {
+    padding: 0;
+    font-size: 0.65rem;
+    font-weight: 500;
+    background: transparent;
+    white-space: nowrap;
+}
+
+    /* Цвета для бейджей */
+    .info-badge.badge-pond {
+        color: #1976d2;
+    }
+
+    .info-badge.badge-park {
+        color: #388e3c;
+    }
+
+    .info-badge.badge-whole {
+        color: #7b1fa2;
+    }
+
+.info-name {
+    font-weight: 500;
+    color: #495057;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.info-details {
+    display: flex;
+    gap: 4px;
+    color: #6c757d;
+    font-size: 0.65rem;
+    white-space: nowrap;
+}
+
+/* Скрываем десктопную информацию на мобилке */
+@media (max-width: 768px) {
+    .desktop-info {
+        display: none;
+    }
+}
+
+/* Адаптация для узкого десктопа (768px-1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .info-details {
+        display: none; /* Скрываем детали на узких экранах */
+    }
+
+    .booking-info {
+        gap: 6px;
+        padding: 3px 6px;
+    }
+
+    .info-name {
+        font-size: 0.65rem;
+    }
+
+    .info-badge {
+        font-size: 0.6rem;
     }
 }
