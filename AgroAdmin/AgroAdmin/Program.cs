@@ -248,6 +248,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(AgroAdmin.Client._Imports).Assembly);
 
-app.MapMethods("/health", ["HEAD"], () => Results.Ok());
+app.MapMethods("/health", ["GET", "HEAD"], () => Results.Ok("Healthy"));
 
 app.Run();
