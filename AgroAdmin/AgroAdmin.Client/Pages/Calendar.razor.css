@@ -92,6 +92,13 @@
     align-items: flex-end;
 }
 
+/* Скрываем на десктопе */
+@media (min-width: 769px) {
+    .mobile-badge-container {
+        display: none;
+    }
+}
+
 .badge {
     padding: 2px 6px;
     border-radius: 12px;
@@ -484,5 +491,100 @@
         width: calc(100% - 32px);
         left: 16px;
         transform: none;
+    }
+}
+
+/* ========================================
+   6. ДЕСКТОПНАЯ ИНФОРМАЦИЯ В ЯЧЕЙКАХ
+   ======================================== */
+.desktop-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 28px;
+    padding: 0 4px;
+}
+
+.booking-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(2px);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.7rem;
+}
+
+    .booking-info:hover {
+        background: rgba(255, 255, 255, 0.85);
+        transform: translateX(2px);
+    }
+
+/* Бейджи - только текст с цветом */
+.info-badge {
+    padding: 0;
+    font-size: 0.65rem;
+    font-weight: 500;
+    background: transparent;
+    white-space: nowrap;
+}
+
+    /* Цвета для бейджей */
+    .info-badge.badge-pond {
+        color: #1976d2;
+    }
+
+    .info-badge.badge-park {
+        color: #388e3c;
+    }
+
+    .info-badge.badge-whole {
+        color: #7b1fa2;
+    }
+
+.info-name {
+    font-weight: 500;
+    color: #495057;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.info-details {
+    display: flex;
+    gap: 4px;
+    color: #6c757d;
+    font-size: 0.65rem;
+    white-space: nowrap;
+}
+
+/* Скрываем десктопную информацию на мобилке */
+@media (max-width: 768px) {
+    .desktop-info {
+        display: none;
+    }
+}
+
+/* Адаптация для узкого десктопа (768px-1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .info-details {
+        display: none; /* Скрываем детали на узких экранах */
+    }
+
+    .booking-info {
+        gap: 6px;
+        padding: 3px 6px;
+    }
+
+    .info-name {
+        font-size: 0.65rem;
+    }
+
+    .info-badge {
+        font-size: 0.6rem;
     }
 }

@@ -87,6 +87,98 @@
                     <div class="calendar-cell @cellClass @(date.Month != _currentMonth.Month ? "other-month" : "")"
                          @onclick="() => HandleCellClick(date, dayBookings)">
                         <div class="date-number">@date.Day</div>
+                        @* Десктопная информация (скрывается на мобилке) *@
+                        <div class="desktop-info">
+                            @if (isWholeOccupied)
+                            {
+                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(whole)">
+                                    <span class="info-badge badge-whole">Дом</span>
+                                    <span class="info-name">@whole.Guest?.FullName</span>
+                                    <span class="info-details">
+                                        👥 @whole.TotalGuestsCount
+                                        @if (whole.NeedsSauna)
+                                        {
+                                            <text>🌡️</text>
+                                        }
+                                        @if (whole.NeedsBanquetHall)
+                                        {
+                                            <text>🥂</text>
+                                        }
+                                        @if (whole.HasDog)
+                                        {
+                                            <text>🐕</text>
+                                        }
+                                    </span>
+                                </div>
+                            }
+                            else if (occupiedCount == 2)
+                            {
+                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(pond)">
+                                    <span class="info-badge badge-pond">Пруд</span>
+                                    <span class="info-name">@pond.Guest?.FullName</span>
+                                    <span class="info-details">
+                                        👥 @pond.TotalGuestsCount
+                                        @if (pond.NeedsSauna)
+                                        {
+                                            <text>🌡️</text>
+                                        }
+                                        @if (pond.NeedsBanquetHall)
+                                        {
+                                            <text>🥂</text>
+                                        }
+                                        @if (pond.HasDog)
+                                        {
+                                            <text>🐕</text>
+                                        }
+                                    </span>
+                                </div>
+                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(park)">
+                                    <span class="info-badge badge-park">Парковка</span>
+                                    <span class="info-name">@park.Guest?.FullName</span>
+                                    <span class="info-details">
+                                        👥 @park.TotalGuestsCount
+                                        @if (park.NeedsSauna)
+                                        {
+                                            <text>🌡️</text>
+                                        }
+                                        @if (park.NeedsBanquetHall)
+                                        {
+                                            <text>🥂</text>
+                                        }
+                                        @if (park.HasDog)
+                                        {
+                                            <text>🐕</text>
+                                        }
+                                    </span>
+                                </div>
+                            }
+                            else if (occupiedCount == 1)
+                            {
+                                var occupiedUnit = pond ?? park;
+                                var unitType = pond != null ? "Пруд" : "Парковка";
+                                var badgeClass = pond != null ? "badge-pond" : "badge-park";
+
+                                <div class="booking-info" @onclick:stopPropagation="true" @onclick="() => OnEditBooking(occupiedUnit)">
+                                    <span class="info-badge @badgeClass">@unitType</span>
+                                    <span class="info-name">@occupiedUnit.Guest?.FullName</span>
+                                    <span class="info-details">
+                                        👥 @occupiedUnit.TotalGuestsCount
+                                        @if (occupiedUnit.NeedsSauna)
+                                        {
+                                            <text>🌡️</text>
+                                        }
+                                        @if (occupiedUnit.NeedsBanquetHall)
+                                        {
+                                            <text>🥂</text>
+                                        }
+                                        @if (occupiedUnit.HasDog)
+                                        {
+                                            <text>🐕</text>
+                                        }
+                                    </span>
+                                </div>
+                            }
+                        </div>
         
                         @if (!isWholeOccupied && occupiedCount > 0)
                         {
