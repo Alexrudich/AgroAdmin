@@ -1,7 +1,6 @@
 ﻿using AgroAdmin.Domain.Models;
 using AgroAdmin.Infrastructure.Abstractions;
 using AgroAdmin.Infrastructure.Persistence;
-using AgroAdmin.Infrastructure.Services;
 using AgroAdmin.Shared.Dto.Bookings.Events;
 using AgroAdmin.Shared.Dto.Bookings.Requests;
 using AgroAdmin.Shared.Dto.Bookings.Responses;
@@ -262,8 +261,8 @@ public class BookingsController(
             // 5. Создаем бронь
             var booking = new Booking(
                 guestId: guestId,
-                arrival: dto.ArrivalDate,
-                departure: dto.DepartureDate,
+                arrival: DateTime.SpecifyKind(dto.ArrivalDate, DateTimeKind.Utc),
+                departure: DateTime.SpecifyKind(dto.DepartureDate, DateTimeKind.Utc),
                 createdAt: DateTime.UtcNow,
                 unit: dto.ReservedUnit,
                 totalGuests: dto.TotalGuestsCount,
