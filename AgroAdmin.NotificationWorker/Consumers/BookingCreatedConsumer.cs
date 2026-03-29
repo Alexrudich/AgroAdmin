@@ -25,19 +25,31 @@ public class BookingCreatedConsumer(
             _ => "🏢"
         };
 
-        // 2. Определяем время напоминания (за час до заезда)
-        var checkInDateTime = msg.ArrivalDate.Date + msg.CheckInTime;
+        // 2. Определяем время напоминания (за час до заезда по Минску)
+        var minskTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Belarus Standard Time");
+
+        // Собираем локальную дату и время заезда (по Минску)
+        var checkInLocal = msg.ArrivalDate.Date + msg.CheckInTime;
         if (msg.CheckInTime == TimeSpan.Zero)
         {
-            checkInDateTime = msg.ArrivalDate.Date + new TimeSpan(14, 0, 0);
+            checkInLocal = msg.ArrivalDate.Date + new TimeSpan(14, 0, 0);
         }
 
-        var reminderTime = checkInDateTime.ToUniversalTime().AddHours(-1);
-        if (reminderTime <= DateTime.UtcNow)
-            reminderTime = DateTime.UtcNow.AddSeconds(10);
+        // Явно указываем, что это локальное время Минска (Kind = Unspecified)
+        var checkInUnspecified = DateTime.SpecifyKind(checkInLocal, DateTimeKind.Unspecified);
 
-        // 3. Формируем текст сообщения (без лишних пустых строк)
-        var checkInTimeStr = checkInDateTime.ToString("HH:mm");
+        // Конвертируем в UTC, указывая исходную временную зону
+        var checkInUtc = TimeZoneInfo.ConvertTimeToUtc(checkInUnspecified, minskTimeZone);
+
+        // Вычитаем 1 час для напоминания
+        var reminderTimeUtc = checkInUtc.AddHours(-1);
+
+        // Если напоминание уже в прошлом - отправляем через 10 секунд
+        if (reminderTimeUtc <= DateTime.UtcNow)
+            reminderTimeUtc = DateTime.UtcNow.AddSeconds(10);
+
+        // 3. Формируем текст сообщения
+        var checkInTimeStr = checkInLocal.ToString("HH:mm");
 
         var text = $"🔔 <b>Скоро заезд!</b>\n" +
                    $"{unitEmoji} <b>{unitName}</b>\n" +
@@ -69,7 +81,7 @@ public class BookingCreatedConsumer(
         var reminder = new ScheduledReminder
         {
             Message = text,
-            ScheduledFor = reminderTime,
+            ScheduledFor = reminderTimeUtc,
             Priority = ReminderPriority.High,
             IsSent = false,
             TargetChatId = null
@@ -78,7 +90,7 @@ public class BookingCreatedConsumer(
         dbContext.ScheduledReminders.Add(reminder);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("📅 Авто-напоминание для брони #{BookingId} создано на {ReminderTime:dd.MM.yyyy HH:mm} (заезд в {CheckInTime})",
-            msg.BookingId, reminderTime, checkInTimeStr);
+        logger.LogInformation("📅 Авто-напоминание для брони #{BookingId} создано на {ReminderTime:dd.MM.yyyy HH:mm} UTC (заезд в {CheckInTime} по Минску)",
+            msg.BookingId, reminderTimeUtc, checkInTimeStr);
     }
 }
