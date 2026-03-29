@@ -87,28 +87,26 @@ public static class TelegramMessageFormatter
         sb.AppendLine(FormatDateRanges("🟢 *Полностью свободно* (все 3 объекта)", fullyFreeDates));
 
         var partiallyFree = availability.Where(d => d.IsPartiallyFree).ToList();
+
         if (partiallyFree.Any())
         {
-            sb.AppendLine($"\n🟡 *Частично занято* (свободен 1-2 объекта):");
+            sb.AppendLine($"\n🟡 *Частично занято* (свободен 1 объект):");
 
             var onlyPondFree = partiallyFree.Where(d => d.IsPondSideFree && !d.IsParkingSideFree).Select(d => d.Date).ToList();
             var onlyParkingFree = partiallyFree.Where(d => !d.IsPondSideFree && d.IsParkingSideFree).Select(d => d.Date).ToList();
-            var bothFreeButWholeOccupied = partiallyFree.Where(d => d.IsPondSideFree && d.IsParkingSideFree && !d.IsWholeHouseFree).Select(d => d.Date).ToList();
 
             if (onlyPondFree.Any())
                 sb.AppendLine(FormatDateRanges($"   🌊 Только {ReservedUnits.PondSide.GetRussianName()}", onlyPondFree));
 
             if (onlyParkingFree.Any())
                 sb.AppendLine(FormatDateRanges($"   🚗 Только {ReservedUnits.ParkingSide.GetRussianName()}", onlyParkingFree));
-
-            if (bothFreeButWholeOccupied.Any())
-                sb.AppendLine(FormatDateRanges($"   🏠 Занят {ReservedUnits.WholeHouse.GetRussianName()}, свободны обе половинки", bothFreeButWholeOccupied));
         }
 
         var fullyOccupied = availability.Where(d => d.IsFullyOccupied).Select(d => d.Date).ToList();
+
         if (fullyOccupied.Any())
         {
-            sb.AppendLine($"\n🔴 *Полностью занято* (все 3 объекта):");
+            sb.AppendLine($"\n🔴 *Полностью занято* (все объекты):");
             sb.AppendLine(FormatDateRanges("   ", fullyOccupied));
         }
 
