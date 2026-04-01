@@ -216,15 +216,36 @@ public class TelegramService : ITelegramService
         _logger.LogInformation("Received command {Command} from {ChatId}", command, chatId);
 
         using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        // Получаем роль пользователя
+        var recipient = await dbContext.TelegramRecipients
+            .FirstOrDefaultAsync(r => r.ChatId == chatId.ToString(), ct);
+
+        var userRole = recipient?.Role;
+
+        // Проверяем, доступна ли команда для роли пользователя
+        if (!TelegramCommands.IsCommandAvailable(command ?? "", userRole))
+        {
+            await botClient.SendTextMessageAsync(
+                chatId,
+                "⛔ У вас нет доступа к этой команде.",
+                cancellationToken: ct);
+            return;
+        }
+
+        // Выполняем команду
         switch (command)
         {
             case "/start":
-                await botClient.SendTextMessageAsync(chatId, TelegramMessages.Welcome, parseMode: ParseMode.Markdown, cancellationToken: ct);
+                var basicCommands = TelegramCommands.FormatBasicCommandList();
+                var welcomeMessage = TelegramMessages.GetWelcomeMessage(basicCommands);
+                await botClient.SendTextMessageAsync(chatId, welcomeMessage, parseMode: ParseMode.Markdown, cancellationToken: ct);
                 break;
 
             case "/help":
-                await botClient.SendTextMessageAsync(chatId, TelegramMessages.Help, parseMode: ParseMode.Markdown, cancellationToken: ct);
+                var helpMessage = TelegramMessages.GetHelpMessage(TelegramCommands.FormatCommandList(userRole));
+                await botClient.SendTextMessageAsync(chatId, helpMessage, parseMode: ParseMode.Markdown, cancellationToken: ct);
                 break;
 
             case "/nearestbookings":
@@ -242,6 +263,7 @@ public class TelegramService : ITelegramService
             case "/bookingsummary":
                 await ShowBookingSummaryAsync(botClient, chatId, ct);
                 break;
+
             case "/health":
                 await ShowHealthAsync(botClient, chatId, ct);
                 break;

@@ -16,9 +16,9 @@
             </div>
             <div class="col-md-2">
                 <select @bind="_newRole" class="form-select">
-                    <option value="Viewer">Просмотр</option>
-                    <option value="Manager">Управление</option>
-                    <option value="Admin">Админ</option>
+                    <option value="viewer">Просмотр</option>
+                    <option value="manager">Управление</option>
+                    <option value="admin">Админ</option>
                 </select>
             </div>
             <div class="col-md-1">
@@ -72,9 +72,9 @@
                             <select value="@r.Role" 
                                     @onchange="(args) => OnRoleChanged(r, args)" 
                                     class="form-select form-select-sm">
-                                <option value="Viewer">Просмотр</option>
-                                <option value="Manager">Управление</option>
-                                <option value="Admin">Админ</option>
+                                <option value="viewer">Просмотр</option>
+                                <option value="manager">Управление</option>
+                                <option value="admin">Админ</option>
                             </select>
                         </td>
                         <td class="text-center">
@@ -117,7 +117,7 @@
     private List<TelegramRecipientDto> _recipients = [];
     private string _newName = "";
     private string _newChatId = "";
-    private string _newRole = "Viewer";
+    private string _newRole = "viewer";
     private bool _newIsDefault = false;
     private bool _newIsActive = true;
 
