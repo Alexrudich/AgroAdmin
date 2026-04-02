@@ -160,7 +160,9 @@ public class DatabaseBackupService(
         dbContext.BackupInfos.Add(backupInfo);
         await dbContext.SaveChangesAsync(stoppingToken);
 
-        var message = $"📦 Бэкап за {backupMonth.Year}-{backupMonth.Month:D2} готов\n📄 {fileName}\n🔗 {fileLink}";
+        var message = $"📦 <b>Бэкап за {backupMonth.Year}-{backupMonth.Month:D2} готов</b>\n\n" +
+                      $"📄 {fileName}\n\n" +
+                      $"🔗 <a href=\"{fileLink}\">Скачать</a>";
         await telegram.SendMessageAsync(message);
     }
 
