@@ -20,6 +20,7 @@ public class DatabaseBackupService(
     : BackgroundService, IDatabaseBackupService
 {
     private readonly TimeSpan _backupInterval = TimeSpan.FromDays(7);
+    private readonly TimeSpan _tokenRefreshInterval = TimeSpan.FromMinutes(30);
     private readonly string _backupDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "backups");
     private readonly string _oauthCredentialsPath =
         Environment.GetEnvironmentVariable("GOOGLE_OAUTH_CREDENTIALS_PATH")
@@ -29,6 +30,16 @@ public class DatabaseBackupService(
         ?? "/root/.aspnet/google/token.json";
     private readonly string? _myEmail = Environment.GetEnvironmentVariable("GOOGLE_PRIVATE_EMAIL");
     private readonly string _environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Unknown";
+
+    private string GetFilePrefix()
+    {
+        return _environment switch
+        {
+            "Production" => "prod_",
+            "Development" => "dev_",
+            _ => ""
+        };
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -42,24 +53,23 @@ public class DatabaseBackupService(
 
         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
 
-        // Проверяем токен при старте
-        try
+        await RefreshTokenIfNeededAsync();
+
+        _ = Task.Run(async () =>
         {
-            logger.LogInformation("🔍 Проверка Google Drive токена...");
-            var credential = await GetUserCredentialAsync();
-            if (credential != null)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                logger.LogInformation("✅ Google Drive токен валиден");
+                try
+                {
+                    await Task.Delay(_tokenRefreshInterval, stoppingToken);
+                    await RefreshTokenIfNeededAsync();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "❌ Ошибка в периодическом обновлении токена");
+                }
             }
-            else
-            {
-                logger.LogWarning("⚠️ Не удалось проверить Google Drive токен");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "❌ Ошибка проверки токена при старте");
-        }
+        }, stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -76,34 +86,21 @@ public class DatabaseBackupService(
         }
     }
 
-    private string GetEnvPrefix()
+    private async Task RefreshTokenIfNeededAsync()
     {
-        return _environment switch
+        try
         {
-            "Development" => "🖥️ [ЛОКАЛКА] ",
-            "Production" => "🚀 [ПРОД] ",
-            _ => "⚠️ "
-        };
-    }
-
-    private string GetEnvShortPrefix()
-    {
-        return _environment switch
+            logger.LogInformation("🔄 Проверка Google Drive токена...");
+            var credential = await GetUserCredentialAsync();
+            if (credential != null)
+            {
+                logger.LogInformation("✅ Токен валиден");
+            }
+        }
+        catch (Exception ex)
         {
-            "Development" => "🖥️ ",
-            "Production" => "🚀 ",
-            _ => "⚠️ "
-        };
-    }
-
-    private string GetFilePrefix()
-    {
-        return _environment switch
-        {
-            "Production" => "prod_",
-            "Development" => "dev_",
-            _ => ""
-        };
+            logger.LogError(ex, "❌ Ошибка проверки токена");
+        }
     }
 
     private async Task PerformBackupAsync(CancellationToken stoppingToken)
@@ -146,7 +143,7 @@ public class DatabaseBackupService(
 
         if (string.IsNullOrEmpty(fileLink))
         {
-            await telegram.SendMessageAsync($"{GetEnvShortPrefix()}❌ Ошибка загрузки бэкапа за {backupMonth.Year}-{backupMonth.Month:D2}");
+            await telegram.SendMessageAsync($"❌ Ошибка загрузки бэкапа за {backupMonth.Year}-{backupMonth.Month:D2}");
             return;
         }
 
@@ -163,7 +160,7 @@ public class DatabaseBackupService(
         dbContext.BackupInfos.Add(backupInfo);
         await dbContext.SaveChangesAsync(stoppingToken);
 
-        var message = $"{GetEnvPrefix()}📦 Бэкап за {backupMonth.Year}-{backupMonth.Month:D2} готов\n📄 {fileName}\n🔗 {fileLink}";
+        var message = $"📦 Бэкап за {backupMonth.Year}-{backupMonth.Month:D2} готов\n📄 {fileName}\n🔗 {fileLink}";
         await telegram.SendMessageAsync(message);
     }
 
@@ -222,7 +219,7 @@ public class DatabaseBackupService(
 
         worksheet.Cells.AutoFitColumns();
 
-        var fileName = $"{GetFilePrefix()}{year}-{month:D2}.xlsx";
+        var fileName = $"{year}-{month:D2}.xlsx";
         var yearPath = Path.Combine(_backupDir, year.ToString());
         Directory.CreateDirectory(yearPath);
         var filePath = Path.Combine(yearPath, fileName);
@@ -250,7 +247,6 @@ public class DatabaseBackupService(
                 ApplicationName = "AgroAdmin"
             });
 
-            // Настройка для поиска папки с поддержкой общих дисков
             var folderId = await GetOrCreateFolderAsync(service, "AgroAdminBackups");
             if (string.IsNullOrEmpty(folderId))
             {
@@ -258,7 +254,6 @@ public class DatabaseBackupService(
                 return null;
             }
 
-            // Проверяем, есть ли уже файл с таким именем
             var fileListRequest = service.Files.List();
             fileListRequest.Q = $"name = '{fileName}' and '{folderId}' in parents and trashed = false";
             fileListRequest.Fields = "files(id)";
@@ -360,7 +355,6 @@ public class DatabaseBackupService(
             using var scope = services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            // Получаем все бронирования с гостями
             var allBookings = await dbContext.Bookings
                 .Include(b => b.Guest)
                 .OrderBy(b => b.ArrivalDate)
@@ -371,7 +365,6 @@ public class DatabaseBackupService(
                 return (false, "📭 Нет данных для бэкапа", null);
             }
 
-            // Создаем файл с полными данными
             var now = DateTime.UtcNow;
             var fileName = $"{GetFilePrefix()}full_backup_{now:yyyy-MM-dd_HHmmss}.xlsx";
             var filePath = await CreateFullBackupExcelAsync(allBookings, fileName);
@@ -381,7 +374,6 @@ public class DatabaseBackupService(
                 return (false, "❌ Ошибка создания файла бэкапа", null);
             }
 
-            // Загружаем на Google Drive
             var fileLink = await UploadToGoogleDriveAsync(filePath, fileName);
 
             if (string.IsNullOrEmpty(fileLink))
@@ -389,7 +381,6 @@ public class DatabaseBackupService(
                 return (false, "❌ Ошибка загрузки бэкапа на Google Drive", null);
             }
 
-            // Подсчитываем общую сумму
             var totalCost = allBookings.Sum(b => b.AccommodationCost ?? 0);
             var totalGuests = allBookings.Sum(b => b.TotalGuestsCount);
 
@@ -423,6 +414,12 @@ public class DatabaseBackupService(
             var tokenJson = await File.ReadAllTextAsync(_tokenPath);
             var token = JsonConvert.DeserializeObject<Google.Apis.Auth.OAuth2.Responses.TokenResponse>(tokenJson);
 
+            if (string.IsNullOrEmpty(token?.RefreshToken))
+            {
+                logger.LogError("❌ В токене отсутствует refresh_token. Нужно получить новый token.json");
+                return null;
+            }
+
             await using var oauthStream = new FileStream(_oauthCredentialsPath, FileMode.Open, FileAccess.Read);
             var secrets = (await GoogleClientSecrets.FromStreamAsync(oauthStream)).Secrets;
 
@@ -437,22 +434,41 @@ public class DatabaseBackupService(
             var flow = new Google.Apis.Auth.OAuth2.Flows.AuthorizationCodeFlow(initializer);
             var credential = new UserCredential(flow, _myEmail, token);
 
-            // Проверяем, не истек ли токен (IsStale вместо IsExpired)
+            var needsRefresh = false;
+
             if (credential.Token.IsStale)
             {
-                logger.LogInformation("🔄 Токен устарел, обновляем...");
-                await credential.RefreshTokenAsync(CancellationToken.None);
-
-                // После обновления сохраняем новый токен в файл
-                var newTokenJson = JsonConvert.SerializeObject(credential.Token, Formatting.Indented);
-                await File.WriteAllTextAsync(_tokenPath, newTokenJson);
-                logger.LogInformation("✅ Обновленный токен сохранен в файл: {Path}", _tokenPath);
+                needsRefresh = true;
+                logger.LogInformation("🔄 Токен IsStale, обновляем...");
+            }
+            else if (credential.Token.ExpiresInSeconds.HasValue && credential.Token.ExpiresInSeconds.Value < 300)
+            {
+                needsRefresh = true;
+                logger.LogInformation("🔄 Токен истекает через {Seconds} сек, обновляем...", credential.Token.ExpiresInSeconds.Value);
             }
 
-            logger.LogInformation("✅ UserCredential получен, токен действителен до: {Expiry}",
-                credential.Token.ExpiresInSeconds.HasValue
-                    ? DateTime.UtcNow.AddSeconds(credential.Token.ExpiresInSeconds.Value).ToString("yyyy-MM-dd HH:mm:ss")
-                    : "неизвестно");
+            if (needsRefresh)
+            {
+                try
+                {
+                    await credential.RefreshTokenAsync(CancellationToken.None);
+
+                    var newTokenJson = JsonConvert.SerializeObject(credential.Token, Formatting.Indented);
+                    await File.WriteAllTextAsync(_tokenPath, newTokenJson);
+                    logger.LogInformation("✅ Токен обновлен и сохранен");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "❌ Ошибка обновления токена. Возможно, refresh_token протух");
+                    return null;
+                }
+            }
+
+            var expiresAt = credential.Token.ExpiresInSeconds.HasValue
+                ? DateTime.UtcNow.AddSeconds(credential.Token.ExpiresInSeconds.Value)
+                : DateTime.UtcNow.AddHours(1);
+
+            logger.LogInformation("✅ Токен действителен до: {Expiry}", expiresAt.ToString("yyyy-MM-dd HH:mm:ss"));
 
             return credential;
         }
@@ -472,7 +488,6 @@ public class DatabaseBackupService(
             using var package = new ExcelPackage();
             var worksheet = package.Workbook.Worksheets.Add("FullBackup");
 
-            // Заголовки
             worksheet.Cells[1, 1].Value = "ID";
             worksheet.Cells[1, 2].Value = "GuestName";
             worksheet.Cells[1, 3].Value = "Phone";
