@@ -23,6 +23,7 @@ public class BookingsController(
     IBookingValidationService validationService,
     IPublishEndpoint publishEndpoint,
     IBookingTelegramService bookingTelegramService,
+    INotificationService notificationService,
     ILogger<BookingsController> logger) : ControllerBase
 {
     [HttpGet]
@@ -451,11 +452,44 @@ public class BookingsController(
 
             await context.SaveChangesAsync();
 
+            // Удаляем старый scheduled reminder (если дата/время заезда изменились)
+            try
+            {
+                await notificationService.DeleteReminderByBookingIdAsync(id);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Could not delete old scheduled reminder for booking {Id}", id);
+            }
+
+            // Публикуем событие для создания нового reminder
+            try
+            {
+                await publishEndpoint.Publish(new BookingUpdatedEvent
+                {
+                    BookingId = booking.Id,
+                    GuestName = booking.Guest?.FullName ?? "Неизвестный гость",
+                    Phone = booking.Guest?.Phone ?? "нет телефона",
+                    ArrivalDate = booking.ArrivalDate,
+                    DepartureDate = booking.DepartureDate,
+                    Unit = booking.ReservedUnit,
+                    NeedsSauna = booking.NeedsSauna,
+                    AdminNotes = booking.AdminNotes,
+                    CheckInTime = booking.CheckInTime,
+                    AccommodationCost = booking.AccommodationCost,
+                    TotalGuestsCount = booking.TotalGuestsCount
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Could not publish BookingUpdatedEvent to RabbitMQ for booking {Id}", id);
+            }
+
             logger.LogInformation("Booking {Id} updated successfully", id);
             return NoContent();
         }
         catch (Exception ex)
-        {
+        { 
             logger.LogError(ex, "Error updating booking {Id}", id);
             return BadRequest(new
             {

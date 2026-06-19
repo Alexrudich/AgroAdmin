@@ -9,15 +9,37 @@ namespace AgroAdmin.NotificationWorker.Consumers;
 
 public class BookingCreatedConsumer(
     ILogger<BookingCreatedConsumer> logger,
-    AppDbContext dbContext) : IConsumer<BookingCreatedEvent>
+    AppDbContext dbContext) : IConsumer<BookingCreatedEvent>, IConsumer<BookingUpdatedEvent>
 {
     public async Task Consume(ConsumeContext<BookingCreatedEvent> context)
     {
         var msg = context.Message;
+        await CreateReminderForBookingAsync(msg.BookingId, msg.GuestName, msg.Phone, msg.ArrivalDate, msg.DepartureDate, msg.Unit, msg.NeedsSauna, msg.AdminNotes, msg.CheckInTime, msg.AccommodationCost, msg.TotalGuestsCount);
+    }
+
+    public async Task Consume(ConsumeContext<BookingUpdatedEvent> context)
+    {
+        var msg = context.Message;
+        await CreateReminderForBookingAsync(msg.BookingId, msg.GuestName, msg.Phone, msg.ArrivalDate, msg.DepartureDate, msg.Unit, msg.NeedsSauna, msg.AdminNotes, msg.CheckInTime, msg.AccommodationCost, msg.TotalGuestsCount);
+    }
+
+    private async Task CreateReminderForBookingAsync(
+        int bookingId,
+        string guestName,
+        string phone,
+        DateTime arrivalDate,
+        DateTime departureDate,
+        ReservedUnits unit,
+        bool needsSauna,
+        string? adminNotes,
+        TimeSpan checkInTime,
+        decimal? accommodationCost,
+        int totalGuestsCount)
+    {
 
         // 1. Превращаем Enum в красивый текст
-        var unitName = msg.Unit.ToFriendlyString();
-        var unitEmoji = msg.Unit switch
+        var unitName = unit.ToFriendlyString();
+        var unitEmoji = unit switch
         {
             ReservedUnits.PondSide => "🌊",
             ReservedUnits.ParkingSide => "🚗",
@@ -29,10 +51,10 @@ public class BookingCreatedConsumer(
         var minskTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Belarus Standard Time");
 
         // Собираем локальную дату и время заезда (по Минску)
-        var checkInLocal = msg.ArrivalDate.Date + msg.CheckInTime;
-        if (msg.CheckInTime == TimeSpan.Zero)
+        var checkInLocal = arrivalDate.Date + checkInTime;
+        if (checkInTime == TimeSpan.Zero)
         {
-            checkInLocal = msg.ArrivalDate.Date + new TimeSpan(14, 0, 0);
+            checkInLocal = arrivalDate.Date + new TimeSpan(14, 0, 0);
         }
 
         // Явно указываем, что это локальное время Минска (Kind = Unspecified)
@@ -53,28 +75,28 @@ public class BookingCreatedConsumer(
 
         var text = $"🔔 <b>Скоро заезд!</b>\n" +
                    $"{unitEmoji} <b>{unitName}</b>\n" +
-                   $"👤 <b>{msg.GuestName}</b>\n" +
-                   $"📞 {msg.Phone}\n" +
-                   $"📅 {msg.ArrivalDate:dd.MM.yyyy} — {msg.DepartureDate:dd.MM.yyyy}\n" +
+                   $"👤 <b>{guestName}</b>\n" +
+                   $"📞 {phone}\n" +
+                   $"📅 {arrivalDate:dd.MM.yyyy} — {departureDate:dd.MM.yyyy}\n" +
                    $"⏰ Заезд: {checkInTimeStr}\n" +
-                   $"👥 {msg.TotalGuestsCount} чел.";
+                   $"👥 {totalGuestsCount} чел.";
 
         // Баня, если заказана
-        if (msg.NeedsSauna)
+        if (needsSauna)
         {
             text += $"\n🌡️ Баня заказана";
         }
 
         // Стоимость, если есть
-        if (msg.AccommodationCost.HasValue && msg.AccommodationCost.Value > 0)
+        if (accommodationCost.HasValue && accommodationCost.Value > 0)
         {
-            text += $"\n💰 Стоимость: {msg.AccommodationCost.Value:N0} BYN";
+            text += $"\n💰 Стоимость: {accommodationCost.Value:N0} BYN";
         }
 
         // Примечания, если есть
-        if (!string.IsNullOrEmpty(msg.AdminNotes))
+        if (!string.IsNullOrEmpty(adminNotes))
         {
-            text += $"\n📝 Примечания: {msg.AdminNotes}";
+            text += $"\n📝 Примечания: {adminNotes}";
         }
 
         // 4. Сохраняем в таблицу ScheduledReminders
@@ -84,13 +106,14 @@ public class BookingCreatedConsumer(
             ScheduledFor = reminderTimeUtc,
             Priority = ReminderPriority.High,
             IsSent = false,
-            TargetChatId = null
+            TargetChatId = null,
+            BookingId = bookingId
         };
 
         dbContext.ScheduledReminders.Add(reminder);
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation("📅 Авто-напоминание для брони #{BookingId} создано на {ReminderTime:dd.MM.yyyy HH:mm} UTC (заезд в {CheckInTime} по Минску)",
-            msg.BookingId, reminderTimeUtc, checkInTimeStr);
+            bookingId, reminderTimeUtc, checkInTimeStr);
     }
 }
