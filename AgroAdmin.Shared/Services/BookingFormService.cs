@@ -24,7 +24,7 @@ public class BookingFormService(
     private bool _isRefreshing = false;
 
     // Состояние
-    public CreateBookingDto Booking { get; set; } = new() { Guest = new GuestDto() };
+    public CreateBookingDto Booking { get; set; } = new() { Guest = new GuestDto(), ArrivalDate = DateTime.Today.AddHours(14), DepartureDate = DateTime.Today.AddDays(1).AddHours(14) };
     public List<BookingDto> AllBookings { get; set; } = new();
 
     // Поиск по имени
