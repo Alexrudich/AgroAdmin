@@ -79,6 +79,19 @@ public class NotificationService(AppDbContext context) : INotificationService
         }
     }
 
+    public async Task DeleteReminderByBookingIdAsync(int bookingId)
+    {
+        var reminders = await context.ScheduledReminders
+            .Where(r => r.BookingId == bookingId && !r.IsSent)
+            .ToListAsync();
+
+        if (reminders.Any())
+        {
+            context.ScheduledReminders.RemoveRange(reminders);
+            await context.SaveChangesAsync();
+        }
+    }
+
     public async Task<List<TelegramRecipientDto>> GetRecipientsAsync()
     {
         return await context.TelegramRecipients

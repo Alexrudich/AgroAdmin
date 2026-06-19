@@ -9,6 +9,7 @@ public interface INotificationService
     Task CreateReminderAsync(CreateReminderDto dto);
     Task UpdateReminderAsync(int id, CreateReminderDto dto);
     Task DeleteReminderAsync(int id);
+    Task DeleteReminderByBookingIdAsync(int bookingId);
 
     Task<List<TelegramRecipientDto>> GetRecipientsAsync();
     Task AddRecipientAsync(TelegramRecipientDto dto);

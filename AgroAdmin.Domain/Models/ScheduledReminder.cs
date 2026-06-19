@@ -5,6 +5,7 @@ namespace AgroAdmin.Domain.Models;
 public class ScheduledReminder
 {
     public int Id { get; set; }
+    public int? BookingId { get; set; }
     public string Message { get; set; } = string.Empty;
     public DateTime ScheduledFor { get; set; }
     public bool IsSent { get; set; } = false;

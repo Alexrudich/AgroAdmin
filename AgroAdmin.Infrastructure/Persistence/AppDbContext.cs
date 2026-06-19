@@ -36,6 +36,9 @@ namespace AgroAdmin.Infrastructure.Persistence
 
                 builder.Property(b => b.FeedbackComment)
                     .HasMaxLength(1000);
+
+                builder.Property(b => b.AccommodationCost)
+                    .HasPrecision(18, 2);
             });
 
             // Конфигурация для SaunaOrder
@@ -111,6 +114,13 @@ namespace AgroAdmin.Infrastructure.Persistence
 
                 builder.HasIndex(r => new { r.ScheduledFor, r.IsSent });
             });
+
+            // Исправленная конфигурация: связь ScheduledReminder -> Booking
+            modelBuilder.Entity<ScheduledReminder>()
+                .HasOne<Booking>()
+                .WithMany()
+                .HasForeignKey(r => r.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Конфигурация для TelegramRecipient
             modelBuilder.Entity<TelegramRecipient>(builder =>
