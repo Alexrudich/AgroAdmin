@@ -10,10 +10,6 @@ namespace AgroAdmin.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_ScheduledReminders_ScheduledReminders_BookingId",
-                table: "ScheduledReminders");
-
             migrationBuilder.AddColumn<int>(
                 name: "BookingId",
                 table: "ScheduledReminders",
@@ -24,14 +20,6 @@ namespace AgroAdmin.Infrastructure.Persistence.Migrations
                 name: "IX_ScheduledReminders_BookingId",
                 table: "ScheduledReminders",
                 column: "BookingId");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_ScheduledReminders_Bookings_BookingId",
-                table: "ScheduledReminders",
-                column: "BookingId",
-                principalTable: "Bookings",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.Cascade);
         }
 
         /// <inheritdoc />
