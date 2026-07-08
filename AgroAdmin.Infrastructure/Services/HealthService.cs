@@ -30,7 +30,9 @@ public class HealthService(
             await CheckGoogleDriveAsync(),
             // 4. Фоновые сервисы
             CheckBackgroundServices(),
-            // 5. Диск
+            // 5. Telegram API
+            await CheckTelegramAsync(),
+            // 6. Диск
             CheckDiskSpace()
         };
 
@@ -223,6 +225,38 @@ public class HealthService(
             {
                 Name = "Фоновые сервисы",
                 IsHealthy = false,
+                Message = ex.Message
+            };
+        }
+    }
+
+    private async Task<ComponentHealth> CheckTelegramAsync()
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var telegramService = scope.ServiceProvider.GetRequiredService<ITelegramService>();
+            var isAvailable = await telegramService.IsTelegramApiAvailableAsync();
+            sw.Stop();
+
+            return new ComponentHealth
+            {
+                Name = "Telegram API",
+                IsHealthy = isAvailable,
+                ResponseTimeMs = sw.ElapsedMilliseconds,
+                Message = isAvailable ? "API доступен" : "Не удалось подключиться"
+            };
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            logger.LogError(ex, "Telegram health check failed");
+            return new ComponentHealth
+            {
+                Name = "Telegram API",
+                IsHealthy = false,
+                ResponseTimeMs = sw.ElapsedMilliseconds,
                 Message = ex.Message
             };
         }

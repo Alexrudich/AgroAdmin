@@ -27,6 +27,8 @@ public class TelegramService : ITelegramService
     private readonly ITelegramApiClient _apiClient;
     private readonly string _defaultChatId;
     private CancellationTokenSource? _receivingCts;
+    private int _consecutiveErrors;
+    private readonly object _errorLock = new();
 
     public TelegramService(
         IConfiguration configuration,
@@ -122,6 +124,11 @@ public class TelegramService : ITelegramService
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, TelegramBotUpdate update, CancellationToken ct)
     {
+        lock (_errorLock)
+        {
+            _consecutiveErrors = 0;
+        }
+
         try
         {
             if (update.Message?.Text is { } messageText)
@@ -156,15 +163,26 @@ public class TelegramService : ITelegramService
         }
     }
 
-    private Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken ct)
+    private async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken ct)
     {
         var errorMessage = exception switch
         {
             ApiRequestException apiEx => $"Telegram API Error: {apiEx.ErrorCode} - {apiEx.Message}",
             _ => exception.Message
         };
-        _logger.LogError(exception, "Telegram bot error: {Error}", errorMessage);
-        return Task.CompletedTask;
+
+        int currentErrors;
+        lock (_errorLock)
+        {
+            _consecutiveErrors++;
+            currentErrors = _consecutiveErrors;
+        }
+
+        _logger.LogError(exception, "Telegram bot error (consecutive: {Errors}): {Error}", currentErrors, errorMessage);
+
+        // Exponential backoff: 1s → 2s → 4s → 8s → 16s → 30s (max)
+        var delaySeconds = Math.Min(Math.Pow(2, Math.Min(currentErrors - 1, 5)), 30);
+        await Task.Delay(TimeSpan.FromSeconds(delaySeconds), ct);
     }
 
     private async Task<bool> IsAuthorizedAsync(long chatId, CancellationToken ct)
@@ -523,6 +541,19 @@ public class TelegramService : ITelegramService
         {
             _logger.LogError(ex, "Error in ShowHealthAsync");
             await botClient.SendTextMessageAsync(chatId, "❌ Ошибка при проверке здоровья системы", cancellationToken: ct);
+        }
+    }
+
+    public async Task<bool> IsTelegramApiAvailableAsync()
+    {
+        try
+        {
+            await _botClient.GetMeAsync(CancellationToken.None);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 }
