@@ -8,4 +8,5 @@ public interface ITelegramService
     Task SendBookingNotificationAsync(BookingDto booking);
     Task StartReceivingAsync(CancellationToken cancellationToken);
     Task StopReceivingAsync();
+    Task<bool> IsTelegramApiAvailableAsync();
 }
